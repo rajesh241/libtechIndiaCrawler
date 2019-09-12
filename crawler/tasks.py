@@ -66,7 +66,7 @@ def crawlLocation(logger,locationCode,startFinYear=None,endFinYear=None):
   parent_ldict=getLocationDict(logger,locationID=parentLocation)
   parentLocationCode=parent_ldict.get("code",None)
   logger.info(parentLocationCode)
-  glanceURL=getGlance(logger,parentLocationCode)
+  glanceURL=nicGlanceStats(logger,parentLocationCode)
 
   #Get Jobcard Register only for block and panchayats
   if locationType == 'panchayat':
@@ -282,7 +282,7 @@ def downloadMusters(logger,locationCode,startFinYear=None,num_threads=100):
   libtechQueueManager(logger,jobList,num_threads=num_threads)
 
 
-def jobcardRegister(logger,locationCode):
+def jobcardRegister(logger,locationCode,startFinYear=None,endFinYear=None):
   error=None
   reportType="jobcardRegister"
   reportName="Jobcard Register"
@@ -1633,7 +1633,7 @@ def extractMISReportURL(logger):
 
 
 
-def getGlance(logger,locationCode):
+def nicGlanceStats(logger,locationCode,startFinYear=None,endFinYear=None):
   reportType="nicGlanceStats"
   reportName="NIC At a Glance Stats"
   updateStatus,reportURL=isReportUpdated(logger,reportType,locationCode)
@@ -1766,7 +1766,7 @@ def getGlance(logger,locationCode):
   finyear=''
   url=saveReport(logger,ldict,reportType,finyear,df)
   logger.info(url)
-  return None
+  return url
 
 
 def getStatArray(logger,statsURL,locationCode):

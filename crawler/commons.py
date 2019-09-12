@@ -163,13 +163,15 @@ def getLocationDict(logger,locationCode=None,locationID=None):
   return ldict
 
 def getTask(logger,token):
-  url="%s/api/getTask/" % (baseURL)
+  url="%s/api/queue/?isDone=0&ordering=-priority,updated&limit=1" % (baseURL)
   headers={
       'content-type':'application/json',
       "Authorization" : "JWT " + token
     }
   r=requests.get(url,headers=headers)
-  response=r.json()  
+  response=r.json()
+  return response
+  exit(0)
   taskID=response.get("id",None)
   locationCode=response.get("locationCode",None)
   if (taskID is None) or (locationCode is None):
@@ -453,21 +455,47 @@ def saveReport(logger,ldict,reportType,finyear,df):
     createUpdateDjangoReport(logger,reportType,finyear,reportURL,excelURL=excelURL,ldict=ldict)
     return reportURL
 
-def updateTask(logger,taskID,error):
+def NREGANICServerStatus(logger,locationCode):
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  stateName=ldict.get("stateName",None)
+  stateCode=ldict.get("stateCode",None)
+  crawlIP=ldict.get("crawlIP",None)
+  url=f"http://{crawlIP}/netnrega/homestciti.aspx?state_code={stateCode}&state_name={stateName}"
+  r=requests.get(url)
+  logger.info(r.status_code)
+  if r.status_code == 200:
+    return True
+  else:
+    return False
+
+def updateTask(logger,taskID,reportURL=None,inProgress=None,parked=None):
   headers=getAuthenticationHeader()
-  if error is None:
+  if inProgress is not None:
+    isError=0
+    isDone=0
+    priority=0
+    status='inProgress'
+  if parked is not None:
+    isError=0
+    isDone=0
+    priority=20
+    status='parked'
+  elif reportURL is not None:
     isError=0
     isDone=1
+    priority=0
     status='completed'
   else:
     isError=1
     isDone=0
+    priority=10
     status='error'
   patchData={
     'id' : taskID,
     'isError' : isError,
     'isDone': isDone,
     'status' : status,
+    'priority':priority,
     }
   r=requests.patch(TASKQUEUEURL,headers=headers,data=json.dumps(patchData))
   logger.debug(f"Patch status {r.status_code} and response {r.content}")
