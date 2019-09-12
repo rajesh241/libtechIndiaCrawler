@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 import urllib.parse as urlparse
 import pandas as pd
 #from defines import djangoSettings
-from commons import loggerFetch,getAuthenticationToken,getTask,updateTask,getLocationDict
+from commons import loggerFetch,getAuthenticationToken,getTask,updateTask,getLocationDict,NREGANICServerStatus
 import tasks
 def argsFetch():
   '''
@@ -29,18 +29,28 @@ def executeTask(logger):
   if token is None:
     return "Authentication has been unsuccessful"
   logger.debug(f"Token is {token}")
-  taskDict=getTask(logger,token) 
-  if taskDict is None:
+  response=getTask(logger,token) 
+  if response['count'] > 0:
+    logger.info(response)
+  else:
+    logger.info("Queue is empty")
     return "No Tasks to be completed"
+  taskDict=response['results'][0]
   reportType=taskDict.get("reportType",None)
-  ldict=taskDict.get("ldict",None)
+  locationCode=taskDict.get("locationCode",None)
+  startFinYear=taskDict.get("startFinYear",None)
+  endFinYear=taskDict.get("endFinYear",None)
   taskID=taskDict.get("id",None)
-  finyear=taskDict.get("finyear",None)
-  
-  logger.info(reportType)
+  isServerRunning=NREGANICServerStatus(logger,locationCode)
   logger.debug(taskDict)
-  error = getattr(tasks, reportType)(logger,ldict,finyear)
-  updateTask(logger,taskID,error)
+  logger.debug(isServerRunning)
+  if (isServerRunning):
+    updateTask(logger,taskID,inProgress=True)
+  else:
+    updateTask(logger,taskID,parked=True)
+    return "Task is parked"
+  reportURL = getattr(tasks, reportType)(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear)
+  updateTask(logger,taskID,reportURL)
   return None
 def main():
   args = argsFetch()
