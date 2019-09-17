@@ -22,6 +22,7 @@ def argsFetch():
   parser.add_argument('-ti1', '--testInput1', help='Test Input 1', required=False)
   parser.add_argument('-fn', '--funcName', help='Test Input 1', required=False)
   parser.add_argument('-f', '--finyear', help='Test Input 1', required=False)
+  parser.add_argument('-sf', '--startFinYear', help='Test Input 1', required=False)
   parser.add_argument('-ti2', '--testInput2', help='Test Input 2', required=False)
   args = vars(parser.parse_args())
   return args
@@ -40,8 +41,28 @@ def main():
     funcName="extractMISReportURL"
     funcName=args['funcName']
     finyear=args['finyear']
+    startFinYear=args.get('startFinYear',None)
     locationCode=args['locationCode']
-    error=getattr(tasks,funcName)(logger,locationCode)
+    ldict=getLocationDict(logger,locationCode=locationCode)
+    jobcard='RJ-272100309802522500/263'
+    funcArgs=["17",ldict,jobcard]
+   # getattr(tasks,funcName)(logger,funcArgs)
+   # exit(0)
+#    error=g$aetattr(tasks,funcName)(logger,funcArgs)
+ #  jobcard='RJ-272100309802522500/263'
+ #  jdict={
+ #    'jobcard':jobcard,
+ #          }
+ #  ldict=getLocationDict(logger,locationCode=locationCode)
+ #  funcArgs=[startFinYear,ldict,jdict]
+ #  error=getattr(tasks,funcName)(logger,funcArgs)
+ #  exit(0)
+     
+    
+    if startFinYear is not None:
+      error=getattr(tasks,funcName)(logger,locationCode,startFinYear=startFinYear)
+    else:
+      error=getattr(tasks,funcName)(logger,locationCode)
     exit(0)
     #error=getattr(tasks, funcName)(logger,stateCode='27')
     #error=getattr(tasks, funcName)(logger,limit=1,num_threads=1)
