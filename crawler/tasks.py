@@ -19,23 +19,30 @@ import numpy as np
 def libtechQueueManager(logger,jobList,num_threads=100):
   error=None
   q = Queue(maxsize=0)
+  rq = Queue(maxsize=0) # This is result Queue
   i=0
   for job in jobList:
     q.put(job)
-
+  
   for i in range(num_threads):
     name="libtechWorker%s" % str(i)
-    worker = Thread(name=name,target=libtechQueueWorker, args=(logger,q))
+    worker = Thread(name=name,target=libtechQueueWorker, args=(logger,q,rq))
     worker.setDaemon(True)
     worker.start()
 
   q.join()
   for i in range(num_threads):
     q.put(None)
-  return error
+  resultArray=[]
+  while not rq.empty():
+    result = rq.get()
+    if result is not None:
+      resultArray.extend(result)
+    
+  return resultArray
 
 
-def libtechQueueWorker(logger,q):
+def libtechQueueWorker(logger,q,rq):
   name = threading.currentThread().getName()
   while True:
     obj=q.get()
@@ -43,11 +50,12 @@ def libtechQueueWorker(logger,q):
       break
     funcName=obj['funcName']
     funcArgs=obj['funcArgs']
-    logger.info("Queue Size %s Thread %s  job %s " % (str(q.qsize()),name,""))
-    logger.warning("Queue Size %s Thread %s  job %s " % (str(q.qsize()),name,""))
+    logger.info("Queue Size %s Thread %s  job %s " % (str(q.qsize()),name,funcName))
+    logger.warning("Queue Size %s Thread %s  job %s " % (str(q.qsize()),name,funcName))
     try:
    #   result = getattr(queueMethods, funcName)(logger,funcArgs)
-      result = globals()[funcName](logger,name,funcArgs)
+      result = globals()[funcName](logger,funcArgs,threadName=name)
+      rq.put(result)
     except Exception as e:
       logger.error(e, exc_info=True)
     time.sleep(3)
@@ -83,24 +91,44 @@ def crawlLocation(logger,locationCode,startFinYear=None,endFinYear=None):
     downloadBlockRejectedPayments(logger,blockCode=blockCode,startFinYear=startFinYear,endFinYear=endFinYear)
 
   for eachCode in locationCodeArray:
-    downloadMusters(logger,eachCode,startFinYear=startFinYear)
-    createWorkPaymentReport(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear)
+    detailWorkPayment(logger,eachCode,startFinYear=None,endFinYear=None)
 
-def updateWorkPaymentReport(logger,locationCode,startFinYear=None,endFinYear=None):
-  if endFinYear is None:
-    endFinYear=getCurrentFinYear()
+def detailWorkPayment1(logger,locationCode,startFinYear=None,endFinYear=None):
+  musterTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100)
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  locationType=ldict.get("locationType",None)
+  blockCode=ldict.get("blockCode",None)
+  if locationType != "panchayat":
+    return None
   if startFinYear is None:
     startFinYear=getDefaultStartFinYear()
+  if endFinYear is None:
+    endFinYear=getCurrentFinYear()
+
+  jobcardRegister(logger,locationCode)
+  blockRejectedTransactions(logger,blockCode,startFinYear=startFinYear,endFinYear=endFinYear)
+  downloadMusters(logger,locationCode,startFinYear=startFinYear)
+  jobList=[]
+  for finyear in range(int(startFinYear),int(endFinYear)+1):
+    finyear=str(finyear)
+    funcArgs=[locationCode,finyear]
+    p={}
+    p['funcName']="createWorkPaymentReport"
+    p['funcArgs']=funcArgs
+    jobList.append(p)
+  libtechQueueManager(logger,jobList,num_threads=10)
+  return ''
+def updateWorkPaymentReport(logger,locationCode,finyear=None):
   ldict=getLocationDict(logger,locationCode=locationCode)
   #Get Rejected Transactions
   blockCode=ldict.get("blockCode",None)
-  for finyear in range(int(startFinYear),int(endFinYear)+1):
+  if finyear is not None:
     logger.info(finyear)
     reportType="blockRejectedTransactions"
-    rejectedDF=getReportDF(logger,blockCode,reportType,finyear) 
+    rejectedDF=getReportDF(logger,locationCode=blockCode,reportType=reportType,finyear=finyear) 
     logger.info(rejectedDF.columns)
     reportType="detailWorkPayment"
-    wpDF=getReportDF(logger,locationCode,reportType,finyear) 
+    wpDF=getReportDF(logger,locationCode=locationCode,reportType=reportType,finyear=finyear) 
     if ( (wpDF is not None) and (rejectedDF is not None)):
       for index, row in wpDF.iterrows():
         jobcard=row['jobcard']
@@ -185,30 +213,20 @@ def temp(logger,locationCode,startFinYear=None,endFinYear=None):
     reportType="detailWorkPayment"
     url=saveReport(logger,ldict,reportType,str(finyear),wpDF)
     logger.info(url)
-    updateWorkPaymentReport(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear)
+    updateWorkPaymentReport(logger,locationCode,finyear=finyear)
  
-def createWorkPaymentReport(logger,locationCode,startFinYear=None,endFinYear=None):
-  if endFinYear is None:
-    endFinYear=getCurrentFinYear()
-  if startFinYear is None:
-    startFinYear=getDefaultStartFinYear()
+def createWorkPaymentReport(logger,funcArgs,threadName=''):
+  logger.info("I am here")
+  locationCode=funcArgs[0]
+  finyear=funcArgs[1]
   ldict=getLocationDict(logger,locationCode=locationCode)
-  for finyear in range(int(startFinYear),int(endFinYear)+1):
-    logger.info(finyear)
-    wpDF=None
+  wpDF=None
+  if finyear is not None:
     reportType="jobcardRegister"
-    jobcardRegisterURL=getReportFileURL(logger,ldict,reportType,'')
-    logger.info(jobcardRegisterURL)
-    try:
-      jobcardDF=pd.read_csv(jobcardRegisterURL)
-    except:
-      jrError=jobcardRegister(logger,locationCode)
-      if jrError is not None:
-        error=f"could not download JobcardRegister for {ldict}"
-        logger.error(error)
-        return error
-      else:
-        jobcardDF=pd.read_csv(jobcardRegisterURL)
+    jobcardDF=getReportDF(logger,locationCode=locationCode,reportType=reportType) 
+    if jobcardDF is None:
+      return None
+
     i=0
     for index, row in jobcardDF.iterrows():
       i=i+1
@@ -216,6 +234,9 @@ def createWorkPaymentReport(logger,locationCode,startFinYear=None,endFinYear=Non
       filepath=getFilePath(logger,ldict)
       filename="%sDATA/jobcards/%s.csv" % (filepath,slugify(jobcard))
       awsURL=getAWSFileURL(filename)
+      logger.info(awsURL)
+      if i == 5:
+        break
       #logger.info(awsURL)
       try:
         jcWPDF=pd.read_csv(awsURL)
@@ -224,6 +245,7 @@ def createWorkPaymentReport(logger,locationCode,startFinYear=None,endFinYear=Non
       if jcWPDF is not None:
         partDF=jcWPDF.loc[jcWPDF['finyear'] == finyear]
         partDF=partDF.reset_index(drop=True)
+        logger.info(f"part DF is {partDF.head()}")
         if wpDF is None:
           wpDF = partDF
         else:
@@ -232,25 +254,267 @@ def createWorkPaymentReport(logger,locationCode,startFinYear=None,endFinYear=Non
       reportType="detailWorkPayment"
       url=saveReport(logger,ldict,reportType,str(finyear),wpDF)
       logger.info(url)
-      updateWorkPaymentReport(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear)
-     
+      updateWorkPaymentReport(logger,locationCode,finyear=finyear)
 
-def downloadMusters(logger,locationCode,startFinYear=None,num_threads=100):
+def mergeTransactions(logger,funcArgs,threadName="default"):
+  #workerDF  row.state,row.district,row.block,row.panchayat,row.village,row.stateCode,row.districtCode,row.blockCode,row.panchayatCode,row.jobcard,row.headOfHousehold,row.issue Date,row.caste,row.jcNo,row.applicantNo,row.name,row.age,row.gender,row.fatherHusbandName,row.isDeleted,row.isMinority,row.isDisabled,
+  # worker DF Headers 'state','district','block','panchayat','village','stateCode','districtCode','blockCode','panchayatCode','jobcard','headOfHousehold','issue Date','caste','jcNo','applicantNo','name','age','gender','fatherHusbandName','isDeleted','isMinority','isDisabled',
+  locationHeaders=['state','district','block','panchayat','village','stateCode','districtCode','blockCode','panchayatCode']
+  baseRowHeaders=['jobcard','applicantNo','name','gender','age','accountNo','finAgency','aadharNo','workerCode','finyear','daysAllocated','amountDue']
+  workerRowHeaders=['headOfHousehold','issue Date','caste','jcNo','fatherHusbandName','isDeleted','isMinority','isDisabled']
+  musterRowHeaders=['musterPanchayatName','musterPanchayatCode','localWorkSite','m_finyear','musterNo','workCode','workName','dateFrom','dateTo','paymentDate','musterIndex','m_accountNo','m_bankName','m_branchName','m_branchCode','dayWage','daysProvided','daysWorked','totalWage','wagelistNo','creditedDate']
+  rejectedRowHeaders=["rejWagelists","rejFTOs","rejReasons","rejProcessDate","rejStatus","rejCount"]
+  ftoHeader=["wagelistIssueDate","ftoNo","ftoFinYear","secondSignatoryDate"]
+  ftoRow=["","","",""]
+  csvArray=[]
+  txnDict=funcArgs[0]
+  workerDF=funcArgs[1]
+  musterDF=funcArgs[2]
+  rejectedDF=funcArgs[3]
+  workerCode=txnDict.get("workerCode",None)
+  musterNo=txnDict.get("musterNo",None)
+  jobcard=txnDict.get("jobcard",None)
+  name=txnDict.get("name",None)
+  baseRow=[txnDict.jobcard,txnDict.applicantNo,txnDict.name,txnDict.gender,txnDict.age,txnDict.accountNo,txnDict.finAgency,txnDict.aadharNo,txnDict.workerCode,txnDict.finyear,txnDict.daysAllocated,txnDict.amountDue]
+
+  selectedRow=workerDF.loc[(workerDF['jobcard'] == jobcard) & (workerDF['name'] == name)]
+  #logger.info(len(selectedRow))
+  if len(selectedRow) > 0:
+    workerRow=selectedRow.iloc[0][ workerRowHeaders ].values.flatten().tolist()
+    locationRow=selectedRow.iloc[0][ locationHeaders ].values.flatten().tolist()
+  #logger.info(workerRow)
+
+  selectedRow=musterDF.loc[(musterDF['workerCode'] == workerCode) & (musterDF['musterNo'] == musterNo)]
+  if len(selectedRow) > 0:
+    musterRow=selectedRow.iloc[0][ musterRowHeaders ].values.flatten().tolist()
+  #logger.info(musterRow)
+
+
+  matchedDF=rejectedDF.loc[(rejectedDF['workerCode'] == workerCode) & (rejectedDF['musterNo'] == musterNo)]
+  matchedRows=len(matchedDF)
+  rejWagelists=''
+  rejFTOs=''
+  rejReasons=''
+  rejProcessDate=''
+  rejStatus=''
+  rejCount=0
+  if matchedRows > 0:
+    matchedDF.to_csv(f"/tmp/{musterNo}.csv")
+    matchedDF = matchedDF.replace(np.nan, '', regex=True)
+    for i, row in matchedDF.iterrows():
+      rejWagelists+=f"{row['wagelistNo']} |"
+      rejFTOs+=f"{row['ftoNo']} |"
+      rejReasons+=f"{row['rejectionReason']} |"
+      rejProcessDate+=f"{row['processDate']} |"
+      rejStatus+=f"{row['status']} |"
+      if row['status'] == "Rejected":
+        rejCount=rejCount+1
+    rejReasons=rejReasons.rstrip("|")
+    rejWagelists=rejWagelists.rstrip("|")
+    rejFTOs=rejFTOs.rstrip("|")
+    rejProcessDate=rejProcessDate.rstrip("|")
+    rejStatus=rejStatus.rstrip("|")
+  rejectedRow=[rejWagelists,rejFTOs,rejReasons,rejProcessDate,rejStatus,rejCount]
+  #logger.info(f"rejected row is {rejectedRow}")
+  
+  a=locationRow+baseRow+workerRow+musterRow+ftoRow+rejectedRow
+  headers=locationHeaders+baseRowHeaders+workerRowHeaders+musterRowHeaders+rejectedRowHeaders
+  csvArray.append(a)
+  return csvArray
+def printCols(logger,df):
+  s=''
+  h=''
+  for col in df.columns:
+    logger.info(col)
+    s+="row.%s," % col
+    h+="'%s'," % col
+  logger.info(s)
+  logger.info(h)
+def detailWorkPayment(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100):
+  musterTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100)
+  locationHeaders=['state','district','block','panchayat','village','stateCode','districtCode','blockCode','panchayatCode']
+  baseRowHeaders=['jobcard','applicantNo','name','gender','age','accountNo','finAgency','aadharNo','workerCode','finyear','daysAllocated','amountDue']
+  workerRowHeaders=['headOfHousehold','issue Date','caste','jcNo','fatherHusbandName','isDeleted','isMinority','isDisabled']
+  musterRowHeaders=['musterPanchayatName','musterPanchayatCode','localWorkSite','m_finyear','musterNo','workCode','workName','dateFrom','dateTo','paymentDate','musterIndex','m_accountNo','m_bankName','m_branchName','m_branchCode','dayWage','daysProvided','daysWorked','totalWage','wagelistNo','creditedDate']
+  ftoHeaders=["wagelistIssueDate","ftoNo","ftoFinYear","secondSignatoryDate"]
+  rejectedRowHeaders=["rejWagelists","rejFTOs","rejReasons","rejProcessDate","rejStatus","rejCount"]
+  headers=locationHeaders+baseRowHeaders+workerRowHeaders+musterRowHeaders+ftoHeaders+rejectedRowHeaders
   ldict=getLocationDict(logger,locationCode=locationCode)
-  #First we need to get jobcard List for the particular panchayat
+  locationType=ldict.get("locationType",None)
+  blockCode=ldict.get("blockCode",None)
+  if locationType != "panchayat":
+    return None
+  if startFinYear is None:
+    startFinYear=getDefaultStartFinYear()
+  if endFinYear is None:
+    endFinYear=getCurrentFinYear()
+
+  rejectedDF=None
+  musterDF=None
+  workerDF=getReportDF(logger,locationCode=locationCode,reportType="workerRegister",index_col=0) 
+  rejDFs=[]
+  for finyear in range(int(startFinYear),int(endFinYear)+1):
+    finyear=str(finyear)
+    reportType="blockRejectedTransactions"
+    df=getReportDF(logger,locationCode=blockCode,reportType=reportType,finyear=finyear,index_col=0) 
+    if df is not None:
+      logger.info(f"DF shape {df.shape} for finyear {finyear}")
+      rejDFs.append(df)
+  rejDF=pd.concat(rejDFs,ignore_index=True)
+  rejDF.to_csv("/tmp/rejDF.csv")
+  logger.info(f"Saape of combined DF is {rejDF.shape}")
+  rejectedDF=rejDF.drop_duplicates()
+
+  for finyear in range(int(startFinYear),int(endFinYear)+1):
+    updateStatus,reportURL=isReportUpdated(logger,'detailWorkPayment',locationCode,finyear=finyear)
+    if updateStatus == False:
+      jcDF=getReportDF(logger,locationCode=locationCode,reportType="jobcardTransactions",finyear=finyear)
+      musterDF=getReportDF(logger,locationCode=locationCode,reportType="musterTransactions",finyear=finyear)
+   #   logger.info(jcDF.head())
+      jobList=[]
+      for index,row in jcDF.iterrows():
+        funcArgs=[row,workerDF,musterDF,rejectedDF]
+        funcName="mergeTransactions" 
+        p={}
+        p['funcName']=funcName
+        p['funcArgs']=funcArgs
+        jobcard=row['jobcard']
+        jobList.append(p)
+      logger.info(f"Lenght of jobList is {len(jobList)}")
+      reportType="detailWorkPayment" 
+      resultArray=libtechQueueManager(logger,jobList,num_threads=num_threads)
+      wpDF = pd.DataFrame(resultArray, columns =headers)
+      wpDF=wpDF.sort_values(['jcNo','dateFrom'])
+      url=saveReport(logger,ldict,reportType,finyear,wpDF)
+  return ''
+def musterTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100):
+  jobcardTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100)
+  locationArrayLabel=["state","district","block","panchayat","village","stateCode","districtCode","blockCode","panchayatCode","musterPanchayatName","musterPanchayatCode","localWorkSite"]
+  musterArrayLabel=["finyear","m_finyear","musterNo","workCode","workName","dateFrom","dateTo","paymentDate"] 
+  detailArrayLabel=["musterIndex","workerCode","jobcard","name","m_accountNo","m_bankName","m_branchName","m_branchCode","dayWage","daysProvided","daysWorked","totalWage","wagelistNo","creditedDate"]
+  headers=locationArrayLabel+musterArrayLabel+detailArrayLabel
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  locationType=ldict.get("locationType",None)
+  blockCode=ldict.get("blockCode",None)
+  if locationType != "panchayat":
+    return None
+  if startFinYear is None:
+    startFinYear=getDefaultStartFinYear()
+  if endFinYear is None:
+    endFinYear=getCurrentFinYear()
+  for finyear in range(int(startFinYear),int(endFinYear)+1):
+    updateStatus,reportURL=isReportUpdated(logger,'musterTransactions',locationCode,finyear=finyear)
+    if updateStatus == False:
+      jobList=[]
+      finyear=str(finyear)
+      logger.info(finyear)
+      reportType='jobcardTransactions'
+      txnDF=getReportDF(logger,locationCode=locationCode,reportType=reportType,finyear=finyear)
+      logger.info(txnDF.head())
+      urls=txnDF.musterURL.unique()
+      logger.info(f"Number of Musters to be downloaded is {len(urls)}")
+      for url in urls:
+        funcArgs=[ldict,url,finyear]
+        funcName="getMusterDF"
+        p={}
+        p['funcName']="getMusterDF"
+        p['funcArgs']=funcArgs
+        jobList.append(p)
+      reportType="musterTransactions" 
+      resultArray=libtechQueueManager(logger,jobList,num_threads=num_threads)
+      wpDF = pd.DataFrame(resultArray, columns =headers)
+      url=saveReport(logger,ldict,reportType,finyear,wpDF)
+  return ''
+def jobcardTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100):
+  workerArrayLabel=["jobcard","applicantNo","name","gender","age","accountNo","finAgency","aadharNo"]
+  txnArrayLabel=["workerCode","finyear","workName","workDate","daysAllocated","amountDue","musterNo","musterURL"]
+  headers=workerArrayLabel+txnArrayLabel
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  locationType=ldict.get("locationType",None)
+  blockCode=ldict.get("blockCode",None)
+  if locationType != "panchayat":
+    return None
+  if startFinYear is None:
+    startFinYear=getDefaultStartFinYear()
+  if endFinYear is None:
+    endFinYear=getCurrentFinYear()
+  updateStatus,reportURL=isReportUpdated(logger,'jobcardTransactions',locationCode,finyear=startFinYear)
+  if updateStatus == False:
+    jobcardRegister(logger,locationCode)
+    reportType="jobcardRegister"
+    jobcardDF=getReportDF(logger,locationCode=locationCode,reportType=reportType) 
+    if jobcardDF is None:
+      return None
+    i=0
+    jobList=[]
+    for index, row in jobcardDF.iterrows():
+      i=i+1
+      jobcard=row['jobcard']
+      funcArgs=[startFinYear,ldict,jobcard]
+      p={}
+      p['funcName']="fetchJobcardDetails"
+      p['funcArgs']=funcArgs
+      jobList.append(p)
+      #logger.info(f"{index}-{p}")
+      if i == 10000:
+        break
+    reportType="jobcardTransactions" 
+    resultArray=libtechQueueManager(logger,jobList,num_threads=num_threads)
+    wpDF = pd.DataFrame(resultArray, columns =headers)
+    for finyear in range(int(startFinYear),int(endFinYear)+1):
+      finyear=str(finyear)
+      df=wpDF.loc[(wpDF['finyear'] == finyear) ]
+      url=saveReport(logger,ldict,reportType,finyear,df)
+  return ''
+
+ #csvArray=[]
+ #header=["header"]
+ #a=[str(datetime.datetime.now)]
+ #csvArray.append(a)
+ #reportType='downloadJobards'
+ #for finyear in range(int(startFinYear),int(endFinYear)+1):
+ #  df = pd.DataFrame(csvArray, columns =header)
+ #  url=saveReport(logger,ldict,reportType,finyear,df)
+
+
+def downloadMusters(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100):
+  
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  locationType=ldict.get("locationType",None)
+  blockCode=ldict.get("blockCode",None)
+  if locationType != "panchayat":
+    return None
+  if startFinYear is None:
+    startFinYear=getDefaultStartFinYear()
+  if endFinYear is None:
+    endFinYear=getCurrentFinYear()
+
+  jobcardRegister(logger,locationCode)
+  blockRejectedTransactions(logger,blockCode,startFinYear=startFinYear,endFinYear=endFinYear)
+
+  updateStatus,reportURL=isReportUpdated(logger,'downloadMusters',locationCode,finyear=startFinYear)
+  if updateStatus:
+    return reportURL
+
+  rejDFs=[]
+  for finyear in range(int(startFinYear),int(endFinYear)+1):
+    finyear=str(finyear)
+    reportType="blockRejectedTransactions"
+    df=getReportDF(logger,locationCode=blockCode,reportType=reportType,finyear=finyear,index_col=0) 
+    if df is not None:
+      logger.info(f"DF shape {df.shape} for finyear {finyear}")
+      rejDFs.append(df)
+  rejDF=pd.concat(rejDFs,ignore_index=True)
+  rejDF.to_csv("/tmp/rejDF.csv")
+  logger.info(f"Saape of combined DF is {rejDF.shape}")
+  rejDF=rejDF.drop_duplicates()
+ 
+  jobcardRegister(logger,locationCode)
+  blockRejectedTransactions(logger,blockCode,startFinYear=startFinYear,endFinYear=endFinYear)
   reportType="jobcardRegister"
-  jobcardRegisterURL=getReportFileURL(logger,ldict,reportType,'')
-  logger.info(jobcardRegisterURL)
-  try:
-    jobcardDF=pd.read_csv(jobcardRegisterURL)
-  except:
-    jrError=jobcardRegister(logger,ldict)
-    if jrError is not None:
-      error=f"could not download JobcardRegister for {ldict}"
-      logger.error(error)
-      return error
-    else:
-      jobcardDF=pd.read_csv(jobcardRegisterURL)
+  jobcardDF=getReportDF(logger,locationCode=locationCode,reportType=reportType) 
+  if jobcardDF is None:
+    return None
   logger.info(jobcardDF.head())
   jobList=[]
   i=0
@@ -269,7 +533,7 @@ def downloadMusters(logger,locationCode,startFinYear=None,num_threads=100):
       'jcNo':jcNo,
 
             }
-    funcArgs=[startFinYear,ldict,jdict]
+    funcArgs=[startFinYear,ldict,jdict,rejDF]
     p={}
     p['funcName']="getJobcardDetails"
     p['funcArgs']=funcArgs
@@ -278,9 +542,18 @@ def downloadMusters(logger,locationCode,startFinYear=None,num_threads=100):
     if i == 10000:
       break
  # logger.warning(jobList)    
- # num_threads=5    
+ # num_threads=5 
+  
   libtechQueueManager(logger,jobList,num_threads=num_threads)
 
+  csvArray=[]
+  header=["header"]
+  a=[str(datetime.datetime.now)]
+  csvArray.append(a)
+  reportType='downloadMusters'
+  for finyear in range(int(startFinYear),int(endFinYear)+1):
+    df = pd.DataFrame(csvArray, columns =header)
+    url=saveReport(logger,ldict,reportType,finyear,df)
 
 def jobcardRegister(logger,locationCode,startFinYear=None,endFinYear=None):
   error=None
@@ -444,21 +717,226 @@ def processJobcardRegister(logger,ldict,myhtml):
     url=saveReport(logger,ldict,reportType,finyear,df)
     logger.info(url)
     return url
+def updateJobcardDF(logger,locationCode,rejDF=None,jcDF=None,startFinYear=None,jobcard=None):
+  if ( (jcDF is not None) and (rejDF is not None)):
+    logger.info(f"Shape of JC DF is {jcDF.shape}")
+    if jcDF is not None:
+      for index, row in jcDF.iterrows():
+        jobcard=row['jobcard']
+        name=row['name']
+        workerCode="%s_%s" % (jobcard,name)
+        musterNo=row['musterNo']
+        matchedDF=rejDF.loc[(rejDF['workerCode'] == workerCode) & (rejDF['musterNo'] == musterNo)]
+        matchedRows=len(matchedDF)
+        rejWagelists=''
+        rejFTOs=''
+        rejReasons=''
+        rejProcessDate=''
+        rejStatus=''
+        rejCount=0
+        if matchedRows > 0:
+          matchedDF.to_csv(f"/tmp/{musterNo}.csv")
+          matchedDF = matchedDF.replace(np.nan, '', regex=True)
+          for i, row in matchedDF.iterrows():
+            rejWagelists+=f"{row['wagelistNo']} |"
+            rejFTOs+=f"{row['ftoNo']} |"
+            rejReasons+=f"{row['rejectionReason']} |"
+            rejProcessDate+=f"{row['processDate']} |"
+            rejStatus+=f"{row['status']} |"
+            if row['status'] == "Rejected":
+              rejCount=rejCount+1
+          rejReasons=rejReasons.rstrip("|")
+          rejWagelists=rejWagelists.rstrip("|")
+          rejFTOs=rejFTOs.rstrip("|")
+          rejProcessDate=rejProcessDate.rstrip("|")
+          rejStatus=rejStatus.rstrip("|")
+        jcDF.at[index, 'rejCount'] = rejCount
+        jcDF.at[index, 'rejWagelists'] = rejWagelists
+        jcDF.at[index, 'rejFTOs'] = rejFTOs
+        jcDF.at[index, 'rejProcessDate'] = rejProcessDate
+        jcDF.at[index, 'rejStatus'] = rejStatus
+        jcDF.at[index, 'rejReasons'] = rejReasons
+  else:
+    jcDF=None
+
+  return jcDF 
+
+def updateJobcardDF1(logger,locationCode,rejDF=None,startFinYear=None,jobcard=None):
+#  jobcard='RJ-272100309802522500/263'
+  jobcardArray=[]
+  if jobcard is None:
+    reportType="jobcardRegister"
+    jobcardDF=getReportDF(logger,locationCode=locationCode,reportType=reportType) 
+    for index,row in jobcardDF.iterrows():
+      jobcard=row['jobcard']
+      jobcardArray.append(jobcard)
+  else:
+    jobcardArray.append(jobcard)
+  logger.info(locationCode)
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  filepath=getFilePath(logger,ldict)
+  blockCode=ldict.get("blockCode",None)
+  if startFinYear is None:
+    startFinYear=getDefaultStartFinYear()
+  endFinYear=getCurrentFinYear()
+
+  if rejDF is None:
+    rejDFs=[]
+    for finyear in range(int(startFinYear),int(endFinYear)+1):
+      finyear=str(finyear)
+      reportType="blockRejectedTransactions"
+      df=getReportDF(logger,locationCode=blockCode,reportType=reportType,finyear=finyear,index_col=0) 
+      if df is not None:
+        logger.info(f"DF shape {df.shape} for finyear {finyear}")
+        rejDFs.append(df)
+    rejDF=pd.concat(rejDFs,ignore_index=True)
+    rejDF.to_csv("/tmp/rejDF.csv")
+    logger.info(f"Saape of combined DF is {rejDF.shape}")
+    rejDF=rejDF.drop_duplicates()
+    logger.info(f"Shape after removing duplicates of combined DF is {rejDF.shape}")
+#  if jobcard is not None:
+  for jobcard in jobcardArray:
+    filename="%sDATA/jobcards/%s.csv" % (filepath,slugify(jobcard))
+    logger.info(filename) 
+    jcDF=getReportDF(logger,filename=filename)
+    logger.info(f"Shape of JC DF is {jcDF.shape}")
+    if jcDF is not None:
+      for index, row in jcDF.iterrows():
+        jobcard=row['jobcard']
+        name=row['name']
+        workerCode="%s_%s" % (jobcard,name)
+        musterNo=row['musterNo']
+        matchedDF=rejDF.loc[(rejDF['workerCode'] == workerCode) & (rejDF['musterNo'] == musterNo)]
+        matchedRows=len(matchedDF)
+        rejWagelists=''
+        rejFTOs=''
+        rejReasons=''
+        rejProcessDate=''
+        rejStatus=''
+        rejCount=0
+        if matchedRows > 0:
+          matchedDF.to_csv(f"/tmp/{musterNo}.csv")
+          matchedDF = matchedDF.replace(np.nan, '', regex=True)
+          for i, row in matchedDF.iterrows():
+            rejWagelists+=f"{row['wagelistNo']} |"
+            rejFTOs+=f"{row['ftoNo']} |"
+            rejReasons+=f"{row['rejectionReason']} |"
+            rejProcessDate+=f"{row['processDate']} |"
+            rejStatus+=f"{row['status']} |"
+            if row['status'] == "Rejected":
+              rejCount=rejCount+1
+          rejReasons=rejReasons.rstrip("|")
+          rejWagelists=rejWagelists.rstrip("|")
+          rejFTOs=rejFTOs.rstrip("|")
+          rejProcessDate=rejProcessDate.rstrip("|")
+          rejStatus=rejStatus.rstrip("|")
+        jcDF.at[index, 'rejCount'] = rejCount
+        jcDF.at[index, 'rejWagelists'] = rejWagelists
+        jcDF.at[index, 'rejFTOs'] = rejFTOs
+        jcDF.at[index, 'rejProcessDate'] = rejProcessDate
+        jcDF.at[index, 'rejStatus'] = rejStatus
+        jcDF.at[index, 'rejReasons'] = rejReasons
+    return jcDF 
+   #fileURL=uploadS3(logger,filename,df=jcDF)
+   #logger.info(fileURL)
+
+def processJobcard(logger,ldict,jobcard,myhtml,jdict=None,startFinYear=None):
+  error=None
+  df=None
+  endFinYear=getCurrentFinYear()
+  if startFinYear is None:
+    startFinYear = str ( int(endFinYear) -1 )
+  workerArrayLabel=["jobcard","applicantNo","name","gender","age","accountNo","finAgency","aadharNo"]
+  txnArrayLabel=["workerCode","finyear","workName","workDate","daysAllocated","amountDue","musterNo","musterURL"]
+  wpArrayLabel=workerArrayLabel+txnArrayLabel
+  wpArray=[]
+  blankWorkerArray=[jobcard,"","","","","","",""]
+
+  htmlsoup=BeautifulSoup(myhtml,"lxml")
+  workerTable=htmlsoup.find("table",id="workerTable")
+  workerDict={}
+  workerArray=[]
+  if workerTable is not None:
+    rows=workerTable.findAll("tr")
+    for row in rows:
+      cols=row.findAll("td")
+      applicantNo=cols[0].text.lstrip().rstrip()
+      if applicantNo.isdigit():
+        name=cols[1].text.lstrip().rstrip()
+        workerCode="%s_%s" % (jobcard,name)
+        gender=cols[2].text.lstrip().rstrip()
+        age=cols[3].text.lstrip().rstrip()
+        accountNo=cols[4].text.lstrip().rstrip()
+        bankPost=cols[5].text.lstrip().rstrip()
+        aadharNo=cols[6].text.lstrip().rstrip()
+        a=[jobcard,applicantNo,name,gender,age,accountNo,bankPost,aadharNo]
+        workerDict[workerCode]=a
+  workTable=htmlsoup.find("table",id="workTable")
+  lastWorkDateDict={}
+  defaultLastWorkDate=getDateObj("01/01/1970")
+  if workTable is not None:
+    rows=workTable.findAll('tr')
+    previousName=None
+    for row in rows:
+      if "Date from which Employment Availed" not in str(row):
+        cols=row.findAll('td')
+        name=cols[1].text.lstrip().rstrip()
+        if name == "":
+          name=previousName
+        else:
+          previousName=name
+        srno=cols[0].text.lstrip().rstrip()
+        #logger.info("processing %s %s" % (srno,name))
+        workDateString=cols[2].text.lstrip().rstrip()
+        workDate=getDateObj(workDateString)
+        workDateMinusFour=workDate-datetime.timedelta(days=4)
+        daysAllocated=cols[3].text.lstrip().rstrip()
+        workName=cols[4].text.lstrip().rstrip()
+        amountDue=cols[6].text.lstrip().rstrip()
+        finyear=str(getFinYear(dateObj=workDate))
+        musterLink=cols[5].find('a')
+        if musterLink is not None:
+          musterURL=musterLink['href']
+        else:
+          musterURL=None
+        musterNo=cols[5].text.lstrip().rstrip()
+        #logger.info(finyear)
+         
+        if int(finyear) >= int(startFinYear):
+          workerCode="%s_%s" % (jobcard,name)
+          txnArray=[workerCode,finyear,workName,workDate,daysAllocated,amountDue,musterNo,musterURL]
+          workerArray=workerDict.get(workerCode,blankWorkerArray)
+          a=workerArray+txnArray
+          wpArray.append(a)
+  return wpArray
 
 
-def getJobcardDetails(logger,threadName,funcArgs):
+def fetchJobcardDetails(logger,funcArgs,threadName='default'):
   startFinYear=funcArgs[0]
   ldict=funcArgs[1]
+  jobcard=funcArgs[2]
+  error,outhtml=downloadJobcard(logger,ldict,jobcard)
+  if error is not None:
+    return error,df
+  jcArray= processJobcard(logger,ldict,jobcard,outhtml,startFinYear=startFinYear)
+  return jcArray
+def getJobcardDetails(logger,funcArgs,threadName="default"):
+  startFinYear=funcArgs[0]
+  ldict=funcArgs[1]
+  jdict=funcArgs[2]
+  rejDF=funcArgs[3]
+  locationCode=ldict.get("code",None)
   stateCode=ldict.get("stateCode",None)
   districtCode=ldict.get("districtCode",None)
   blockCode=ldict.get("blockCode",None)
   panchayatCode=ldict.get("panchayatCode",None)
   stateName=ldict.get("stateName",None)
+  ldict=funcArgs[1]
+  jdict=funcArgs[2]
   districtName=ldict.get("districtName",None)
   blockName=ldict.get("blockName",None)
   panchayatName=ldict.get("panchayatName",None)
-  jdict=funcArgs[2]
-  logger.warning(jdict)
+  #logger.warning(jdict)
   jobcard=jdict.get("jobcard",None)
   village=jdict.get("village",None)
   caste=jdict.get("caste",None)
@@ -467,19 +945,21 @@ def getJobcardDetails(logger,threadName,funcArgs):
   #This will get all the jobcard Details
   error=None
   df=None
-  logger.debug("This loop will get all the Jobcard Details")
+  #logger.debug("This loop will get all the Jobcard Details")
   error,outhtml=downloadJobcard(logger,ldict,jobcard)
   if error is not None:
     return error,df
   error,df= processJobcard(logger,ldict,jobcard,outhtml,jdict=jdict,startFinYear=startFinYear)
   if df is not None:
+   if rejDF is not None:
+     df=updateJobcardDF(logger,locationCode,rejDF=rejDF,jcDF=df)
    filepath=getFilePath(logger,ldict)
    filename="%sDATA/jobcards/%s.csv" % (filepath,slugify(jobcard))
    fileURL=uploadS3(logger,filename,df=df)
    logger.warning(f"Jobcard Details {jobcard} -{fileURL}") 
    return error,df
 
-def processJobcard(logger,ldict,jobcard,myhtml,jdict=None,startFinYear=None):
+def processJobcard1(logger,ldict,jobcard,myhtml,jdict=None,startFinYear=None):
   wpDF=None
   stateCode=ldict.get("stateCode",None)
   districtCode=ldict.get("districtCode",None)
@@ -526,7 +1006,6 @@ def processJobcard(logger,ldict,jobcard,myhtml,jdict=None,startFinYear=None):
       cols=row.findAll("td")
       applicantNo=cols[0].text.lstrip().rstrip()
       if applicantNo.isdigit():
-        logger.info(applicantNo)
         name=cols[1].text.lstrip().rstrip()
         workerCode="%s_%s" % (jobcard,name)
         gender=cols[2].text.lstrip().rstrip()
@@ -540,7 +1019,6 @@ def processJobcard(logger,ldict,jobcard,myhtml,jdict=None,startFinYear=None):
   lastWorkDateDict={}
   defaultLastWorkDate=getDateObj("01/01/1970")
   if workTable is not None:
-    logger.info("workTabl is not none")
     rows=workTable.findAll('tr')
     previousName=None
     for row in rows:
@@ -571,7 +1049,7 @@ def processJobcard(logger,ldict,jobcard,myhtml,jdict=None,startFinYear=None):
           musterLink=cols[5].find('a')
           if musterLink is not None:
             musterURL=musterLink['href']
-            logger.debug(f"Muster URL is {musterURL}")
+            #logger.debug(f"Muster URL is {musterURL}")
             error,txnDict=getWorkerTransaction(logger,ldict,musterURL,workerCode)
             if error is None:
               txnArray=[finyear,txnDict['musterNo'],txnDict['workCode'],txnDict['workName'],txnDict['dateFrom'],txnDict['dateTo'],txnDict['paymentDate'],txnDict['musterIndex'],txnDict['m_accountNo'],txnDict['m_bankName'],txnDict['m_branchName'],txnDict['m_branchCode'],txnDict['dayWage'],txnDict['daysProvided'],txnDict['daysWorked'],txnDict['totalWage'],txnDict['creditedDate']]
@@ -626,7 +1104,7 @@ def downloadJobcard(logger,ldict,jobcard):
   panchayatCode=ldict.get("panchayatCode",None)
   crawlIP=ldict.get("crawlIP",None)
   url="http://%s/citizen_html/jcr.asp?reg_no=%s&panchayat_code=%s" % (NICSearchIP,jobcard,panchayatCode)
-  logger.debug(f"Jobcard Download URL is {url}")
+  #logger.debug(f"Jobcard Download URL is {url}")
   r=requests.get(url)
   if r.status_code != 200:
     error=f"Unable to download Jobcard {jobcard} status code {r.status_code}"
@@ -692,6 +1170,149 @@ def getWorkerTransaction(logger,ldict,musterURL,workerCode,forceDownload=None):
       txnDict=partDF.to_dict('records')[0]
 
   return error,txnDict
+def getMusterDF(logger,funcArgs,threadName="default"):
+  ldict=funcArgs[0]
+  musterURL=funcArgs[1]
+  infinyear=funcArgs[2]
+  newMusterFormat=True
+  error=None
+  df=None
+  csvArray=[]
+  stateCode=ldict.get("stateCode",None)
+  districtCode=ldict.get("districtCode",None)
+  blockCode=ldict.get("blockCode",None)
+  panchayatCode=ldict.get("panchayatCode",None)
+  stateName=ldict.get("stateName",None)
+  districtName=ldict.get("districtName",None)
+  blockName=ldict.get("blockName",None)
+  panchayatName=ldict.get("panchayatName",None)
+  locationArrayLabel=["state","district","block","panchayat","village","stateCode","districtCode","blockCode","panchayatCode","musterPanchayatName","musterPanchayatCode","localWorkSite"]
+  musterArrayLabel=["finyear","m_finyear","musterNo","workCode","workName","dateFrom","dateTo","paymentDate"] 
+  detailArrayLabel=["musterIndex","workerCode","jobcard","name","m_accountNo","m_bankName","m_branchName","m_branchCode","dayWage","daysProvided","daysWorked","totalWage","wagelistNo","creditedDate"]
+  columnLabels=locationArrayLabel+musterArrayLabel+detailArrayLabel
+  locationArray=[stateName,districtName,blockName,panchayatName,"",stateCode,districtCode,blockCode,panchayatCode]
+
+  parsedURL=parse.urlsplit(musterURL)
+  queryDict=dict(parse.parse_qsl(parsedURL.query))
+  musterNo=queryDict.get('msrno',None)
+  fullFinYear=queryDict.get('finyear',None)
+  finyear=fullFinYear[-2:] 
+  dateFromString=queryDict.get('dtfrm',None)
+  dateFrom=getDateObj(dateFromString)
+  dateToString=queryDict.get('dtto',None)
+  dateTo=getDateObj(dateToString)
+  workCode=queryDict.get('workcode',None)
+  workName=queryDict.get('wn',None)
+  musterPanchayatCode=queryDict.get('panchayat_code',None)
+  if musterPanchayatCode == panchayatCode:
+    localWorkSite=True
+  else:
+    localWorkSite=False
+  if musterPanchayatCode is not None:
+    mlDict=getLocationDict(logger,locationCode=musterPanchayatCode)
+    musterPanchayatName=mlDict.get("panchayatName",None)
+  locationArray=[stateName,districtName,blockName,panchayatName,"",stateCode,districtCode,blockCode,panchayatCode,musterPanchayatName,musterPanchayatCode,localWorkSite]
+  musterHTML=fetchNewMuster(logger,ldict,musterURL,finyear,musterNo,workCode)
+  if musterHTML is None:
+    mdict={
+        'musterNo' : musterNo,
+        'finyear' : finyear,
+        'workCode': workCode,
+            }
+    musterHTML=fetchOldMuster(logger,ldict,mdict)
+    if musterHTML is None:
+      error=f"Count not download muster with URL {musterURL}"
+      return csvArray
+    else:
+      newMusterFormat=False
+  error,musterSummaryTable,musterTable=validateMusterHTML(logger,ldict,musterHTML,workCode)
+  if error is not None:
+    return csvArray 
+  title="Muster Details" 
+  myhtml=''
+  myhtml+=getCenterAlignedHeading("Muster Summary Table")
+  myhtml+=stripTableAttributes(musterSummaryTable,"musterSummary")
+  myhtml+=getCenterAlignedHeading("Muster Detail Table")
+  myhtml+=stripTableAttributes(musterTable,"musterDetails")
+  myhtml=htmlWrapperLocal(title=title, head='<h1 aling="center">'+title+'</h1>', body=myhtml)
+
+  stateShortCode=ldict.get("stateShortCode",None)
+  musterStartAttendanceColumn=4
+  musterEndAttendanceColumn=19
+  isComplete=False
+  remarks=''
+  allWorkerFound=True
+  allWagelistFound=True
+  allWDFound=True
+  isComplete=True
+
+  htmlsoup=BeautifulSoup(myhtml,"lxml")
+  ptds=htmlsoup.find_all("td", text=re.compile("Payment Date"))
+  paymentDate=None
+  if len(ptds) == 1:
+    ptdText=ptds[0].text
+    paymentDateString=ptdText.split(":")[1].lstrip().rstrip()
+    paymentDate=getDateObj(paymentDateString)
+  musterArray=[infinyear,finyear,musterNo,workCode,workName,dateFrom,dateTo,paymentDate] 
+  mytable=htmlsoup.find('table',id="musterDetails")
+  rows  = mytable.findAll('tr')
+  sharpeningIndex=None
+  if newMusterFormat == False:
+    sharpeningIndex=getSharpeningIndex(logger,rows[0])
+    if sharpeningIndex is None:
+      error="Sharpening Index not Found"
+    musterEndAttendanceColumn=sharpeningIndex-5
+
+  
+  reMatchString="%s-" % (stateShortCode)
+  for row in rows:
+    wdRemarks=''
+    cols=row.findAll("td")
+      
+    if len(cols) > 7:
+      nameandjobcard=cols[1].text.lstrip().rstrip()
+      if stateShortCode in nameandjobcard:
+        musterIndex=cols[0].text.lstrip().rstrip()
+        nameandjobcard=nameandjobcard.replace('\n',' ')
+        nameandjobcard=nameandjobcard.replace("\\","")
+        nameandjobcardarray=re.match(r'(.*)'+reMatchString+'(.*)',nameandjobcard)
+        name_relationship=nameandjobcardarray.groups()[0]
+        name=name_relationship.split("(")[0].lstrip().rstrip()
+        jobcard=reMatchString+nameandjobcardarray.groups()[1].lstrip().rstrip()
+        if newMusterFormat==True:
+          totalWage=cols[24].text.lstrip().rstrip()
+          accountNo=cols[25].text.lstrip().rstrip()
+          dayWage=cols[21].text.lstrip().rstrip()
+          daysWorked=cols[20].text.lstrip().rstrip()
+          wagelistNo=cols[29].text.lstrip().rstrip()
+          bankName=cols[26].text.lstrip().rstrip()
+          branchName=cols[27].text.lstrip().rstrip()
+          branchCode=cols[28].text.lstrip().rstrip()
+          creditedDateString=cols[30].text.lstrip().rstrip()
+        else:
+          totalWage=cols[sharpeningIndex+1].text.lstrip().rstrip()
+          accountNo=""
+          dayWage=cols[sharpeningIndex-3].text.lstrip().rstrip()
+          daysWorked=cols[sharpeningIndex-4].text.lstrip().rstrip()
+          wagelistNo=cols[sharpeningIndex+5].text.lstrip().rstrip()
+          bankName=cols[sharpeningIndex+2].text.lstrip().rstrip()
+          branchName=cols[sharpeningIndex+3].text.lstrip().rstrip()
+          branchCode=cols[sharpeningIndex+4].text.lstrip().rstrip()
+          creditedDateString=cols[sharpeningIndex+7].text.lstrip().rstrip()
+
+
+        creditedDate=getDateObj(creditedDateString)
+
+        daysProvided=0
+        for attendanceIndex in range(int(musterStartAttendanceColumn),int(musterEndAttendanceColumn)+1):
+          if cols[attendanceIndex].text.lstrip().rstrip() != "":
+            daysProvided=daysProvided+1
+
+        workerCode="%s_%s" % (jobcard,name)
+        detail=[musterIndex,workerCode,jobcard,name,accountNo,bankName,branchName,branchCode,dayWage,daysProvided,daysWorked,totalWage,wagelistNo,creditedDate]
+        a=locationArray+musterArray+detail
+        csvArray.append(a)
+  return csvArray
 
 def downloadAndSaveMuster(logger,ldict,musterURL):
   newMusterFormat=True
@@ -825,9 +1446,10 @@ def downloadAndSaveMuster(logger,ldict,musterURL):
             daysProvided=daysProvided+1
 
         workerCode="%s_%s" % (jobcard,name)
-        detail=[musterIndex,workerCode,jobcard,name,accountNo,bankName,branchName,branchCode,dayWage,daysProvided,daysWorked,totalWage,creditedDate]
+        detail=[musterIndex,workerCode,jobcard,name,accountNo,bankName,branchName,branchCode,dayWage,daysProvided,daysWorked,totalWage,wagelistNo,creditedDate]
         a=locationArray+musterArray+detail
         csvArray.append(a)
+  return csvArray
   df = pd.DataFrame(csvArray, columns =columnLabels)
   logger.info(musterFileName)
   musterCSV=uploadS3(logger,musterFileName,df=df)
@@ -1304,8 +1926,27 @@ def downloadBlockRejectedPayments(logger,blockCode=None,stateCode=None,limit=100
         jobList.append(p)
   libtechQueueManager(logger,jobList,num_threads=num_threads)
 
-
-def getBlockRejectedTransactions(logger,threadName,funcArgs):
+def blockRejectedTransactions(logger,locationCode,startFinYear=None,endFinYear=None):
+  if startFinYear is None:
+    startFinYear=getDefaultStartFinYear()
+  if endFinYear is None:
+    endFinYear=getCurrentFinYear()
+  jobList=[]
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  locationType=ldict.get("locationType",None)
+  if locationType != "block":
+    return None
+  
+  for finyear in range(int(startFinYear),int(endFinYear)+1):
+    finyear=str(finyear)
+    funcArgs=[ldict,finyear]
+    p={}
+    p['funcName']="getBlockRejectedTransactions"
+    p['funcArgs']=funcArgs
+    jobList.append(p)
+  libtechQueueManager(logger,jobList,num_threads=10)
+  return '' 
+def getBlockRejectedTransactions(logger,funcArgs,threadName=''):
   debug=None
   csvArray=[]
   searchString='Rejected_ref_no_detail.aspx'
@@ -1500,7 +2141,7 @@ def getBlockRejectedURLs(logger,locationType='district',locationCodeParam='block
   libtechQueueManager(logger,jobList,num_threads=num_threads)
 
 
-def getFTOURLs(logger,funcArgs):
+def getFTOURLs(logger,funcArgs,threadName=''):
   reportType='NICFTOStatusHTML'
   url=funcArgs[0]
   logger.info(f"baseURL  {url}")

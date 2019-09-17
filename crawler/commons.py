@@ -13,7 +13,7 @@ from io import StringIO,BytesIO
 import time
 import pandas as pd
 
-from defines import apiusername,apipassword,AUTHENDPOINT,baseURL,REPORTURL,AWS_PROFILE_NAME,AWS_DATA_BUCKET_BASEURL,AWS_DATA_BUCKET,TASKQUEUEURL,defaultReDownloadThreshold,reportReDownloadThresholds,LOCATIONURL
+from defines import apiusername,apipassword,AUTHENDPOINT,baseURL,REPORTURL,AWS_PROFILE_NAME,AWS_DATA_BUCKET_BASEURL,AWS_DATA_BUCKET,TASKQUEUEURL,defaultReDownloadThreshold,reportReDownloadThresholds,LOCATIONURL,reportReDownloadThresholdsCurYear
 
 
 def loggerFetch(level=None,filename=None):
@@ -77,7 +77,6 @@ def daysSinceModifiedS3(logger,filename,bucket=None):
   try: 
     obj.load()
     modifiedDate=obj.last_modified
-    logger.info(modifiedDate)
     timeDiff=datetime.datetime.now(datetime.timezone.utc)-modifiedDate
     daysDiff = timeDiff.days
   except:
@@ -105,7 +104,7 @@ def uploadS3(logger,filename,data=None,df=None,bucket=None,contentType=None):
   reportURL=AWS_DATA_BUCKET_BASEURL+filename
   if df is not None:
     output = BytesIO()
-    writer = pd.ExcelWriter(output, engine='xlsxwriter')
+    writer = pd.ExcelWriter(output, engine='xlsxwriter',options={'strings_to_urls': False})
     df.to_excel(writer)
     writer.save()
     data = output.getvalue()
@@ -134,6 +133,7 @@ def getAuthenticationToken():
             }
   try:
     r=requests.post(AUTHENDPOINT,data=data)
+    print(r.status_code)
     token=r.json()['token']
   except:
     token=None
@@ -362,6 +362,7 @@ def getAuthenticationHeader():
       'content-type':'application/json',
       "Authorization" : "JWT " + token
     }
+  print(headers)
   return headers
 
 def is_json(json_data):
@@ -391,13 +392,20 @@ def getReportFilePath(logger,ldict,reportType,finyear):
       filename="%sDATA/reports/%s_%s_%s.csv" % (filepath,reportType,finyear,slugify(name))
     return filename
 
-def getReportDF(logger,locationCode,reportType,finyear=None):
-  ldict=getLocationDict(logger,locationCode)
-  if finyear is None:
-    finyear=''
-  awsURL=getReportFileURL(logger,ldict,reportType,finyear)
+def getReportDF(logger,locationCode=None,reportType=None,finyear=None,filename=None,index_col=None):
+  if filename is not None:
+    awsURL=getAWSFileURL(filename)
+  else:
+    ldict=getLocationDict(logger,locationCode=locationCode)
+    if finyear is None:
+      finyear=''
+    awsURL=getReportFileURL(logger,ldict,reportType,finyear)
+  logger.info(f"Aws url is {awsURL}")
   try:
-    df=pd.read_csv(awsURL)
+    if index_col is not None:
+      df=pd.read_csv(awsURL,index_col=index_col)
+    else:
+      df=pd.read_csv(awsURL)
   except:
     df=None
   return df
@@ -488,7 +496,7 @@ def updateTask(logger,taskID,reportURL=None,inProgress=None,parked=None):
   else:
     isError=1
     isDone=0
-    priority=10
+    priority=20
     status='error'
   patchData={
     'id' : taskID,
@@ -496,6 +504,7 @@ def updateTask(logger,taskID,reportURL=None,inProgress=None,parked=None):
     'isDone': isDone,
     'status' : status,
     'priority':priority,
+    'reportURL':reportURL,
     }
   r=requests.patch(TASKQUEUEURL,headers=headers,data=json.dumps(patchData))
   logger.debug(f"Patch status {r.status_code} and response {r.content}")
@@ -613,7 +622,10 @@ def isReportUpdated(logger,reportType,locationCode,finyear=None):
       updatedDateString=updatedString.split("T")[0]
       myDateTime=datetime.datetime.strptime(updatedDateString,'%Y-%m-%d').date()
       diffDays=dateDifference(myDateTime)
-      threshold=reportReDownloadThresholds.get(reportType,defaultReDownloadThreshold)
+      if str(finyear) == str(getCurrentFinYear()):
+        threshold=reportReDownloadThresholdsCurYear.get(reportType,defaultReDownloadThreshold)
+      else:
+        threshold=reportReDownloadThresholds.get(reportType,defaultReDownloadThreshold)
       if diffDays < threshold:
         updateStatus=True
     
