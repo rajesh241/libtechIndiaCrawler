@@ -9,6 +9,7 @@ apiusername=config['apiusername']
 apipassword=config['apipassword']
 AUTHENDPOINT='%s/auth/jwt/' % (baseURL)
 REPORTURL='%s/api/report/' % (baseURL)
+LOCATIONDATASTATUSURL='%s/api/dataStatus/' % (baseURL)
 LOCATIONURL='%s/api/location/' % (baseURL)
 TASKQUEUEURL='%s/api/queue/' % (baseURL)
 AWS_DATA_BUCKET="libtech-india-data"

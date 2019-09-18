@@ -19,6 +19,7 @@ def argsFetch():
   parser.add_argument('-t', '--test', help='Test Loop', required=False,action='store_const', const=1)
   parser.add_argument('-e', '--execute', help='Execute the code', required=False,action='store_const', const=1)
   parser.add_argument('-ti1', '--testInput1', help='Test Input 1', required=False)
+  parser.add_argument('-lf', '--logFile', help='Test Input 1', required=False)
   parser.add_argument('-fn', '--funcName', help='Test Input 1', required=False)
   parser.add_argument('-ti2', '--testInput2', help='Test Input 2', required=False)
   args = vars(parser.parse_args())
