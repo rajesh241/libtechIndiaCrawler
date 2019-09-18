@@ -1,4 +1,4 @@
-from commons import getFullFinYear,getCurrentFinYear,validateAndSave,correctDateFormat,getjcNumber,getFilePath,saveReport,getCenterAlignedHeading,stripTableAttributes,stripTableAttributesPreserveLinks,getFinYear,getDateObj,htmlWrapperLocal,getAWSFileURL,getReportFileURL,daysSinceModifiedS3,getDefaultStartFinYear,createUpdateDjangoReport,getShortFinYear,getLocationDict,getReportURL,isReportUpdated,getChildLocations,getReportDF
+from commons import getFullFinYear,getCurrentFinYear,validateAndSave,correctDateFormat,getjcNumber,getFilePath,saveReport,getCenterAlignedHeading,stripTableAttributes,stripTableAttributesPreserveLinks,getFinYear,getDateObj,htmlWrapperLocal,getAWSFileURL,getReportFileURL,daysSinceModifiedS3,getDefaultStartFinYear,createUpdateDjangoReport,getShortFinYear,getLocationDict,getReportURL,isReportUpdated,getChildLocations,getReportDF,computePercentage,saveLocationStatus
 from defines import NICSearchIP,NICSearchURL,musterReDownloadThreshold,REPORTURL,LOCATIONURL
 from aws import awsInit,uploadS3
 import requests
@@ -61,6 +61,72 @@ def libtechQueueWorker(logger,q,rq):
     time.sleep(3)
     q.task_done()
 
+def panchayatReferenceDocument(logger,locationCode,startFinYear=None,endFinYear=None):
+  if startFinYear is None:
+    startFinYear=getDefaultStartFinYear()
+  if endFinYear is None:
+    endFinYear=getCurrentFinYear()
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  locationType=ldict.get("locationType",None)
+  if locationType != 'panchayat':
+    return None
+  blockCode=ldict.get("blockCode",None)
+  glanceURL=nicGlanceStats(logger,blockCode)
+  detailWorkPayment(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear,num_threads=100)
+  for finyear in range(int(startFinYear),int(endFinYear)+1):
+    csvArray=[]
+    accuracy=getAccuracy(logger,locationCode,finyear=finyear)
+    saveLocationStatus(logger,locationCode,finyear,accuracy) 
+    a=["accuracy",accuracy]
+    csvArray.append(a)
+    workPaymentURL=getReportFileURL(logger,ldict,"detailWorkPayment",finyear)
+    a=["workPaymentReport",workPaymentURL]
+    csvArray.append(a) 
+    df = pd.DataFrame(csvArray)
+    url=saveReport(logger,ldict,"panchayatReferenceDocument",finyear,df)
+  return ''
+    
+def getAccuracy(logger,locationCode,startFinYear=None,endFinYear=None,finyear=None):
+  if startFinYear is None:
+    startFinYear=getDefaultStartFinYear()
+  if endFinYear is None:
+    endFinYear=getCurrentFinYear()
+  if finyear is not None:
+    finArray=[finyear]
+  else:
+    finArray=[]
+    for finyear in range(int(startFinYear),int(endFinYear)+1):
+      finArray.append(str(finyear))
+
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  blockCode=ldict.get("blockCode",None)
+  glanceURL=nicGlanceStats(logger,blockCode)
+  logger.info(glanceURL)
+  statDF=getReportDF(logger,locationCode=blockCode,reportType="nicGlanceStats") 
+  logger.info(statDF.columns)
+  slug='persondays-generated-so-far'
+  statDF=statDF.fillna(0)
+  statDF['panchayatCode'] = statDF['panchayatCode'].astype(int)
+  statDF['panchayatCode'] = statDF['panchayatCode'].astype(str)
+  statDF['finyear'] = statDF['finyear'].astype(int)
+  statDF['finyear'] = statDF['finyear'].astype(str)
+
+  for finyear in finArray:
+    finyear=str(finyear)
+    selectedRow=statDF.loc[(statDF['finyear']== finyear) & (statDF['slug'] == slug) & (statDF['panchayatCode'] == locationCode)]
+    nicWorkDays=0
+    if len(selectedRow == 1):
+      nicWorkDays=selectedRow.iloc[0]['value']
+      try:
+        nicWorkDays=int(nicWorkDays)
+      except:
+        nicWorkDays=0
+
+    wpDF=getReportDF(logger,locationCode=locationCode,reportType="detailWorkPayment",finyear=finyear) 
+    libtechWorkDays=Total = wpDF['daysWorked'].sum()
+    accuracy=computePercentage(libtechWorkDays,nicWorkDays)
+    logger.info(f"nic work days {nicWorkDays} libtech work days {libtechWorkDays} accuracy {accuracy}")
+  return accuracy 
 def crawlLocation(logger,locationCode,startFinYear=None,endFinYear=None):
   if startFinYear is None:
     startFinYear=getDefaultStartFinYear()
@@ -331,7 +397,6 @@ def printCols(logger,df):
   logger.info(s)
   logger.info(h)
 def detailWorkPayment(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100):
-  musterTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100)
   locationHeaders=['state','district','block','panchayat','village','stateCode','districtCode','blockCode','panchayatCode']
   baseRowHeaders=['jobcard','applicantNo','name','gender','age','accountNo','finAgency','aadharNo','workerCode','finyear','daysAllocated','amountDue']
   workerRowHeaders=['headOfHousehold','issue Date','caste','jcNo','fatherHusbandName','isDeleted','isMinority','isDisabled']
@@ -348,6 +413,9 @@ def detailWorkPayment(logger,locationCode,startFinYear=None,endFinYear=None,num_
     startFinYear=getDefaultStartFinYear()
   if endFinYear is None:
     endFinYear=getCurrentFinYear()
+
+  downloadBlockRejectedPayments(logger,blockCode=blockCode,startFinYear=startFinYear,endFinYear=endFinYear)
+  musterTransactions(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear,num_threads=100)
 
   rejectedDF=None
   musterDF=None
@@ -388,7 +456,6 @@ def detailWorkPayment(logger,locationCode,startFinYear=None,endFinYear=None,num_
       url=saveReport(logger,ldict,reportType,finyear,wpDF)
   return ''
 def musterTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100):
-  jobcardTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100)
   locationArrayLabel=["state","district","block","panchayat","village","stateCode","districtCode","blockCode","panchayatCode","musterPanchayatName","musterPanchayatCode","localWorkSite"]
   musterArrayLabel=["finyear","m_finyear","musterNo","workCode","workName","dateFrom","dateTo","paymentDate"] 
   detailArrayLabel=["musterIndex","workerCode","jobcard","name","m_accountNo","m_bankName","m_branchName","m_branchCode","dayWage","daysProvided","daysWorked","totalWage","wagelistNo","creditedDate"]
@@ -402,6 +469,8 @@ def musterTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num
     startFinYear=getDefaultStartFinYear()
   if endFinYear is None:
     endFinYear=getCurrentFinYear()
+  jobcardTransactions(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear,num_threads=100)
+
   for finyear in range(int(startFinYear),int(endFinYear)+1):
     updateStatus,reportURL=isReportUpdated(logger,'musterTransactions',locationCode,finyear=finyear)
     if updateStatus == False:

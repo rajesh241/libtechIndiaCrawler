@@ -13,7 +13,7 @@ from io import StringIO,BytesIO
 import time
 import pandas as pd
 
-from defines import apiusername,apipassword,AUTHENDPOINT,baseURL,REPORTURL,AWS_PROFILE_NAME,AWS_DATA_BUCKET_BASEURL,AWS_DATA_BUCKET,TASKQUEUEURL,defaultReDownloadThreshold,reportReDownloadThresholds,LOCATIONURL,reportReDownloadThresholdsCurYear
+from defines import apiusername,apipassword,AUTHENDPOINT,baseURL,REPORTURL,AWS_PROFILE_NAME,AWS_DATA_BUCKET_BASEURL,AWS_DATA_BUCKET,TASKQUEUEURL,defaultReDownloadThreshold,reportReDownloadThresholds,LOCATIONURL,reportReDownloadThresholdsCurYear,LOCATIONDATASTATUSURL
 
 
 def loggerFetch(level=None,filename=None):
@@ -451,7 +451,38 @@ def createUpdateDjangoReport(logger,reportType,finyear,reportURL,excelURL=None,l
       r=requests.patch(REPORTURL,headers=headers,data=json.dumps(patchData))
       logger.debug(f"Patch status {r.status_code} and response {r.content}")
     return reportURL
-  
+ 
+def saveLocationStatus(logger,locationCode,finyear,accuracy):
+  ldict=getLocationDict(logger,locationCode=locationCode) 
+  lcode=ldict.get("code",None)
+  lid=ldict.get("id",None)
+  headers=getAuthenticationHeader()
+  #Check if report Exists
+  data={
+    'dataType' : 'nrega',
+    'location__code' : lcode,
+    'finyear' : finyear,
+  }
+  reportID=getIDFromParams(logger,LOCATIONDATASTATUSURL,data)
+  logger.debug(f"report id is {reportID}")
+  if reportID is None:
+    postData={
+    'location' : lid,
+    'finyear' : finyear,
+    'accuracy': accuracy,
+
+            }
+    r=requests.post(LOCATIONDATASTATUSURL,headers=headers,data=json.dumps(postData))
+    logger.debug(f"Post status {r.status_code} and response {r.content}")
+  else:
+    patchData={
+      "id" : reportID,
+      "accuracy" : accuracy,
+    }
+    r=requests.patch(LOCATIONDATASTATUSURL,headers=headers,data=json.dumps(patchData))
+    logger.debug(f"Patch status {r.status_code} and response {r.content}")
+  return None
+ 
 def saveReport(logger,ldict,reportType,finyear,df):
     name=ldict.get("name",None)
     lcode=ldict.get("code",None)
@@ -643,3 +674,20 @@ def getChildLocations(logger,locationCode):
   url=f"{LOCATIONURL}?parentLocation__code={locationCode}"
   logger.info(url)
   return lArray
+
+def computePercentage(input1,input2):
+  if ((input1 is None) or (input2 is None)):
+    accuracy=0
+  elif ((input1 == 0) and (input2 == 0)):
+    accuracy=100
+  elif ((input1 == 0) or (input2 == 0)):
+    accuracy = 0
+  elif (input1 >= input2):
+    accuracy = int(input2*100/input1)
+  elif (input2 > input1):
+    accuracy = int(input1*100/input2)
+  else:
+    accuracy=0
+  return accuracy    
+
+
