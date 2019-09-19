@@ -514,7 +514,7 @@ def updateTask(logger,taskID,reportURL=None,inProgress=None,parked=None):
     isDone=0
     priority=0
     status='inProgress'
-  if parked is not None:
+  elif parked is not None:
     isError=0
     isDone=0
     priority=20
