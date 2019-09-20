@@ -6,7 +6,7 @@ cmd="python /home/mango/repo/libtechIndiaCrawler/crawler/main.py -e -lf $1"
 #echo $cmd
 #$cmd
 myPID=$(pgrep -f "$cmd")
-
+sleep $2
 echo $myPID
 if [ -z "$myPID" ]
 then
