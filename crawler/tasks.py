@@ -160,6 +160,7 @@ def crawlLocation(logger,locationCode,startFinYear=None,endFinYear=None):
     detailWorkPayment(logger,eachCode,startFinYear=None,endFinYear=None)
 
 def detailWorkPayment1(logger,locationCode,startFinYear=None,endFinYear=None):
+  logger.info(f"Executing Muster Transactions for {locationCode} with {startFinYear}-{endFinYear}")
   musterTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100)
   ldict=getLocationDict(logger,locationCode=locationCode)
   locationType=ldict.get("locationType",None)
@@ -456,6 +457,7 @@ def detailWorkPayment(logger,locationCode,startFinYear=None,endFinYear=None,num_
       url=saveReport(logger,ldict,reportType,finyear,wpDF)
   return ''
 def musterTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100):
+  logger.info(f"Executing Muster Transactions for {locationCode} with {startFinYear}-{endFinYear}")
   locationArrayLabel=["state","district","block","panchayat","village","stateCode","districtCode","blockCode","panchayatCode","musterPanchayatName","musterPanchayatCode","localWorkSite"]
   musterArrayLabel=["finyear","m_finyear","musterNo","workCode","workName","dateFrom","dateTo","paymentDate"] 
   detailArrayLabel=["musterIndex","workerCode","jobcard","name","m_accountNo","m_bankName","m_branchName","m_branchCode","dayWage","daysProvided","daysWorked","totalWage","wagelistNo","creditedDate"]
@@ -470,9 +472,10 @@ def musterTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num
   if endFinYear is None:
     endFinYear=getCurrentFinYear()
   jobcardTransactions(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear,num_threads=100)
-
+  
   for finyear in range(int(startFinYear),int(endFinYear)+1):
     updateStatus,reportURL=isReportUpdated(logger,'musterTransactions',locationCode,finyear=finyear)
+    logger.info(f"Update status for musterTransactions for finyear {finyear} is {updateStatus}")
     if updateStatus == False:
       jobList=[]
       finyear=str(finyear)
@@ -495,6 +498,7 @@ def musterTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num
       url=saveReport(logger,ldict,reportType,finyear,wpDF)
   return ''
 def jobcardTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100):
+  logger.info(f"Executing Jobcard Transactions for {locationCode} with {startFinYear}-{endFinYear}")
   workerArrayLabel=["jobcard","applicantNo","name","gender","age","accountNo","finAgency","aadharNo"]
   txnArrayLabel=["workerCode","finyear","workName","workDate","daysAllocated","amountDue","musterNo","musterURL"]
   headers=workerArrayLabel+txnArrayLabel
@@ -505,10 +509,15 @@ def jobcardTransactions(logger,locationCode,startFinYear=None,endFinYear=None,nu
     return None
   if startFinYear is None:
     startFinYear=getDefaultStartFinYear()
-  if endFinYear is None:
-    endFinYear=getCurrentFinYear()
-  updateStatus,reportURL=isReportUpdated(logger,'jobcardTransactions',locationCode,finyear=startFinYear)
-  if updateStatus == False:
+  endFinYear=getCurrentFinYear() # We will over ride the endFinYear because we would anyways download the jobards page and might as well parse it.
+  finalStatus=True
+  
+  for finyear in range(int(startFinYear),int(endFinYear)+1):
+    updateStatus,reportURL=isReportUpdated(logger,'jobcardTransactions',locationCode,finyear=finyear)
+    if updateStatus == False:
+      finalStatus=False
+  logger.info(f"Update Status if Jobcard Transaction is {updateStatus}")
+  if finalStatus == False:
     jobcardRegister(logger,locationCode)
     reportType="jobcardRegister"
     jobcardDF=getReportDF(logger,locationCode=locationCode,reportType=reportType) 

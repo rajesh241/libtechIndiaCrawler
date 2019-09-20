@@ -90,6 +90,8 @@ def uploadS3(logger,filename,data=None,df=None,bucket=None,contentType=None):
   if contentType is None:
     contentType='test/csv'
   if df is not None:
+    df['lastUpdateDate'] = datetime.datetime.now().date()
+  if df is not None:
     csv_buffer = StringIO()
     df.to_csv(csv_buffer,encoding='utf-8-sig')
     data=csv_buffer.getvalue()
