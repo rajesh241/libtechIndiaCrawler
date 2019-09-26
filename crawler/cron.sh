@@ -1,8 +1,10 @@
 #!/bin/bash
 #First we will kill the process if it is older than 3 hours
-cd /home/mango/repo/libtechIndiaCrawler/venv/
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+echo DIR
+cd $DIR/../venv
 source bin/activate
-cmd="python /home/mango/repo/libtechIndiaCrawler/crawler/main.py -e -lf $1"
+cmd="python $DIR/main.py -e -lf $1"
 #echo $cmd
 #$cmd
 myPID=$(pgrep -f "$cmd")
