@@ -525,7 +525,7 @@ def NREGANICServerStatus(logger,locationCode):
   else:
     return False
 
-def updateTask(logger,taskID,reportURL=None,inProgress=None,parked=None,processName=None,startTime=None,endTime=None,duration=None):
+def updateTask(logger,taskID,reportURL=None,inProgress=None,parked=None,processName=None,startTime=None,endTime=None,duration=None,remarks=None):
   headers=getAuthenticationHeader()
   now=datetime.datetime.now()
   if inProgress is not None:
@@ -563,6 +563,8 @@ def updateTask(logger,taskID,reportURL=None,inProgress=None,parked=None,processN
     patchData['endTime']=endTime
   if duration is not None:
     patchData['duration']=duration
+  if remarks is not None:
+    patchData['remarks']=remarks
   r=requests.patch(TASKQUEUEURL,headers=headers,data=json.dumps(patchData))
   logger.debug(f"Patch status {r.status_code} and response {r.content}")
  
