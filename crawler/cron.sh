@@ -4,7 +4,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 echo DIR
 cd $DIR/../venv
 source bin/activate
-cmd="python $DIR/main.py -e -lf $1"
+cmd="python $DIR/main.py -e -pn $1"
 #echo $cmd
 #$cmd
 myPID=$(pgrep -f "$cmd")

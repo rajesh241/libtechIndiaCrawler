@@ -164,15 +164,31 @@ def getLocationDict(logger,locationCode=None,locationID=None):
   #logger.debug(ldict)
   return ldict
 
-def getTask(logger,token):
-  url="%s/api/queue/?isDone=0&ordering=-priority,updated&limit=1" % (baseURL)
+def getTask(logger,taskID=None):
+  token=getAuthenticationToken()
+  if taskID is not None:
+    url="%s/api/queue/?id=%s" % (baseURL,str(taskID))
+  else:
+    url="%s/api/queue/?isDone=0&ordering=-priority,updated&limit=1" % (baseURL)
+  logger.info(url)
   headers={
       'content-type':'application/json',
       "Authorization" : "JWT " + token
     }
   r=requests.get(url,headers=headers)
   response=r.json()
-  return response
+  count=response.get("count",None)
+  if taskID is not None:
+    returnID=response.get("id",None)
+    if returnID is None:
+      taskDict=None
+    else:
+      taskDict=response
+  elif ((count is None) or (count == 0)):
+    taskDict= None
+  else:
+    taskDict=response['results'][0]
+  return taskDict
   exit(0)
   taskID=response.get("id",None)
   locationCode=response.get("locationCode",None)
@@ -509,8 +525,9 @@ def NREGANICServerStatus(logger,locationCode):
   else:
     return False
 
-def updateTask(logger,taskID,reportURL=None,inProgress=None,parked=None):
+def updateTask(logger,taskID,reportURL=None,inProgress=None,parked=None,processName=None,startTime=None,endTime=None,duration=None):
   headers=getAuthenticationHeader()
+  now=datetime.datetime.now()
   if inProgress is not None:
     isError=0
     isDone=0
@@ -538,7 +555,14 @@ def updateTask(logger,taskID,reportURL=None,inProgress=None,parked=None):
     'status' : status,
     'priority':priority,
     'reportURL':reportURL,
+    'processName':processName,
     }
+  if startTime is not None:
+    patchData['startTime']=startTime
+  if endTime is not None:
+    patchData['endTime']=endTime
+  if duration is not None:
+    patchData['duration']=duration
   r=requests.patch(TASKQUEUEURL,headers=headers,data=json.dumps(patchData))
   logger.debug(f"Patch status {r.status_code} and response {r.content}")
  
