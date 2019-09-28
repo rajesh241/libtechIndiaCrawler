@@ -51,12 +51,18 @@ def executeTask(logger,taskID=None,processName=None):
   else:
     updateTask(logger,taskID,parked=True,processName=processName)
     return "Task is parked"
-  reportURL = getattr(tasks, reportType)(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear)
+  try:
+    reportURL = getattr(tasks, reportType)(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear)
+    remarks=''
+  except Exception as e:
+    remarks=str(e)
+    logger.info(f"Remarks are {remarks}")
+    reportURL=None
   endTimeObj=datetime.datetime.now()
   endTime=endTimeObj.isoformat()
   duration=int(((endTimeObj-startTimeObj).total_seconds())/60)
   logger.info(f"Duration is {duration}")
-  updateTask(logger,taskID,reportURL,processName=processName,endTime=endTime,duration=duration)
+  updateTask(logger,taskID,reportURL,processName=processName,endTime=endTime,duration=duration,remarks=remarks)
   return None
 def main():
   args = argsFetch()
