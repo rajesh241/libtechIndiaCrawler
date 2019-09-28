@@ -8,6 +8,8 @@ import pandas as pd
 #from defines import djangoSettings
 from commons import loggerFetch,getAuthenticationToken,getTask,updateTask,getLocationDict,NREGANICServerStatus
 import tasks
+import time
+import datetime
 def argsFetch():
   '''
   Paser for the argument list that returns the args list
@@ -19,24 +21,23 @@ def argsFetch():
   parser.add_argument('-t', '--test', help='Test Loop', required=False,action='store_const', const=1)
   parser.add_argument('-e', '--execute', help='Execute the code', required=False,action='store_const', const=1)
   parser.add_argument('-ti1', '--testInput1', help='Test Input 1', required=False)
-  parser.add_argument('-lf', '--logFile', help='Test Input 1', required=False)
+  parser.add_argument('-pn', '--processName', help='ProcessName', required=False)
+  parser.add_argument('-tid', '--taskID', help='Optional Task ID', required=False)
   parser.add_argument('-fn', '--funcName', help='Test Input 1', required=False)
   parser.add_argument('-ti2', '--testInput2', help='Test Input 2', required=False)
   args = vars(parser.parse_args())
   return args
 
-def executeTask(logger):
-  token=getAuthenticationToken()
-  if token is None:
-    return "Authentication has been unsuccessful"
-  logger.debug(f"Token is {token}")
-  response=getTask(logger,token) 
-  if response['count'] > 0:
-    logger.info(response)
-  else:
+def executeTask(logger,taskID=None,processName=None):
+  if processName is None:
+    processName='default'
+  taskDict=getTask(logger,taskID=taskID)
+  startTimeObj=datetime.datetime.now()
+  startTime=startTimeObj.isoformat()
+  if taskDict is None:
     logger.info("Queue is empty")
     return "No Tasks to be completed"
-  taskDict=response['results'][0]
+  logger.info(taskDict)
   reportType=taskDict.get("reportType",None)
   locationCode=taskDict.get("locationCode",None)
   startFinYear=taskDict.get("startFinYear",None)
@@ -46,12 +47,16 @@ def executeTask(logger):
   logger.debug(taskDict)
   logger.debug(isServerRunning)
   if (isServerRunning):
-    updateTask(logger,taskID,inProgress=True)
+    updateTask(logger,taskID,inProgress=True,processName=processName,startTime=startTime)
   else:
-    updateTask(logger,taskID,parked=True)
+    updateTask(logger,taskID,parked=True,processName=processName)
     return "Task is parked"
   reportURL = getattr(tasks, reportType)(logger,locationCode,startFinYear=startFinYear,endFinYear=endFinYear)
-  updateTask(logger,taskID,reportURL)
+  endTimeObj=datetime.datetime.now()
+  endTime=endTimeObj.isoformat()
+  duration=int(((endTimeObj-startTimeObj).total_seconds())/60)
+  logger.info(f"Duration is {duration}")
+  updateTask(logger,taskID,reportURL,processName=processName,endTime=endTime,duration=duration)
   return None
 def main():
   args = argsFetch()
@@ -90,7 +95,9 @@ def main():
 
   if args['execute']:
     logger.info("Executing from Crawl Queue")
-    message=executeTask(logger)
+    taskID=args['taskID']
+    processName=args['processName']
+    message=executeTask(logger,taskID=taskID,processName=processName)
     logger.debug(f"Task Executed with message {message}")
      
   logger.info("...END PROCESSING") 
