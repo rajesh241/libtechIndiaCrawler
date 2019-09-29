@@ -5,6 +5,7 @@ import requests
 import json
 import logging
 import datetime
+import pytz
 from bs4 import BeautifulSoup
 from logging.handlers import RotatingFileHandler
 from slugify import slugify
@@ -718,4 +719,8 @@ def computePercentage(input1,input2):
     accuracy=0
   return accuracy    
 
-
+def getCurrentDateTime():
+  utc_now = pytz.utc.localize(datetime.datetime.utcnow())
+  india_now = utc_now.astimezone(pytz.timezone("Asia/Calcutta"))
+  india_now_isoformat=india_now.isoformat()
+  return india_now,india_now_isoformat
