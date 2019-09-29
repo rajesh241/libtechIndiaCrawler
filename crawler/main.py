@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 import urllib.parse as urlparse
 import pandas as pd
 #from defines import djangoSettings
-from commons import loggerFetch,getAuthenticationToken,getTask,updateTask,getLocationDict,NREGANICServerStatus
+from commons import loggerFetch,getAuthenticationToken,getTask,updateTask,getLocationDict,NREGANICServerStatus,getCurrentDateTime
 import tasks
 import time
 import datetime
@@ -32,8 +32,7 @@ def executeTask(logger,taskID=None,processName=None):
   if processName is None:
     processName='default'
   taskDict=getTask(logger,taskID=taskID)
-  startTimeObj=datetime.datetime.now()
-  startTime=startTimeObj.isoformat()
+  startTimeObj,startTime=getCurrentDateTime()
   if taskDict is None:
     logger.info("Queue is empty")
     return "No Tasks to be completed"
@@ -58,8 +57,7 @@ def executeTask(logger,taskID=None,processName=None):
     remarks=str(e)
     logger.info(f"Remarks are {remarks}")
     reportURL=None
-  endTimeObj=datetime.datetime.now()
-  endTime=endTimeObj.isoformat()
+  endTimeObj,endTime=getCurrentDateTime()
   duration=int(((endTimeObj-startTimeObj).total_seconds())/60)
   logger.info(f"Duration is {duration}")
   updateTask(logger,taskID,reportURL,processName=processName,endTime=endTime,duration=duration,remarks=remarks)
