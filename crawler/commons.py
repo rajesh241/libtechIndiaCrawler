@@ -142,13 +142,15 @@ def getAuthenticationToken():
     token=None
   return token
 
-def getLocationDict(logger,locationCode=None,locationID=None):
+def getLocationDict(logger,locationCode=None,locationID=None,scheme=None):
+  if scheme is None:
+    scheme='nrega'
   if locationID is not None: 
     url="%s/api/location/?id=%s" % (baseURL,locationID)
     r=requests.get(url)
     return r.json()
   elif locationCode is not None:
-    url="%s/api/location/?code=%s" % (baseURL,locationCode)
+    url="%s/api/location/?code=%s&scheme=%s" % (baseURL,locationCode,scheme)
   else:
     return None
   r=requests.get(url)
