@@ -18,6 +18,7 @@ AWS_DATA_BUCKET_BASEURL="https://libtech-india-data.s3.ap-south-1.amazonaws.com/
 NICSearchIP="mnregaweb4.nic.in"
 NICSearchURL="http://mnregaweb4.nic.in/netnrega/nregasearch1.aspx"
 NICStatURL="http://mnregaweb4.nic.in/netnrega/all_lvl_details_dashboard_new.aspx"
+JharkhandPDSBaseURL="https://aahar.jharkhand.gov.in/secc_cardholders/searchRationResults"
 musterReDownloadThreshold=30
 defaultReDownloadThreshold=30
 

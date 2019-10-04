@@ -41,8 +41,9 @@ def executeTask(logger,taskID=None,processName=None):
   locationCode=taskDict.get("locationCode",None)
   startFinYear=taskDict.get("startFinYear",None)
   endFinYear=taskDict.get("endFinYear",None)
+  scheme=taskDict.get("scheme",None)
   taskID=taskDict.get("id",None)
-  isServerRunning=NREGANICServerStatus(logger,locationCode)
+  isServerRunning=NREGANICServerStatus(logger,locationCode,scheme=scheme)
   logger.debug(taskDict)
   logger.debug(isServerRunning)
   if (isServerRunning):

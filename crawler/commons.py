@@ -347,9 +347,12 @@ def getjcNumber(jobcard):
   return jcNumber
 
 def getFilePath(logger,ldict,locationType=None):
+  scheme=ldict.get("scheme",None)
+  filepath="india"
+  if (scheme == "pds"):
+    filepath="pds/india"
   if locationType is None:
     locationType=ldict.get("locationType",None)
-  filepath="india"
   if locationType == 'state':
     stateName=slugify(ldict.get("stateName",None))
     filepath="%s/%s/" % (filepath,stateName)
@@ -357,7 +360,7 @@ def getFilePath(logger,ldict,locationType=None):
     stateName=slugify(ldict.get("stateName",None))
     districtName=slugify(ldict.get("districtName",None))
     filepath="%s/%s/%s/" % (filepath,stateName,districtName)
-  elif locationType == 'block':
+  elif ( (locationType == 'block') or (locationType == 'pdsBlock')):
     stateName=slugify(ldict.get("stateName",None))
     districtName=slugify(ldict.get("districtName",None))
     blockName=slugify(ldict.get("blockName",None))
@@ -368,6 +371,12 @@ def getFilePath(logger,ldict,locationType=None):
     blockName=slugify(ldict.get("blockName",None))
     panchayatName=slugify(ldict.get("panchayatName",None))
     filepath="%s/%s/%s/%s/%s/" % (filepath,stateName,districtName,blockName,panchayatName)
+  elif locationType == 'pdsVillage':
+    stateName=slugify(ldict.get("stateName",None))
+    districtName=slugify(ldict.get("districtName",None))
+    blockName=slugify(ldict.get("blockName",None))
+    villageName=slugify(ldict.get("name",None))
+    filepath="%s/%s/%s/%s/%s/" % (filepath,stateName,districtName,blockName,villageName)
   else:
     filepath=None
   return filepath
@@ -515,7 +524,9 @@ def saveReport(logger,ldict,reportType,finyear,df):
     createUpdateDjangoReport(logger,reportType,finyear,reportURL,excelURL=excelURL,ldict=ldict)
     return reportURL
 
-def NREGANICServerStatus(logger,locationCode):
+def NREGANICServerStatus(logger,locationCode,scheme=None):
+  if scheme == "pds":
+    return True
   ldict=getLocationDict(logger,locationCode=locationCode)
   stateName=ldict.get("stateName",None)
   stateCode=ldict.get("stateCode",None)
@@ -700,10 +711,23 @@ def dateDifference(fromDate,toDate=None):
   dateDiff=toDate-fromDate
   return dateDiff.days
 
-def getChildLocations(logger,locationCode):
+def getChildLocations(logger,locationCode,scheme=None):
   lArray=[]
-  url=f"{LOCATIONURL}?parentLocation__code={locationCode}"
+  if scheme is not None:
+    url=f"{LOCATIONURL}?parentLocation__code={locationCode}&scheme={scheme}&limit=10000"
+  else:
+    url=f"{LOCATIONURL}?parentLocation__code={locationCode}&limit=10000"
   logger.info(url)
+  r=requests.get(url)
+  if r.status_code == 200:
+    data=r.json()
+    count=data.get('count',None)
+    if ( (count is not None) or (count > 0)):
+      results=data.get('results',None)
+      for res in results:
+        lCode=res.get("code",None)
+        if lCode is not None:
+          lArray.append(lCode)
   return lArray
 
 def computePercentage(input1,input2):
