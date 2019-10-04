@@ -1,5 +1,5 @@
 from commons import getFullFinYear,getCurrentFinYear,validateAndSave,correctDateFormat,getjcNumber,getFilePath,saveReport,getCenterAlignedHeading,stripTableAttributes,stripTableAttributesPreserveLinks,getFinYear,getDateObj,htmlWrapperLocal,getAWSFileURL,getReportFileURL,daysSinceModifiedS3,getDefaultStartFinYear,createUpdateDjangoReport,getShortFinYear,getLocationDict,getReportURL,isReportUpdated,getChildLocations,getReportDF,computePercentage,saveLocationStatus
-from defines import NICSearchIP,NICSearchURL,musterReDownloadThreshold,REPORTURL,LOCATIONURL
+from defines import NICSearchIP,NICSearchURL,musterReDownloadThreshold,REPORTURL,LOCATIONURL,JharkhandPDSBaseURL
 from aws import awsInit,uploadS3
 import requests
 import pandas as pd
@@ -2547,3 +2547,106 @@ def getStatArray(logger,statsURL,locationCode):
                 csvArray.append(locationArray+stat)
   return csvArray  
 
+def rationList(logger,locationCode,startFinYear=None,endFinYear=None):
+  lArray=getChildLocations(logger,locationCode,scheme="pds")
+  logger.info(lArray)
+  csvArray=[]
+  title="PDSList"
+  timeout=10
+  cardTypeArray=['5','6','7']
+  l=['stateName','districtName','blockName','villageName','stateCode','districtCode','blockCode','villageCode']
+  a=['rationCardNumber','name','nameHindi','fatherHusbandName','cardType','familyCount','uidCount','dealer','dealerCode','data','mappedStatus']
+  colHeaders=l+a
+
+  for lcode in lArray:
+    ldict=getLocationDict(logger,locationCode=lcode,scheme="pds")
+    districtCode=ldict.get("districtCode",None)
+    blockCode=ldict.get("blockCode",None)
+    villageCode=ldict.get("code",None)
+    myhtml=None
+    error=None
+    outhtml=''
+    r=requests.get(JharkhandPDSBaseURL)
+    cookies=r.cookies
+    headers = {
+          'Origin': 'https://aahar.jharkhand.gov.in',
+          'Accept-Encoding': 'gzip, deflate',
+          'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+          'Upgrade-Insecure-Requests': '1',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.97 Safari/537.36 Vivaldi/1.94.1008.44',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+          'Cache-Control': 'max-age=0',
+          'Referer': 'https://aahar.jharkhand.gov.in/secc_cardholders/searchRation',
+          'Connection': 'keep-alive',
+      }
+
+    for cardType in cardTypeArray:
+      data = [
+              ('_method', 'POST'),
+              ('data[SeccCardholder][rgi_district_code]', districtCode),
+              ('data[SeccCardholder][rgi_block_code]', blockCode),
+              ('r1', 'dealer'),
+              ('data[SeccCardholder][rgi_village_code]', villageCode),
+              ('data[SeccCardholder][dealer_id]', ''),
+              ('data[SeccCardholder][cardtype_id]', cardType),
+              ('data[SeccCardholder][rationcard_no]', ''),
+          ]
+      response = requests.post('https://aahar.jharkhand.gov.in/secc_cardholders/searchRationResults', headers=headers, cookies=cookies, data=data, timeout=timeout, verify=False)
+      if response.status_code == 200:
+        myhtml=response.content
+        logger.info("able to download list")
+        soup=BeautifulSoup(myhtml,"lxml")
+        myTable=soup.find('table',id='maintable')
+        if myTable is not None:
+          outhtml+=getCenterAlignedHeading(cardType)
+          outhtml+=stripTableAttributes(myTable,"maintable")
+      else:
+        error="unable to download"
+    outhtml=htmlWrapperLocal(title=title, head='<h1 aling="center">'+title+'</h1>', body=outhtml)
+    data=processPDSData(logger,ldict,outhtml)
+    csvArray=csvArray+data
+  reportURL=''
+  if len(csvArray) > 0:
+    df=pd.DataFrame(csvArray,columns=colHeaders)
+    reportType="rationList"
+    finyear=''
+    ldict=getLocationDict(logger,locationCode=locationCode,scheme="pds")
+    logger.info(ldict)
+    reportURL=saveReport(logger,ldict,reportType,finyear,df)
+  return reportURL 
+def processPDSData(logger,ldict,myhtml):
+  csvArray=[]
+  stateCode=ldict.get("stateCode",None)
+  districtCode=ldict.get("districtCode",None)
+  blockCode=ldict.get("blockCode",None)
+  villageCode=ldict.get("code",None)
+  stateName=ldict.get("stateName",None)
+  districtName=ldict.get("districtName",None)
+  blockName=ldict.get("blockName",None)
+  villageName=ldict.get("name",None)
+  l=[stateName,districtName,blockName,villageName,stateCode,districtCode,blockCode,villageCode]
+  soup=BeautifulSoup(myhtml,"lxml")
+  myTables=soup.findAll('table',id='maintable')
+
+  for myTable in myTables:
+    rows=myTable.findAll('tr')
+    for row in rows:
+      cols=row.findAll('td')
+      if len(cols) == 11:
+        srNo=cols[0].text.lstrip().rstrip()
+        name=cols[2].text.lstrip().rstrip()
+        #logger.info(name)
+        rationCardNumber=cols[1].text.lstrip().rstrip()
+        nameHindi=cols[3].text.lstrip().rstrip()
+        fatherHusbandName=cols[4].text.lstrip().rstrip()
+        cardType=cols[5].text.lstrip().rstrip()
+        familyCount=cols[6].text.lstrip().rstrip()
+        uidCount=cols[7].text.lstrip().rstrip()
+        dealer=cols[8].text.lstrip().rstrip()
+        data=cols[9].text.lstrip().rstrip()
+        mappedStatus=cols[10].text.lstrip().rstrip()
+        dealerCode=''
+        a=[rationCardNumber,name,nameHindi,fatherHusbandName,cardType,familyCount,uidCount,dealer,dealerCode,data,mappedStatus]
+        csvArray.append(l+a)
+  return csvArray
