@@ -17,10 +17,11 @@ else
   echo "Variable is not empty"
   myTime=`ps -o etimes= -p "$myPID"`
   echo $myTime
-  if [ $myTime -gt 900000 ]
+  if [ $myTime -gt 28800 ]
     then 
       echo "Time is about 3 hours"
       kill -9 $myPID
   fi
 fi
+# 28800 corresponds to roughly 8 hours
 pgrep -f "$cmd" || $cmd &> /tmp/$1.log
