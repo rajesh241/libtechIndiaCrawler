@@ -2708,6 +2708,7 @@ def apBlockRejectedTransactions(logger,locationCode,startFinYear=None,endFinYear
   finyear=''
   reportType="apBlockRejectedTransactions"
   url=saveReport(logger,ldict,reportType,finyear,wpDF)
+  return ''
 
 def apDownloadRejectedURL(logger,funcArgs,threadName="default"):
   csvArray=[]
