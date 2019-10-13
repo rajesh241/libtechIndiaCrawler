@@ -2650,3 +2650,93 @@ def processPDSData(logger,ldict,myhtml):
         a=[rationCardNumber,name,nameHindi,fatherHusbandName,cardType,familyCount,uidCount,dealer,dealerCode,data,mappedStatus]
         csvArray.append(l+a)
   return csvArray
+
+def apBlockRejectedTransactions(logger,locationCode,startFinYear=None,endFinYear=None,num_threads=100):
+  jobList=[]
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  locationType=ldict.get("locationType",None)
+  if locationType != 'block':
+    return None
+  stateCode=ldict.get("stateCode",None)
+  districtCode=ldict.get("districtCode",None)
+  blockCode=ldict.get("blockCode",None)
+  shortBlockCode=blockCode[-2:]
+  shortDistrictCode=districtCode[-2:]
+  locationCodeArray=getChildLocations(logger,locationCode)
+  for panchayatCode in locationCodeArray:
+    pdict=getLocationDict(logger,locationCode=panchayatCode)
+    shortPanchayatCode=panchayatCode[-2:]
+    apLocationCode=f"{shortDistrictCode}~{shortBlockCode}~{shortPanchayatCode}"
+    baseURL=f"http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=SmartCardreport_engRH&actionVal=NEFMS&id={apLocationCode}&type=&Date=-1&File=&Agency=&listType=&yearMonth=-1&ReportType=&flag=-1&Rtype=-1&Date1=-1&wtype=-1&ytype=-1&Date2=-1&ltype=-1&year=&program=&fileName={apLocationCode}&stype=-1&ptype=-1&lltype=ITDA"
+    logger.info(f"AP URL is {baseURL}")
+    r=requests.get("http://www.nrega.ap.gov.in/Nregs/")
+    cookies=r.cookies
+    logger.info(cookies)
+    r=requests.get(baseURL,cookies=cookies)
+    if r.status_code == 200:
+      myhtml=r.content
+      mysoup=BeautifulSoup(myhtml,"lxml")
+      with open("/tmp/h.html","wb") as f:
+        f.write(myhtml)
+      tables=mysoup.findAll('table',id="sortable")
+      for table in tables:
+        logger.info("found tables")
+        rows=table.findAll("tr")
+        i=0
+        for row in rows:
+          cols=row.findAll("td")
+          if len(cols)> 9:
+            rejTrans=cols[8].text.lstrip().rstrip()
+            srNo=cols[0].text.lstrip().rstrip()
+            if (srNo.isdigit()) and (rejTrans.isdigit()) and (int(rejTrans) > 0):
+              a=cols[8].find("a")
+              if a is not None:
+                href="http://www.nrega.ap.gov.in"+a["href"]
+                logger.info(f"rejected Transsions url is {href}")
+                funcArgs=[pdict,href]
+                p={}
+                p['funcName']="apDownloadRejectedURL"
+                p['funcArgs']=funcArgs
+                jobList.append(p)
+          i=i+1         
+  locationArrayLabel=["state","district","block","panchayat","village","stateCode","districtCode","blockCode","panchayatCode"]
+  mainLabel=['S.No.','Household Code','Worker Code','Beneficiary Name','ePayorder No.','Amount','NREGA Account No.','File Sent Date','Credit Status','Credited Account No.','Credited Bank Name','Credited Bank IIN No.','Bank UTR No.','Remarks']
+  headers=locationArrayLabel+mainLabel
+  resultArray=libtechQueueManager(logger,jobList,num_threads=num_threads)
+  wpDF = pd.DataFrame(resultArray, columns =headers)
+  finyear=''
+  reportType="apBlockRejectedTransactions"
+  url=saveReport(logger,ldict,reportType,finyear,wpDF)
+
+def apDownloadRejectedURL(logger,funcArgs,threadName="default"):
+  csvArray=[]
+  url=funcArgs[1]
+  ldict=funcArgs[0]
+  stateCode=ldict.get("stateCode",None)
+  districtCode=ldict.get("districtCode",None)
+  blockCode=ldict.get("blockCode",None)
+  panchayatCode=ldict.get("panchayatCode",None)
+  stateName=ldict.get("stateName",None)
+  districtName=ldict.get("districtName",None)
+  blockName=ldict.get("blockName",None)
+  panchayatName=ldict.get("panchayatName",None)
+  villageName=''
+  l=[stateName,districtName,blockName,panchayatName,villageName,stateCode,districtCode,blockCode,panchayatCode]
+  r=requests.get("http://www.nrega.ap.gov.in/Nregs/")
+  cookies=r.cookies
+  logger.info(cookies)
+  r=requests.get(url,cookies=cookies)
+  if r.status_code == 200:
+    myhtml=r.content
+    mysoup=BeautifulSoup(myhtml,"lxml")
+    tables=mysoup.findAll("table",id="sortable")
+    for table in tables:
+      rows=table.findAll("tr")
+      for row in rows:
+        a=[]
+        cols=row.findAll("td")
+        if len(cols) > 8:
+          for col in cols:
+            a.append(col.text.lstrip().rstrip())
+          csvArray.append(l+a)
+  return csvArray
