@@ -994,8 +994,9 @@ def fetchJobcardDetails(logger,funcArgs,threadName='default'):
   ldict=funcArgs[1]
   jobcard=funcArgs[2]
   error,outhtml=downloadJobcard(logger,ldict,jobcard)
+  jcArray=[]
   if error is not None:
-    return error,df
+    return jcArray 
   jcArray= processJobcard(logger,ldict,jobcard,outhtml,startFinYear=startFinYear)
   return jcArray
 def getJobcardDetails(logger,funcArgs,threadName="default"):
