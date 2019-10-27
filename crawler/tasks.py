@@ -366,7 +366,6 @@ def mergeTransactions(logger,funcArgs,threadName="default"):
   rejStatus=''
   rejCount=0
   if matchedRows > 0:
-    matchedDF.to_csv(f"/tmp/{musterNo}.csv")
     matchedDF = matchedDF.replace(np.nan, '', regex=True)
     for i, row in matchedDF.iterrows():
       rejWagelists+=f"{row['wagelistNo']} |"
@@ -430,7 +429,6 @@ def detailWorkPayment(logger,locationCode,startFinYear=None,endFinYear=None,num_
       logger.info(f"DF shape {df.shape} for finyear {finyear}")
       rejDFs.append(df)
   rejDF=pd.concat(rejDFs,ignore_index=True)
-  rejDF.to_csv("/tmp/rejDF.csv")
   logger.info(f"Saape of combined DF is {rejDF.shape}")
   rejectedDF=rejDF.drop_duplicates()
 
@@ -583,7 +581,6 @@ def downloadMusters(logger,locationCode,startFinYear=None,endFinYear=None,num_th
       logger.info(f"DF shape {df.shape} for finyear {finyear}")
       rejDFs.append(df)
   rejDF=pd.concat(rejDFs,ignore_index=True)
-  rejDF.to_csv("/tmp/rejDF.csv")
   logger.info(f"Saape of combined DF is {rejDF.shape}")
   rejDF=rejDF.drop_duplicates()
  
@@ -813,7 +810,6 @@ def updateJobcardDF(logger,locationCode,rejDF=None,jcDF=None,startFinYear=None,j
         rejStatus=''
         rejCount=0
         if matchedRows > 0:
-          matchedDF.to_csv(f"/tmp/{musterNo}.csv")
           matchedDF = matchedDF.replace(np.nan, '', regex=True)
           for i, row in matchedDF.iterrows():
             rejWagelists+=f"{row['wagelistNo']} |"
@@ -868,7 +864,6 @@ def updateJobcardDF1(logger,locationCode,rejDF=None,startFinYear=None,jobcard=No
         logger.info(f"DF shape {df.shape} for finyear {finyear}")
         rejDFs.append(df)
     rejDF=pd.concat(rejDFs,ignore_index=True)
-    rejDF.to_csv("/tmp/rejDF.csv")
     logger.info(f"Saape of combined DF is {rejDF.shape}")
     rejDF=rejDF.drop_duplicates()
     logger.info(f"Shape after removing duplicates of combined DF is {rejDF.shape}")
@@ -893,7 +888,6 @@ def updateJobcardDF1(logger,locationCode,rejDF=None,startFinYear=None,jobcard=No
         rejStatus=''
         rejCount=0
         if matchedRows > 0:
-          matchedDF.to_csv(f"/tmp/{musterNo}.csv")
           matchedDF = matchedDF.replace(np.nan, '', regex=True)
           for i, row in matchedDF.iterrows():
             rejWagelists+=f"{row['wagelistNo']} |"
@@ -2677,8 +2671,6 @@ def apBlockRejectedTransactions(logger,locationCode,startFinYear=None,endFinYear
     if r.status_code == 200:
       myhtml=r.content
       mysoup=BeautifulSoup(myhtml,"lxml")
-      with open("/tmp/h.html","wb") as f:
-        f.write(myhtml)
       tables=mysoup.findAll('table',id="sortable")
       for table in tables:
         logger.info("found tables")
