@@ -136,7 +136,6 @@ def getAuthenticationToken():
             }
   try:
     r=requests.post(AUTHENDPOINT,data=data)
-    print(r.status_code)
     token=r.json()['token']
   except:
     token=None
@@ -392,7 +391,6 @@ def getAuthenticationHeader():
       'content-type':'application/json',
       "Authorization" : "JWT " + token
     }
-  print(headers)
   return headers
 
 def is_json(json_data):
