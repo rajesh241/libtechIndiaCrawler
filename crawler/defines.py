@@ -22,7 +22,7 @@ NICStatURL="http://mnregaweb4.nic.in/netnrega/all_lvl_details_dashboard_new.aspx
 JharkhandPDSBaseURL="https://aahar.jharkhand.gov.in/secc_cardholders/searchRationResults"
 musterReDownloadThreshold=30
 defaultReDownloadThreshold=30
-
+APSTATECODE='02'
 
 reportReDownloadThresholds=dict(
                  jobcardRegister=30,
