@@ -1,5 +1,5 @@
 from commons import getFullFinYear,getCurrentFinYear,validateAndSave,correctDateFormat,getjcNumber,getFilePath,saveReport,getCenterAlignedHeading,stripTableAttributes,stripTableAttributesPreserveLinks,getFinYear,getDateObj,htmlWrapperLocal,getAWSFileURL,getReportFileURL,daysSinceModifiedS3,getDefaultStartFinYear,createUpdateDjangoReport,getShortFinYear,getLocationDict,getReportURL,isReportUpdated,getChildLocations,getReportDF,computePercentage,saveLocationStatus
-from defines import NICSearchIP,NICSearchURL,musterReDownloadThreshold,REPORTURL,LOCATIONURL,JharkhandPDSBaseURL
+from defines import NICSearchIP,NICSearchURL,musterReDownloadThreshold,REPORTURL,LOCATIONURL,JharkhandPDSBaseURL,APSTATECODE
 from aws import awsInit,uploadS3
 import requests
 import pandas as pd
@@ -514,6 +514,7 @@ def jobcardTransactions(logger,locationCode,startFinYear=None,endFinYear=None,nu
     updateStatus,reportURL=isReportUpdated(logger,'jobcardTransactions',locationCode,finyear=finyear)
     if updateStatus == False:
       finalStatus=False
+  finalStatus=False
   logger.info(f"Update Status if Jobcard Transaction is {updateStatus}")
   if finalStatus == False:
     jobcardRegister(logger,locationCode)
@@ -530,10 +531,12 @@ def jobcardTransactions(logger,locationCode,startFinYear=None,endFinYear=None,nu
       p={}
       p['funcName']="fetchJobcardDetails"
       p['funcArgs']=funcArgs
-      jobList.append(p)
+      if jobcard == 'AP-03-011-004-122/010063':
+        jobList.append(p)
       #logger.info(f"{index}-{p}")
       if i == 10000:
         break
+    num_threads=1
     reportType="jobcardTransactions" 
     resultArray=libtechQueueManager(logger,jobList,num_threads=num_threads)
     wpDF = pd.DataFrame(resultArray, columns =headers)
@@ -638,6 +641,9 @@ def jobcardRegister(logger,locationCode,startFinYear=None,endFinYear=None):
   if updateStatus:
     return reportURL
   ldict=getLocationDict(logger,locationCode=locationCode)
+  stateCode=ldict.get("stateCode",None)
+  if stateCode == APSTATECODE:
+    apJobcardRegister(logger,locationCode) 
   myhtml=getJobcardRegister(logger,ldict)
   myhtml=myhtml.replace(b'</nobr><br>',b',')
   myhtml=myhtml.replace(b"bordercolor='#111111'>",b"bordercolor='#111111'><tr>")
@@ -703,6 +709,7 @@ def processJobcardRegister(logger,ldict,myhtml):
     error=None
     finyear=''
     df=None
+    
     filepath=getFilePath(logger,ldict)
     stateCode=ldict.get("stateCode",None)
     districtCode=ldict.get("districtCode",None)
@@ -712,10 +719,14 @@ def processJobcardRegister(logger,ldict,myhtml):
     districtName=ldict.get("districtName",None)
     blockName=ldict.get("blockName",None)
     panchayatName=ldict.get("panchayatName",None)
+    if stateCode == APSTATECODE:
+      apDF=getReportDF(logger,locationCode=panchayatCode,reportType="apJobcardRegister") 
+    else:
+      apDF=None
     csvArray=[]
     jobcardCsvArray=[]
     locationArrayLabel=["state","district","block","panchayat","village","stateCode","districtCode","blockCode","panchayatCode"]
-    jobcardArrayLabel=["jobcard","headOfHousehold","issue Date","caste","jcNo"]
+    jobcardArrayLabel=["jobcard","tjobcard","headOfHousehold","issue Date","caste","jcNo"]
     workerArrayLabel=["applicantNo","name","age","gender","fatherHusbandName","isDeleted","isMinority","isDisabled"]
     header=locationArrayLabel+jobcardArrayLabel+workerArrayLabel
     jobcardheader=locationArrayLabel+jobcardArrayLabel
@@ -767,7 +778,14 @@ def processJobcardRegister(logger,ldict,myhtml):
             caste=cols[2].text.lstrip().rstrip()
             applicantNo=1
             fatherHusbandName=cols[5].text.lstrip().rstrip()
-            jobcardArray=[jobcard,headOfHousehold,str(issueDate),caste,str(getjcNumber(jobcard))]
+            if apDF is None:
+              tjobcard=jobcard
+            else:
+              tjobcard=''
+              matchedDF=apDF[apDF['jobcard']==jobcard]
+              if len(matchedDF) == 1:
+                tjobcard=matchedDF.iloc[0].tjobcard
+            jobcardArray=[jobcard,tjobcard,headOfHousehold,str(issueDate),caste,str(getjcNumber(jobcard))]
             a=locationArray+jobcardArray
             jobcardCsvArray.append(a)
           else:
@@ -1177,7 +1195,7 @@ def downloadJobcard(logger,ldict,jobcard):
   panchayatCode=ldict.get("panchayatCode",None)
   crawlIP=ldict.get("crawlIP",None)
   url="http://%s/citizen_html/jcr.asp?reg_no=%s&panchayat_code=%s" % (NICSearchIP,jobcard,panchayatCode)
-  #logger.debug(f"Jobcard Download URL is {url}")
+  logger.debug(f"Jobcard Download URL is {url}")
   r=requests.get(url)
   if r.status_code != 200:
     error=f"Unable to download Jobcard {jobcard} status code {r.status_code}"
@@ -2734,3 +2752,73 @@ def apDownloadRejectedURL(logger,funcArgs,threadName="default"):
             a.append(col.text.lstrip().rstrip())
           csvArray.append(l+a)
   return csvArray
+
+def apJobcardRegister(logger,locationCode,startFinYear=None,endFinYear=None):
+  csvArray=[]
+  ldict=getLocationDict(logger,locationCode=locationCode)
+  stateCode=ldict.get("stateCode",None)
+  districtCode=ldict.get("districtCode",None)
+  blockCode=ldict.get("blockCode",None)
+  panchayatCode=ldict.get("panchayatCode",None)
+  shortBlockCode=blockCode[-2:]
+  shortDistrictCode=districtCode[-2:]
+  shortPanchayatCode=panchayatCode[-2:]
+  r=requests.get("http://www.nrega.ap.gov.in/Nregs/")
+  cookies=r.cookies
+  logger.info(cookies)
+ 
+  urlHome="http://www.nrega.ap.gov.in/Nregs/FrontServlet"
+  url="http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=WageSeekersRH&actionVal=JobCardHolder&page=WageSeekersHome&param=JCHI"
+  logger.debug("DistrictCode: %s, blockCode : %s , panchayatCode: %s " % (districtCode,blockCode,panchayatCode))
+  headers = {
+    'Host': 'www.nrega.ap.gov.in',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:45.0) Gecko/20100101 Firefox/45.0',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-GB,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate',
+    'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=WageSeekersRH&actionVal=JobCardHolder&param=JCHI&type=-1&Atype=Display&Ajaxid=Panchayat',
+    'Connection': 'keep-alive',
+    'Content-Type': 'application/x-www-form-urlencoded',
+}
+
+  params = (
+    ('requestType', 'WageSeekersRH'),
+    ('actionVal', 'JobCardHolder'),
+    ('param', 'JCHI'),
+    ('type', '-1'),
+    ('Ajaxid', 'go'),
+)
+
+  data = {
+  'State': '-1',
+ #'District': '03',
+ #'Mandal': '11',
+ #'Panchayat': '04',
+  'District': shortDistrictCode,
+  'Mandal': shortBlockCode,
+  'Panchayat': shortPanchayatCode,
+  'Village': '-1',
+  'HouseHoldId': '',
+  'Go': ''
+}
+
+  response = requests.post('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data)
+  if response.status_code == 200:
+    myhtml=response.content
+    htmlsoup=BeautifulSoup(myhtml,"lxml")
+    myTable=htmlsoup.find("table",id="sortable")
+    if myTable is not None: 
+      rows=myTable.findAll("tr")
+      for row in rows:
+        cols=row.findAll("td")
+        if len(cols) > 3:
+          jobcard=cols[2].text.lstrip().rstrip() 
+          tjobcard=cols[1].text.lstrip().rstrip() 
+          a=[jobcard,tjobcard]
+          csvArray.append(a)
+  reportType="apJobcardRegister"
+  finyear=''
+  df=pd.DataFrame(csvArray,columns=["jobcard","tjobcard"])
+  url=saveReport(logger,ldict,reportType,finyear,df)
+  logger.info(url)
+  return url
