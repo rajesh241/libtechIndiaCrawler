@@ -4,6 +4,9 @@
 #pylint: disable-msg = too-many-statements
 
 import re
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
+import json
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -12,6 +15,7 @@ from commons import  (get_current_finyear,
                       standardize_dates_in_dataframe,
                       get_default_start_fin_year,
                       insert_location_details,
+                      get_finyear_from_muster_url,
                       get_fto_finyear
                      )
 from api_interface import api_get_report_url, api_get_report_dataframe
@@ -81,10 +85,10 @@ def get_worker_register(lobj, logger):
     extract_dict['split_cell_array'] = [9]
     extract_dict['column_headers'] = ['sr_no', 'head_of_household', 'caste',
                                       'IAY_LR', 'name', 'father_husband_name',
-                                      'gender', 'age', 'date_of_request',
-                                      'jobcard', 'issue_date', 'remarks',
+                                      'gender', 'age', 'jobcard_request_date',
+                                      'jobcard', 'jobcard_issue_date', 'jobcard_remarks',
                                       'disabled', 'minority',
-                                      'verification_date']
+                                      'jobcard_verification_date']
     dataframe = None
     if url is not None:
         res = requests.get(url, cookies=cookies)
@@ -140,9 +144,9 @@ def re_extract_village_name(in_s):
         matched = in_s.replace(matched, '')
     return matched
 
-def get_muster_list(lobj, logger, jobcards_dataframe):
-    """ Given a list of jobcard urls this function will fetch all muster
-    URLs"""
+def get_jobcard_transactions(lobj, logger, jobcards_dataframe):
+    """ Given a list of jobciard urls this function will fetch all jobcard
+    transactions"""
     logger.info(f"we are going to fetch muster list")
     logger.info(f"panchayat page url is {lobj.panchayat_page_url}")
     job_list = []
@@ -161,6 +165,128 @@ def get_muster_list(lobj, logger, jobcards_dataframe):
             }
             job_list.append(job_dict)
     dataframe = libtech_queue_manager(logger, job_list)
+    return dataframe
+
+def get_muster_list(lobj, logger, jobcard_transactions_df):
+    """From the jobcard transactions df this function will first get unique
+    work urls and from work urls it will get all unique muster urls"""
+    logger.info(f"lenth of dataframe is  {len(jobcard_transactions_df)}")
+    work_url_array = jobcard_transactions_df.work_name_url.unique()
+    logger.info(f"Number of unique work urls is {len(work_url_array)}")
+    response = requests.get(lobj.panchayat_page_url)
+    cookies = response.cookies
+    job_list = []
+    func_name = "fetch_muster_urls"
+    for url in work_url_array:
+        func_args = [lobj, url, cookies]
+        job_dict = {
+            'func_name' : func_name,
+            'func_args' : func_args
+        }
+        job_list.append(job_dict)
+    dataframe = libtech_queue_manager(logger, job_list)
+    finyear_regex = re.compile(r'finyear=\d{4}-\d{4}')
+    for index, row in dataframe.iterrows():
+        url = row['muster_url']
+        parsed = urlparse.urlparse(url)
+        params_dict = parse_qs(parsed.query)
+        work_name = params_dict.get('wn', [''])[0]
+        work_code = params_dict.get('workcode', [''])[0]
+        date_from = params_dict.get('dtfrm', [''])[0]
+        date_to = params_dict.get('dtto', [''])[0]
+        full_finyear = params_dict.get('finyear', ['00'])[0]
+        finyear = full_finyear[-2:]
+       # finyear = get_finyear_from_muster_url(logger, url, finyear_regex)
+        if finyear.isdigit():
+            finyear = int(finyear)
+        else:
+            finyear = 0
+        dataframe.loc[index, 'finyear'] = finyear
+        dataframe.loc[index, 'date_from'] = date_from
+        dataframe.loc[index, 'date_to'] = date_to
+        dataframe.loc[index, 'work_name'] = work_name
+        dataframe.loc[index, 'work_code'] = work_code
+    dataframe['block_code'] = lobj.block_code
+    logger.info(f"shape of dataframe is {dataframe.shape}")
+    start_fin_year = get_default_start_fin_year()
+    dataframe = dataframe[dataframe['finyear'] >= start_fin_year]
+    logger.info(f"shape of dataframe is {dataframe.shape}")
+    dataframe = dataframe.drop_duplicates()
+    logger.info(f"shape of dataframe is {dataframe.shape}")
+    dataframe = dataframe.reset_index(drop=True)
+    return dataframe
+
+def get_muster_transactions(lobj, logger, muster_list_df):
+    """form the muster list dataframe this will get all the muster
+    transactions"""
+    worker_df = lobj.fetch_report_dataframe(logger, "worker_register")
+    logger.info(f"shape of worker df is {worker_df.shape}")
+    try:
+        response = requests.get(lobj.panchayat_page_url, timeout = 5)
+    except requests.exceptions.Timeout as e: 
+        logger.error(e)
+    cookies = response.cookies
+    job_list = []
+    func_name = "fetch_muster_details"
+    MUSTER_COLUMN_CONFIG_FILE = f"json_config/muster_column_name_dict.json"
+    with open(MUSTER_COLUMN_CONFIG_FILE) as config_file:
+        muster_column_dict = json.load(config_file)
+    logger.info(muster_column_dict)
+    for index, row in muster_list_df.iterrows():
+        url = row['muster_url']
+        muster_no = row['muster_no']
+        finyear = row['finyear']
+        block_code = row['block_code']
+        func_args = [lobj, url, cookies, muster_no, finyear, block_code, muster_column_dict]
+        job_dict = {
+            'func_name' : func_name,
+            'func_args' : func_args
+        }
+        job_list.append(job_dict)
+    dataframe = libtech_queue_manager(logger, job_list)
+    ## In Muster HTML name and relationship appear in the same column.
+    ## Separating them here below. 
+    rows_to_delete = []
+    for index, row in dataframe.iterrows():
+        sr_no = row.get("muster_index", None)
+        if (sr_no is None) or (not sr_no.isdigit()):
+            rows_to_delete.append(index)
+        name_relationship = row['name_relationship']
+        try:
+            relationship = re.search(r'\((.*?)\)', name_relationship).group(1)
+        except:
+            relationship = ''
+        name = name_relationship.replace(f"({relationship})","")
+        dataframe.loc[index, 'name'] = name
+        dataframe.loc[index, 'relationship'] = relationship
+    
+    dataframe = dataframe.drop(rows_to_delete)
+    logger.info(f"dataframe shape is {dataframe.shape}")
+    logger.info(dataframe.columns)
+    logger.info(muster_list_df.columns)
+    dataframe = pd.merge(dataframe, muster_list_df, how='left',
+                         on=['block_code', 'finyear', 'muster_no'])
+    logger.info(f"dataframe shape is {dataframe.shape}")
+    drop_columns = ['caste', 'block_code']
+    dataframe = dataframe.drop(columns=drop_columns)
+    dataframe = pd.merge(dataframe, worker_df, how='left',
+                         on=['jobcard', 'name'])
+    logger.info(dataframe.columns)
+    logger.info(f"dataframe shape is {dataframe.shape}")
+    col_list = ['state_code', 'state_name', 'district_code', 'district_name',
+                'block_code', 'block_name', 'panchayat_name', 'panchayat_code',
+                'village_name', 'jobcard', 'name', 'relationship',
+                'head_of_household', 'caste', 'IAY_LR', 'father_husband_name',
+                'gender', 'age', 'jobcard_request_date', 'jobcard_issue_date', 'jobcard_remarks',
+                'disabled', 'minority', 'jobcard_verification_date', 'work_code',
+                'work_name', 'finyear', 'muster_no', 'muster_index',
+                'date_from', 'date_to', 'muster_url',
+                'days_worked', 'day_wage', 'm_labour_wage', 'm_travel_cost',
+                'm_tools_cost', 'total_wage', 'm_postoffice_bank_name',
+                'm_pocode_bankbranch', 'm_poadd_bankbranchcode',
+                'm_wagelist_no', 'muster_status', 'credited_date',
+                ]
+    dataframe = dataframe[col_list]
     return dataframe
 
 def get_block_rejected_transactions(lobj, logger):
@@ -200,45 +326,46 @@ def get_block_rejected_transactions(lobj, logger):
     column_headers = ['srno', 'fto_no', 'reference_no', 'reference_no_url',
                       'utr_no', 'transaction_date', 'name',
                       'primary_account_holder', 'wagelist_no', 'bank_code',
-                      'ifsc_code', 'amount', 'rejection_date',
+                      'ifsc_code', 'fto_amount', 'rejection_date',
                       'rejection_reason']
     extract_dict['pattern'] = 'UTR No'
     extract_dict['column_headers'] = column_headers
     extract_dict['extract_url_array'] = [2]
     extract_dict['url_prefix'] = f'http://mnregaweb4.nic.in/netnrega/FTO/'
     dataframe_array = []
-    urls_to_download = []
     for url in urls_to_download:
         dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict)
         dataframe_array.append(dataframe)
-    #dataframe = pd.concat(dataframe_array, ignore_index=True)
-    #dataframe.to_csv("/tmp/rejected_transactions.csv")
-    dataframe = pd.read_csv("/tmp/rejected_transactions.csv", index_col=0)
+    rejected_df = pd.concat(dataframe_array, ignore_index=True)
+    #dataframe = pd.read_csv("/tmp/rejected_transactions.csv", index_col=0)
     logger.info(f"shape of dataframe is {dataframe.shape}")
-    dataframe = dataframe.drop_duplicates()
-    logger.info(f"shape of dataframe is {dataframe.shape}")
-    rows_to_pop = ['srno', 'reference_no', 'reference_no_url', 'fto_no', 'name', 'wagelist_no', 'amount',
-                   'rejection_date', 'rejection_reason']
     job_list = []
-    func_name = "fetch_rejection_details" 
-    for index, row in dataframe.iterrows():
+    func_name = "fetch_rejection_details"
+    for index, row in rejected_df.iterrows():
         url = row['reference_no_url']
-        amount = row.get('amount', 0)
-        reference_no = row.get('reference_no', '')
-
-        for column_name in rows_to_pop:
-            row.pop(column_name)
-        func_args = [lobj, url, amount, reference_no,
-                     row]
+        func_args = [lobj, url]
         job_dict = {
             'func_name' : func_name,
             'func_args' : func_args
         }
         job_list.append(job_dict)
-        
     dataframe = libtech_queue_manager(logger, job_list)
-    dataframe.to_csv("/tmp/r.csv")
-    #dataframe = pd.read_csv("/tmp/r.csv")
+    logger.info(f"dataframe shape is {dataframe.shape}")
+    dataframe = dataframe.drop_duplicates()
+    logger.info(f"dataframe shape is {dataframe.shape}")
+    column_headers = ["wagelist_no", "jobcard", "applicant_no", "name",
+                      "work_code", "work_name", "muster_no", "reference_no",
+                      "rejection_status", "rejection_reason", "process_date", "fto_no",
+                      "rejection_serial_no", 'attempt_count', 'record_status',
+                      'fto_finyear']
+    dataframe = dataframe[column_headers]
+    rejected_df_columns = ['reference_no', 'reference_no_url', 'utr_no',
+                           'transaction_date', 'primary_account_holder',
+                           'bank_code', 'ifsc_code', 'fto_amount',
+                           'rejection_date']
+    rejected_df = rejected_df[rejected_df_columns]
+    dataframe = pd.merge(dataframe, rejected_df, how='left',
+                         on=['reference_no'])
     logger.info(f"dataframe shape is {dataframe.shape}")
     dataframe = pd.merge(dataframe, jobcard_df, how='left',
                          on=['jobcard', 'name'])
@@ -246,13 +373,13 @@ def get_block_rejected_transactions(lobj, logger):
                 'block_code', 'block_name', 'panchayat_name', 'panchayat_code',
                 'village_name', 'jobcard', 'applicant_no', 'name',
                 'head_of_household', 'caste', 'IAY_LR', 'father_husband_name',
-                'gender', 'age', 'date_of_request', 'issue_date', 'remarks',
-                'disabled', 'minority', 'verification_date', 'work_code',
-                'work_name', 'muster_no', 'attempt_count', 'record_status', 
-                'wagelist_no', 'fto_no', 'fto_finyear', 'amount',
+                'gender', 'age', 'jobcard_request_date', 'jobcard_issue_date', 'jobcard_remarks',
+                'disabled', 'minority', 'jobcard_verification_date', 'work_code',
+                'work_name', 'muster_no', 'attempt_count', 'record_status',
+                'wagelist_no', 'fto_no', 'fto_finyear', 'fto_amount',
                 'transaction_date', 'process_date', 'reference_no',
                 'rejection_status', 'rejection_reason', 'rejection_serial_no',
                 'utr_no', 'primary_account_holder', 'bank_code', 'ifsc_code']
     dataframe = dataframe[col_list]
-    dataframe.to_csv("/tmp/r1.csv")
     logger.info(f"dataframe shape is {dataframe.shape}")
+    return dataframe

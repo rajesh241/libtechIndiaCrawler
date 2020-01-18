@@ -15,7 +15,9 @@ from api_interface import (get_location_dict,
 from nicnrega import (get_jobcard_register,
                       get_worker_register,
                       get_muster_list,
-                      get_block_rejected_transactions
+                      get_jobcard_transactions,
+                      get_block_rejected_transactions,
+                      get_muster_transactions
                      )
 class Location():
     """This is the base Location Class"""
@@ -67,14 +69,31 @@ class NREGAPanchayat(Location):
         dataframe = get_worker_register(self, logger)
         report_type = "worker_register"
         self.save_report(logger, dataframe, report_type)
-    def muster_list(self, logger):
-        """This will fetch teh muster list for the panchayat"""
+    def jobcard_transactions(self, logger):
+        """This will fetch all jobcard transactions for the panchayat"""
         logger.info(f"Going to fetch Muster list for {self.code}")
         report_type = "jobcard_register"
         jobcard_register_df = self.fetch_report_dataframe(logger, report_type)
-        dataframe = get_muster_list(self, logger, jobcard_register_df)
+        dataframe = get_jobcard_transactions(self, logger, jobcard_register_df)
         report_type = "jobcard_transactions"
         self.save_report(logger, dataframe, report_type)
+    def muster_list(self, logger):
+        """This will fetch all jobcard transactions for the panchayat"""
+        logger.info(f"Going to fetch Muster list for {self.code}")
+        report_type = "jobcard_transactions"
+        jobcard_transaction_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = get_muster_list(self, logger, jobcard_transaction_df)
+        report_type = "muster_list"
+        self.save_report(logger, dataframe, report_type)
+    def muster_transactions(self, logger):
+        """This will fetch all muster transactions for the panchayat"""
+        logger.info(f"Going to fetch Muster transactions for {self.code}")
+        report_type = "muster_list"
+        muster_list_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = get_muster_transactions(self, logger, muster_list_df)
+        report_type = "muster_transactions"
+        self.save_report(logger, dataframe, report_type)
+
 
 class NREGABlock(Location):
     """This is the Panchayat subclass for Location Class"""

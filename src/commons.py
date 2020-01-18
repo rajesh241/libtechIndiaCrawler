@@ -59,7 +59,7 @@ def insert_finyear_in_dataframe(logger, dataframe, date_column_name,
     based on the date value in date_column_name
     """
     if date_format is None:
-        date_format = '%Y-%m-%d'
+        date_format = '%d/%m/%Y'
     dataframe['finyear'] = ''
     for index, row in dataframe.iterrows():
         cur_date = row.get(date_column_name, None)
@@ -167,4 +167,13 @@ def get_fto_finyear(logger, fto_no):
         date_string = date_string[1:7]
         date_object = get_date_object(date_string, "%d%m%y")
         finyear = get_finyear_from_date(date_object)
+    return finyear
+
+def get_finyear_from_muster_url(logger, url, finyear_regex):
+    """Will extract the financial year from muster url using regex"""
+    match_object = finyear_regex.search(url)
+    finyear = None
+    if match_object is not None:
+        pattern = match_object.group()
+        finyear = pattern[-2:]
     return finyear

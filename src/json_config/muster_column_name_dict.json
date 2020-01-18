@@ -1,0 +1,20 @@
+{
+    "नाम/पंजीकरण संख्या" : "name_relationship",
+    "नाम/पंजीकरण संख्या_1" : "jobcard",
+    "गांव" : "m_village_name",
+    "कुल हाजिरी" : "days_worked",
+    "प्रतिदन मजदूर" : "day_wage",
+    "कुल भुगतान" : "total_wage",
+    "Postoffice/Bank Name" : "m_postoffice_bank_name",
+    "Postoffice Code/Branch name" : "m_pocode_bankbranch",
+    "Postoffice address/Branch code" :"m_poadd_bankbranchcode",
+    "Wagelist No." : "m_wagelist_no",
+    "Status" : "muster_status",
+    "A/c Credited Date" : "credited_date",
+    "क्र.सं." : "muster_index",
+    "उपस्थिति के अनुसार देय राशि":"m_labour_wage",
+    "यात्रा और खान पान का व्यय" : "m_travel_cost",
+    "Implements / Sharpening Charge":"m_tools_cost",
+    "Caste":"caste",
+    "Sign./Thumb Impression":"thumb_impression"
+}
