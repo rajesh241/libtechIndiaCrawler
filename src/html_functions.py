@@ -8,6 +8,38 @@ import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 
+def get_urldataframe_from_html(logger, myhtml, mydict=None):
+    """this will harvest urls from html based on the prameters specified in
+    mydict"""
+    dataframe = None
+    csv_array = []
+    col_headers = ["muster_no", "muster_url"]
+    text_pattern = mydict.get('pattern', None)
+    url_prefix = mydict.get('url_prefix', None)
+    mysoup = BeautifulSoup(myhtml, "html5lib")
+    urls = mysoup.findAll("a")
+    for url in urls:
+        href = url.get('href')
+        if text_pattern in href:
+            muster_url = url_prefix + href
+            muster_no = url.text
+            csv_array.append([muster_no, muster_url])
+    dataframe = pd.DataFrame(csv_array, columns=col_headers)
+    return dataframe
+
+def get_urldataframe_from_url(logger, url, mydict=None, cookies=None):
+    """This will harvest urls from the given url based on extract dict
+    parameters"""
+    if cookies is None:
+        response = requests.get(url)
+    else:
+        response = requests.get(url, cookies=cookies)
+    dataframe = None
+    if response.status_code == 200:
+        myhtml = response.content
+        dataframe = get_urldataframe_from_html(logger, myhtml, mydict=mydict)
+    return dataframe
+
 def get_dataframe_from_url(logger, url, mydict=None, cookies=None):
     """Gets the dataframe from the url based on the parameters specified 
     in mydict
@@ -40,12 +72,15 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
     """
     dataframe = None
     text_pattern = mydict.get('pattern', None)
+    table_id = mydict.get('table_id', None)
     mysoup = BeautifulSoup(myhtml, "lxml")
     mysoup = BeautifulSoup(myhtml, "html5lib")
     tables = mysoup.findAll('table')
     matched_tables = []
     #Match the table agains the specified pattern
-    if text_pattern is None:
+    if table_id is not None:
+        matched_tables = mysoup.findAll('table', id=table_id)
+    elif text_pattern is None:
         matched_tables = tables
     else:
         for table in tables:
@@ -57,6 +92,8 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
         my_table = matched_tables[0]
     else:
         my_table = None
+    if my_table is not None:
+        logger.debug(f"found the table")
     #If table found we will extract the rows and columns
     if my_table is not None:
         dataframe_columns = []
