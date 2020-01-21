@@ -10,7 +10,7 @@ from selenium.webdriver.common.by import By
 
 import sys
 sys.path.insert(0, '../')
-from commons import logger_fetch
+from libtech_lib.lib.commons import logger_fetch
 
 
 #######################
