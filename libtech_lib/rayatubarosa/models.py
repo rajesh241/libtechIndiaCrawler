@@ -47,7 +47,7 @@ class RBCrawler():
         path parameters"""
         dataframe = None
         csv_array = []
-        col_headers = ["district_name", "block_name",
+        col_headers = ["district_name_telugu", "block_name_telugu",
                        "village_name", "district_code",
                        "block_code", "village_code"]
         if block_code is not None:
