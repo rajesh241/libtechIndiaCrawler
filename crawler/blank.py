@@ -1,7 +1,7 @@
 """Blank file which can server as starting point for writing any script file"""
 import argparse
 
-from commons import logger_fetch
+from libtech_lib.lib.commons import logger_fetch
 
 def args_fetch():
     '''
