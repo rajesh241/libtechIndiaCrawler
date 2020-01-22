@@ -12,12 +12,12 @@ from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from slugify import slugify
 
-from libtech_lib.lib.commons import logger_fetch
+from libtech_lib.generic.commons import logger_fetch
 from libtech_lib.wrappers.sn import driverInitialize, driverFinalize
-from libtech_lib.lib.aws import get_aws_parquet, upload_s3
-from libtech_lib.lib.html_functions import get_dataframe_from_html
+from libtech_lib.generic.aws import get_aws_parquet, upload_s3
+from libtech_lib.generic.html_functions import get_dataframe_from_html
 from libtech_lib.rayatubarosa.models import RBCrawler, RBLocation
-from libtech_lib.lib.api_interface import api_get_tag_id
+from libtech_lib.generic.api_interface import api_get_tag_id
 def args_fetch():
     '''
     Paser for the argument list that returns the args list
