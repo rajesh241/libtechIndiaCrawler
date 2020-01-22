@@ -941,112 +941,12 @@ class Crawler():
                                                        )
                 village_stat_df_array.append(village_stat_df)
                 ### Now lets go to payment page
-                logger.info('Fetching URL[%s]' % self.payment_url)
-                self.driver.get(self.payment_url)
-                time.sleep(3)
-                self.print_current_window_handles(logger)
-                ##Get Land Values
-                landXpath="//*/select[@ng-model='landtypemdl']"
-                landSelect=Select(self.driver.find_element_by_xpath(landXpath))
-                landList=[]
-                for o in landSelect.options[1:]:
-                    p={}
-                    p['name']=o.text
-                    p['value']=o.get_attribute('value')
-                    landList.append(p)
-                #buttonXPath="//button[1]"
-                logger.info(landList)
-
-                village_x_path = "//select[1]"
-                village_select = Select(self.driver.find_element_by_xpath(village_x_path))
                 vill_df = mandal_df[mandal_df['block_name_telugu'] == mandal_name]
-                for index, row in vill_df.iterrows():
-                    village_code = str(row['village_code'])
-                    district_code = row['district_code']
-                    block_code = row['block_code']
-                    village_name = row['village_name']
-                    try:
-                        village_select.select_by_value(village_code)
-                        #time.sleep(3)
-                    except Exception as e:
-                        logger.error(f'Exception during select ofVillage[{village_code},{slugify(village_name)}] - EXCEPT[{type(e)}, {e}]')
-                        logger.warning(f'Skipping Village[{village_code}]')
-                        break
-                    villageDFs=[]
-                    for p1 in landList:
-                        landValue=p1.get("value")
-                        landType=p1.get("name")
-                        land_type = landType
-                        logger.info(f"village_code[{village_code}, {slugify(village_name)}] landType[{landType}]")
-                        try:
-                            landSelect.select_by_value(landValue)
-                            self.driver.find_element_by_xpath('//input[@value="submit"]').click()
-                            logger.info(f"Submit clicked for vilageName[{village_code}],{slugify(village_name)}] landType[{landType}]")
-                            myhtml = self.driver.page_source
-                            dfs=pd.read_html(myhtml)
-                        except Exception as e:
-                            logger.error(f'Exception during select for landType[{landType}] of Village[{village_code}, {slugify(village_name)}] - EXCEPT[{type(e)}, {e}]')
-                            elem = self.driver.switch_to.active_element
-                            elem.send_keys(Keys.RETURN)
-                            time.sleep(1)
-                            continue
-                            
-                        try:
-                            WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='swal2-confirm swal2-styled']"))).click()
-                            logger.info(f'Skipping for landType[{landType}] of Village[{village_code}]')
-                            continue
-                        except Exception as e:
-                            logger.info(f'Moving Ahead for landType[{landType}]of Village[{village_code},{slugify(village_name)}] - EXCEPT[{type(e)}, {e}]')
-
-                        while True:
-                            try:
-                                #WebDriverWait(self.driver, 3).until(EC.presence_of_element_located((By.LINK_TEXT, 'Name Of Beneficiary')))
-                                WebDriverWait(self.driver, 3).until(EC.element_to_be_clickable((By.XPATH, "//input[@class='btn btn-primary']")))
-                                logger.info(f'Found Data')
-                                myhtml = self.driver.page_source
-                            except Exception as e:
-                                logger.error(f'When reading HTML source landType[{landType}] of Village[{village_code}, {(village_code)}] - EXCEPT[{type(e)}, {e}]')
-                                
-                            #dfs=pd.read_html(myhtml)
-                            df = get_dataframe_from_html(logger, myhtml,
-                                                         mydict=village_extract_dict)
-                            df['village_name_tel']=village_name
-                            df['village_code']=village_code
-                            df['block_code']=block_code
-                            df['district_code']=district_code
-                            df['district_name_tel']=district_name
-                            df['mandal_name_tel']=mandal_name
-                            df['land_type']=landType
-                            villageDFs.append(df)
-                            logger.info(f'Adding the table for village[{village_code}] and type[{landType}]')
-
-                            try:
-                                elem = WebDriverWait(self.driver, 3).until(EC.element_to_be_clickable((By.LINK_TEXT, '›')))
-                                parent = elem.find_element_by_xpath('..')
-                                logger.info(f'parent[{parent.get_attribute("class")}] elem[{elem.get_attribute("class")}]')
-                                if 'disabled' in parent.get_attribute("class"):
-                                    logger.info(f'Disabled so end here!')
-                                    break
-                                else:
-                                    elem.click()
-                                    time.sleep(5)
-                                    continue
-                            except Exception as e:
-                                logger.info(f'No pagination here!')
-                                break
-                    if len(villageDFs) > 0:
-                        villageDF=pd.concat(villageDFs)
-                        report_type = "rb_payment"
-                        rb_location = RBLocation(logger, village_code)
-                        rb_location.save_report(logger, report_type, villageDF,
-                                               sample_name=sample_name)
-                    else:
-                        colHeaders = ['S No', 'Name Of Beneficiary', 'Father Name', 'PSS Name', 'Katha Number', 'Aadhaar', 'Bank Name', 'Bank Account Number(Last 4 Digits)', 'Status,Remarks', 'village_name_tel', 'village_code', 'district_name_tel', 'mandal_name_tel', 'land_type']
-                        villageDF=pd.DataFrame(columns = colHeaders)
-                    villageDF.to_csv(f"~/thrash/{village_code}.csv")
-
-
-                    break
+                self.crawlPaymentvillReport(logger, district_name=district_name,
+                                       mandal_name=mandal_name,
+                                       village_df=vill_df,
+                                        sample_name=sample_name)
+       
 
                
                 logger.info(f"Now I am going to close the village Window")
@@ -1067,8 +967,12 @@ class Crawler():
         dataframe.to_csv("village_stat.csv")
  
         
-    def crawlPaymentvillReport(self,logger, district=None, mandal=None):
-        url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/PaymentvillReport'
+    def crawlPaymentvillReport(self,logger, district_name=None,
+                               mandal_name=None, village_df=None,
+                               sample_name=None):
+        village_extract_dict = {}
+        village_extract_dict['pattern'] = "Katha Number"
+        url = self.payment_url
         logger.info('Fetching URL[%s]' % url)
         self.driver.get(url)
         time.sleep(3)
@@ -1090,31 +994,36 @@ class Crawler():
         #buttonXPath="//button[1]"
         logger.info(landList)
 
-        statusDF=pd.read_csv(self.status_file,index_col=0)
+        #statusDF=pd.read_csv(self.status_file,index_col=0)
         #logger.info(statusDF)
-        filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
-        if len(filteredDF) > 0:
-            curIndex=filteredDF.index[0]
-        else:
-            curIndex=None
-            logger.info('No more requests to process')
-            return 'SUCCESS'
-        statusDF.loc[curIndex,'inProgress'] = 1
-        statusDF.to_csv(self.status_file)
-        while curIndex is not None:
-            row=filteredDF.loc[curIndex]
-            villageName=row['villageName']
-            value=str(row['villageCode'])
+        #filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
+        #if len(filteredDF) > 0:
+        #    curIndex=filteredDF.index[0]
+        #else:
+        #    curIndex=None
+        #    logger.info('No more requests to process')
+        #    return 'SUCCESS'
+        #statusDF.loc[curIndex,'inProgress'] = 1
+        #statusDF.to_csv(self.status_file)
+        #while curIndex is not None:
+        #    row=filteredDF.loc[curIndex]
+        for index, row in village_df.iterrows():
+            village_code = str(row['village_code'])
+            district_code = row['district_code']
+            block_code = row['block_code']
+            village_name = row['village_name']
+            villageName=village_name
+            value=village_code
             land_type = ''
             try:
                 villageSelect.select_by_value(value)
                 #time.sleep(3)
             except Exception as e:
                 logger.error(f'Exception during select of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]')
-                statusDF.loc[curIndex,'inProgress'] = 0
-                statusDF.to_csv(self.status_file)
-                logger.warning(f'Skipping Village[{villageName}]')
-                return 'FAILURE'
+               # statusDF.loc[curIndex,'inProgress'] = 0
+                #statusDF.to_csv(self.status_file)
+                #logger.warning(f'Skipping Village[{villageName}]')
+                #return 'FAILURE'
             villageDFs=[]
             for p1 in landList:
                 landValue=p1.get("value")
@@ -1127,8 +1036,8 @@ class Crawler():
                     logger.info(f"Submit clicked for vilageName[{villageName}], {slugify(villageName)}] landType[{landType}]")
                 except Exception as e:
                     logger.error(f'Exception during select for landType[{landType}] of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]')
-                    statusDF.loc[curIndex,'inProgress'] = 0
-                    statusDF.to_csv(self.status_file)
+                   # statusDF.loc[curIndex,'inProgress'] = 0
+                   # statusDF.to_csv(self.status_file)
                     logger.warning(f'Skipping at landSelect level Village[{villageName}]')
                     return 'FAILURE'
                     
@@ -1139,8 +1048,8 @@ class Crawler():
                         timeout = 5
                     logger.debug(f'Timeout value is {timeout}')
                     WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='swal2-confirm swal2-styled']"))).click()
-                    statusDF.loc[curIndex, landType] = 'failed'
-                    statusDF.to_csv(self.status_file)
+                    #statusDF.loc[curIndex, landType] = 'failed'
+                    #statusDF.to_csv(self.status_file)
                     logger.info(f'Skipping for landType[{landType}] of Village[{villageName}]')
                     continue
                 except Exception as e:
@@ -1154,23 +1063,25 @@ class Crawler():
                         myhtml = self.driver.page_source
                     except Exception as e:
                         logger.error(f'When reading HTML source landType[{landType}] of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]')
-                        statusDF.loc[curIndex,'inProgress'] = 0
-                        statusDF.to_csv(self.status_file)
+                        #statusDF.loc[curIndex,'inProgress'] = 0
+                        #statusDF.to_csv(self.status_file)
                         logger.warning(f'Skipping at HTML read level Village[{villageName}]')
                         return 'FAILURE'
                         
-                    dfs=pd.read_html(myhtml)
-                    df=dfs[0]
+                   # dfs=pd.read_html(myhtml)
+                   # df=dfs[0]
+                    df = get_dataframe_from_html(logger, myhtml,
+                                                  mydict=village_extract_dict)
                     #logger.info('Before')
                     #logger.info(f'{df}')
                     df['village_name_tel']=villageName
                     df['village_code']=value
-                    df['district_name_tel']=district
-                    df['mandal_name_tel']=mandal
+                    df['district_name_tel']=district_name
+                    df['mandal_name_tel']=mandal_name
                     df['land_type']=landType
                     villageDFs.append(df)
-                    statusDF.loc[curIndex, landType] = 'done'
-                    statusDF.to_csv(self.status_file)
+                    #statusDF.loc[curIndex, landType] = 'done'
+                    #statusDF.to_csv(self.status_file)
                     logger.info(f'Adding the table for village[{villageName}] and type[{landType}]')
                     #logger.info(f'{df}')
 
@@ -1191,27 +1102,32 @@ class Crawler():
                 
             if len(villageDFs) > 0:
                 villageDF=pd.concat(villageDFs)
+                report_type = "rb_payment"
+                rb_location = RBLocation(logger, village_code)
+                rb_location.save_report(logger, report_type, villageDF,
+                                       sample_name=sample_name)
             else:
                 colHeaders = ['S No', 'Name Of Beneficiary', 'Father Name', 'PSS Name', 'Katha Number', 'Aadhaar', 'Bank Name', 'Bank Account Number(Last 4 Digits)', 'Status,Remarks', 'village_name_tel', 'village_code', 'district_name_tel', 'mandal_name_tel', 'land_type']
                 villageDF=pd.DataFrame(columns = colHeaders)
 
-            csvFileName=f"{self.dir}/{district}_{mandal}_{villageName}.csv"
-            logger.info('Writing to [%s]' % csvFileName)
-            villageDF.to_csv(csvFileName, index=False)
-            statusDF.loc[curIndex,'status'] = 'done'
-            statusDF.loc[curIndex,'inProgress'] = 0
-            logger.info(f'Updating [{self.status_file}]')
-            statusDF.to_csv(self.status_file)
+            #csvFileName=f"{self.dir}/{district}_{mandal}_{villageName}.csv"
+            #logger.info('Writing to [%s]' % csvFileName)
+            #villageDF.to_csv(csvFileName, index=False)
+            #statusDF.loc[curIndex,'status'] = 'done'
+            #statusDF.loc[curIndex,'inProgress'] = 0
+            #logger.info(f'Updating [{self.status_file}]')
+            #statusDF.to_csv(self.status_file)
             
-            statusDF=pd.read_csv(self.status_file, index_col=0)            
-            filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
-            if len(filteredDF) > 0:
-                curIndex=filteredDF.index[0]
-                statusDF.loc[curIndex,'inProgress'] = 1
-                statusDF.to_csv(self.status_file)
-            else:
-                curIndex=None
+            #statusDF=pd.read_csv(self.status_file, index_col=0)            
+            #filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
+            #if len(filteredDF) > 0:
+            #    curIndex=filteredDF.index[0]
+            #    statusDF.loc[curIndex,'inProgress'] = 1
+            #    statusDF.to_csv(self.status_file)
+            #else:
+            #    curIndex=None
             
+            break
         return 'SUCCESS'
   
     def crawlStatusUpdateReport(self,logger, district=None, mandal=None):
@@ -1353,6 +1269,7 @@ class TestSuite(unittest.TestCase):
         report_type = "rb_payment"
         if report_type == "rb_payment":
            location_code = '4848'
+           location_code = None
            sample_name = 'vizag_itda_10_sample'
            ###This is how your same report
            #rb_location = RBLocation(logger, village_code)
