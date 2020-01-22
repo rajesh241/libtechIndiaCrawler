@@ -4,13 +4,17 @@
 #pylint: disable-msg = too-few-public-methods
 import pandas as pd
 import json
+import datetime
 from libtech_lib.lib.aws import (
     get_aws_parquet,
     get_aws_file_url
 )
 from libtech_lib.lib.api_interface import (
     get_location_dict,
-    api_get_child_locations
+    api_get_child_locations,
+    api_get_tagged_locations,
+    api_get_tag_id,
+    create_update_report
 )
 import os 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -28,6 +32,38 @@ class RBLocation():
         location_array = api_get_child_locations(logger, self.code,
                                                   scheme=self.scheme)
         return location_array
+    def get_codes_by_tag(self, logger, tag_id):
+        location_array = api_get_tagged_locations(logger, tag_id,
+                                                  scheme=self.scheme)
+        return location_array
+        
+    def get_geography_path(self, logger):
+        if self.location_type == 'district':
+            filepath = f"{self.code}/"
+        elif self.location_type == 'block':
+            filepath = f"{self.district_code}/{self.code}/"
+        elif self.location_type == 'village':
+            filepath = f"{self.district_code}/{self.block_code}/{self.code}/"
+        else:
+            filepath = None
+        return filepath
+    def save_report(self, logger, report_type, data, sample_name=None):
+        if sample_name is None:
+            sample_name = "on_demand"
+        base_dir = f"data/samples/{sample_name}/"
+        geography_path = self.get_geography_path(logger)
+        if sample_name == "on_demand":
+            filepath = f"{base_dir}{self.scheme}/{report_type}/{geography_path}"
+        else:
+            today_date = datetime.date.today().strftime("%d_%m_%Y")
+            filepath = f"{base_dir}{self.scheme}/{report_type}/{today_date}/{geography_path}"
+        filename = f"{self.code}_{report_type}.csv"
+        filename = filepath+filename
+        logger.info(f"filename is {filename}")
+        create_update_report(logger, self.id, report_type,
+                             data, filename)
+
+
 
 
 class RBBlock(RBLocation):
@@ -53,17 +89,24 @@ class RBCrawler():
         if block_code is not None:
             rb_block = RBBlock(logger, block_code)
             village_code_array = rb_block.get_child_locations(logger)
-            for village_code in village_code_array:
-                village_loc = RBLocation(logger, village_code)
-                row = [village_loc.district_name,
-                       village_loc.block_name,
-                       village_loc.name,
-                       village_loc.district_code,
-                       village_loc.block_code,
-                       village_loc.code
-                      ]
-                csv_array.append(row)
-            dataframe = pd.DataFrame(csv_array, columns=col_headers)
+        else:
+            tag_id = api_get_tag_id(logger, tag_name)
+            if tag_id is None:
+                village_code_array = []
+            else:
+                rb_location = RBLocation(logger, "28")##Create AP Location object
+                village_code_array = rb_location.get_codes_by_tag(logger, tag_id)
+        for village_code in village_code_array:
+            village_loc = RBLocation(logger, village_code)
+            row = [village_loc.district_name,
+                   village_loc.block_name,
+                   village_loc.name,
+                   village_loc.district_code,
+                   village_loc.block_code,
+                   village_loc.code
+                  ]
+            csv_array.append(row)
+        dataframe = pd.DataFrame(csv_array, columns=col_headers)
         return dataframe
 
 class RBLocationInit():
