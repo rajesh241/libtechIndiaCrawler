@@ -25,8 +25,8 @@ import requests
 import time
 import unittest
 
-from wrappers.logger import loggerFetch
-from wrappers.sn import driverInitialize, driverFinalize, displayInitialize, displayFinalize
+from libtech_lib.generic.commons import logger_fetch
+from libtech_lib.wrappers.sn import driverInitialize, driverFinalize, displayInitialize, displayFinalize
 
 import psutil
 import pandas as pd
@@ -159,9 +159,10 @@ def fetch_captcha(logger, cookies=None, url=None):
         logger.info('Writing [%s]' % filename)
         html_file.write(response.content)
 
-    check_output(['convert', filename, '-resample', '35', filename])
+    #check_output(['convert', filename, '-resample', '35', filename])
 
-    return pytesseract.image_to_string(Image.open(filename), lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
+   # return pytesseract.image_to_string(Image.open(filename), lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
+    return pytesseract.image_to_string(Image.open(filename), lang='eng', config='--psm 8 --dpi 300 -c tessedit_char_whitelist=ABCDEF0123456789')
     #return pytesseract.image_to_string(Image.open(filename), lang='eng', config='-c tessedit_char_whitelist=0123456789')
 
 
@@ -706,7 +707,7 @@ class Crawler():
                 raise    
         
         self.vars = {}
-        self.display = displayInitialize(isDisabled = False, isVisible = is_visible)
+        self.display = displayInitialize(isDisabled = True, isVisible = is_visible)
         self.driver = driverInitialize(timeout=3) # driverInitialize(path='/opt/firefox/', timeout=3)
     
     def __del__(self):
@@ -719,17 +720,7 @@ class Crawler():
         wh_then = self.vars["window_handles"]
         if len(wh_now) > len(wh_then):
             return set(wh_now).difference(set(wh_then)).pop()
-
-    def runCrawl(self,logger, district=None, mandal=None, report_type=None):
-        if not district:
-            district = self.district
-
-        if not mandal:
-            mandal = self.mandal
-
-        if not report_type:
-            report_type = 'status'
-        
+    def login(self, logger, auto_captcha=False):
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/RB/Login'
         logger.info('Fetching URL[%s]' % url)
         self.driver.get(url)
@@ -744,53 +735,69 @@ class Crawler():
         elem = self.driver.find_element_by_xpath('//input[@type="password"]')
         logger.info('Entering Password[%s]' % password)
         elem.send_keys(password)
+        if auto_captcha:
+            retries = 0
+            while True and retries < 3:
+                logger.info('Waiting for Captcha...')
+                #input()
+                WebDriverWait(self.driver, 15).until(EC.element_to_be_clickable((By.ID, "captchdis")))
+                time.sleep(3)
+                
+                captcha_text = '12345'
+                fname = 'captcha.png'
+                self.driver.save_screenshot(fname)
+                img = Image.open(fname)
+                # box = (815, 455, 905, 495)   Captcha Box
+                box = (830, 470, 905, 485)   # Captcha text only
+                area = img.crop(box)
+                filename = 'cropped_' + fname 
+                area.save(filename, 'PNG')
+                            
+                img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
+                img = cv2.resize(img, None, fx=10, fy=10, interpolation=cv2.INTER_LINEAR)
+                img = cv2.medianBlur(img, 9)
+                th, img = cv2.threshold(img, 185, 255, cv2.THRESH_BINARY)
+                filename = 'processed_captcha.png'
+                cv2.imwrite(filename, img)
+                fname = 'converted_captcha.png'
+                #check_output(['convert', filename, '-resample', '10', fname])
+                captcha_text = pytesseract.image_to_string(Image.open(filename), lang='eng', config='--psm 8  --dpi 300 -c tessedit_char_whitelist=ABCDEF0123456789')
+                
+                elem = self.driver.find_element_by_xpath('(//input[@type="text"])[2]')
+                logger.info('Entering Captcha_Text[%s]' % captcha_text)
+                elem.send_keys(captcha_text)
+                
+                login_button = '(//button[@type="button"])[2]'            
+                elem = self.driver.find_element_by_xpath(login_button)
+                logger.info('Clicking Login Button')
+                elem.click()
+                try:
+                    WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='swal2-confirm swal2-styled']"))).click()
+                    logger.info(f'Invalid Captcha [{captcha_text}]')
+                    retries += 1                
+                    WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.LINK_TEXT, 'Refresh'))).click()
+                    continue
+                except TimeoutException:
+                    logger.info(f'Valid Captcha [{captcha_text}]')
+                    break
+                except Exception as e:
+                    logger.error(f'Error guessing [{captcha_text}] - EXCEPT[{type(e)}, {e}]')
+            
+        else:
+            input()
 
-        retries = 0
-        while True and retries < 3:
-            logger.info('Waiting for Captcha...')
-            #input()
-            WebDriverWait(self.driver, 15).until(EC.element_to_be_clickable((By.ID, "captchdis")))
-            time.sleep(3)
-            
-            captcha_text = '12345'
-            fname = 'captcha.png'
-            self.driver.save_screenshot(fname)
-            img = Image.open(fname)
-            # box = (815, 455, 905, 495)   Captcha Box
-            box = (830, 470, 905, 485)   # Captcha text only
-            area = img.crop(box)
-            filename = 'cropped_' + fname 
-            area.save(filename, 'PNG')
-                        
-            img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
-            img = cv2.resize(img, None, fx=10, fy=10, interpolation=cv2.INTER_LINEAR)
-            img = cv2.medianBlur(img, 9)
-            th, img = cv2.threshold(img, 185, 255, cv2.THRESH_BINARY)
-            filename = 'processed_captcha.png'
-            cv2.imwrite(filename, img)
-            fname = 'converted_captcha.png'
-            check_output(['convert', filename, '-resample', '10', fname])
-            captcha_text = pytesseract.image_to_string(Image.open(fname), lang='eng', config='--psm 8  --dpi 300 -c tessedit_char_whitelist=ABCDEF0123456789')
-            
-            elem = self.driver.find_element_by_xpath('(//input[@type="text"])[2]')
-            logger.info('Entering Captcha_Text[%s]' % captcha_text)
-            elem.send_keys(captcha_text)
-            
-            login_button = '(//button[@type="button"])[2]'            
-            elem = self.driver.find_element_by_xpath(login_button)
-            logger.info('Clicking Login Button')
-            elem.click()
-            try:
-                WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='swal2-confirm swal2-styled']"))).click()
-                logger.info(f'Invalid Captcha [{captcha_text}]')
-                retries += 1                
-                WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.LINK_TEXT, 'Refresh'))).click()
-                continue
-            except TimeoutException:
-                logger.info(f'Valid Captcha [{captcha_text}]')
-                break
-            except Exception as e:
-                logger.error(f'Error guessing [{captcha_text}] - EXCEPT[{type(e)}, {e}]')
+
+    def runCrawl(self,logger, district=None, mandal=None, report_type=None,
+                 auto_captcha=False):
+        self.login(logger, auto_captcha=auto_captcha)
+        if not district:
+            district = self.district
+
+        if not mandal:
+            mandal = self.mandal
+
+        if not report_type:
+            report_type = 'status'
         
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDistrictPaymentAbstract'
         logger.info('Fetching URL[%s]' % url)
@@ -1072,7 +1079,7 @@ class Crawler():
   
 class TestSuite(unittest.TestCase):
     def setUp(self):
-        self.logger = loggerFetch('info')
+        self.logger = logger_fetch('info')
         self.logger.info('BEGIN PROCESSING...')
 
     def tearDown(self):
@@ -1106,7 +1113,7 @@ class TestSuite(unittest.TestCase):
         self.logger.info("Running Crawler Tests")
         # Start a RhythuBharosa Crawl
         rb = Crawler()
-        rb.runCrawl(self.logger, report_type='status')
+        rb.runCrawl(self.logger, report_type='panchayat', auto_captcha=False)
         del rb
         
 if __name__ == '__main__':
