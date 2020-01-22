@@ -113,7 +113,8 @@ def api_get_tagged_locations(logger, tag_id, scheme=None):
         scheme = 'nrega'
     params = {
         'libtech_tag' : tag_id,
-        'scheme' : scheme
+        'scheme' : scheme,
+        'limit' : 500
     }
     response = fetch_data(logger, LOCATIONURL, params=params)
     count = response.get("count", 0)

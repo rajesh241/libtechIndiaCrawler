@@ -950,7 +950,6 @@ class Crawler():
 
                
                 logger.info(f"Now I am going to close the village Window")
-                input()
                 self.print_current_window_handles(logger,
                                                   event_name="beforevllageclose")
                 self.driver.close()#This will close the village window
@@ -1127,7 +1126,6 @@ class Crawler():
             #else:
             #    curIndex=None
             
-            break
         return 'SUCCESS'
   
     def crawlStatusUpdateReport(self,logger, district=None, mandal=None):
@@ -1276,9 +1274,8 @@ class TestSuite(unittest.TestCase):
            #rb_location.save_report(logger, report_type, village_df)
            rb_crawler = RBCrawler(self.logger)
            if location_code is not None:
-               village_df = pd.read_csv("~/thrash/village_df.csv")
                sample_name = "on_demand"
-               #village_df = rb_crawler.get_crawl_df(self.logger, block_code=location_code)
+               village_df = rb_crawler.get_crawl_df(self.logger, block_code=location_code)
            elif sample_name is not None:
                village_df = rb_crawler.get_crawl_df(self.logger, tag_name=sample_name)
            else:
