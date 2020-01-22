@@ -1,8 +1,8 @@
 """Blank file which can server as starting point for writing any script file"""
 import argparse
 import pandas as pd
-from libtech_lib.lib.commons import logger_fetch
-from libtech_lib.lib.aws import upload_s3
+from libtech_lib.generic.commons import logger_fetch
+from libtech_lib.generic.aws import upload_s3
 from libtech_lib.rayatubarosa.models import RBLocation, RBCrawler
 def args_fetch():
     '''

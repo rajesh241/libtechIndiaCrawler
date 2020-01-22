@@ -5,11 +5,11 @@
 import pandas as pd
 import json
 import datetime
-from libtech_lib.lib.aws import (
+from libtech_lib.generic.aws import (
     get_aws_parquet,
     get_aws_file_url
 )
-from libtech_lib.lib.api_interface import (
+from libtech_lib.generic.api_interface import (
     get_location_dict,
     api_get_child_locations,
     api_get_tagged_locations,
