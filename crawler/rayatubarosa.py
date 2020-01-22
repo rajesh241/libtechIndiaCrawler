@@ -468,7 +468,7 @@ def main():
         rb_crawler = RBCrawler(logger)
         if location_code is not None:
             village_df = rb_crawler.get_crawl_df(logger, block_code=location_code)
-        if sample_name is not None:
+        elif sample_name is not None:
             village_df = rb_crawler.get_crawl_df(logger, tag_name=sample_name)
         else:
             logger.info("Either of location Code or Sample Name input is required")
