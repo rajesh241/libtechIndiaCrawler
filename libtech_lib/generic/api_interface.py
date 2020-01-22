@@ -13,7 +13,7 @@ with open(JSONCONFIGFILE) as CONFIG_file:
     CONFIG = json.load(CONFIG_file)
 
 BASEURL = CONFIG['baseURL']
-BASEURL = "http://b.libtech.in:8181"
+#BASEURL = "http://b.libtech.in:8181"
 API_USER_NAME = CONFIG['apiusername']
 API_PASSWORD = CONFIG['apipassword']
 AUTHENDPOINT = '%s/api/user/token/' % (BASEURL)
@@ -81,7 +81,6 @@ def get_location_dict(logger, location_code=None, location_id=None, scheme=None)
         location_dict = fetch_data(logger, url)
     if location_code is not None:
         url = f"{LOCATIONURL}?code={location_code}&scheme={scheme}"
-        logger.info(url)
         response = fetch_data(logger, url)
         results = response.get("results", None)
         if results is None:
