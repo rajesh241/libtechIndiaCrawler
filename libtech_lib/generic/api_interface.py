@@ -136,7 +136,8 @@ def api_get_child_locations(logger, location_code, scheme=None):
         scheme = 'nrega'
     params = {
         'parent_location__code' : location_code,
-        'scheme' : scheme
+        'scheme' : scheme,
+        'limit' : 500
     }
     response = fetch_data(logger, LOCATIONURL, params=params)
     count = response.get("count", 0)
