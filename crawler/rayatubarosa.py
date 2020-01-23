@@ -275,11 +275,10 @@ class Crawler():
                     villageDF.to_csv(f"~/thrash/{village_code}.csv")
 
 
-                    break
+                    #break
 
                
                 logger.info(f"Now I am going to close the village Window")
-                input()
                 self.print_current_window_handles(logger,
                                                   event_name="beforevllageclose")
                 self.driver.close()#This will close the village window
