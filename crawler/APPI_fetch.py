@@ -25,7 +25,7 @@ from selenium.webdriver.common.keys import Keys
 import requests
 import time
 import unittest
-
+import datetime
 from libtech_lib.generic.commons import logger_fetch
 from libtech_lib.wrappers.sn import driverInitialize, driverFinalize, displayInitialize, displayFinalize
 from libtech_lib.generic.aws import get_aws_parquet, upload_s3
@@ -736,7 +736,10 @@ class Crawler():
         self.payment_url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/PaymentvillReport'
         self.display = displayInitialize(isDisabled = True, isVisible = is_visible)
         self.driver = driverInitialize(timeout=3) # driverInitialize(path='/opt/firefox/', timeout=3)
-    
+        self.land_type_dict = [{'name': 'Webland', 'value': '1'},
+                               {'name':'ROFR','value':'2'},
+                               {'name': 'Tenant', 'value': '3'},
+                               {'name': 'UnseededWebland','value':'4'}] 
     def __del__(self):
         driverFinalize(self.driver) 
         displayFinalize(self.display)
@@ -747,7 +750,7 @@ class Crawler():
         wh_then = self.vars["window_handles"]
         if len(wh_now) > len(wh_then):
             return set(wh_now).difference(set(wh_then)).pop()
-    def login(self, logger, auto_captcha=False):
+    def login(self, logger, auto_captcha=True):
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/RB/Login'
         logger.info('Fetching URL[%s]' % url)
         self.driver.get(url)
@@ -775,11 +778,12 @@ class Crawler():
                 self.driver.save_screenshot(fname)
                 img = Image.open(fname)
                 # box = (815, 455, 905, 495)   Captcha Box
-                box = (830, 470, 905, 485)   # Captcha text only
+                #box = (830, 470, 905, 485)   # Captcha text only
+                box = (1170, 940, 1315, 965)   # Captcha text only
+                box = (1025, 940, 1170, 965)   # Captcha text only
                 area = img.crop(box)
                 filename = 'cropped_' + fname 
                 area.save(filename, 'PNG')
-                            
                 img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
                 img = cv2.resize(img, None, fx=10, fy=10, interpolation=cv2.INTER_LINEAR)
                 img = cv2.medianBlur(img, 9)
@@ -866,7 +870,251 @@ class Crawler():
                 time.sleep(3)
 
             return 'FAILURE'
-    def download_payment_report(self, logger, village_df, report_type=None, sample_name=None):
+    def download_payment_report(self, logger, base_df, report_type=None, sample_name=None):
+        today_date = datetime.date.today().strftime("%d_%m_%Y")
+        if sample_name == "on_demand":
+            statusfilepath = f"data/samples/{sample_name}/rayatubarosa/{report_type}/{district_code}/{block_code}/status.csv"
+        else:
+            statusfilepath = f"data/samples/{sample_name}/rayatubarosa/{report_type}/{today_date}/status.csv"
+        upload_s3(logger, statusfilepath, base_df)
+        village_df = base_df[base_df['status'] == "pending"]
+        logger.info(f"lengt of village df is {len(village_df)}")
+        village_df = village_df[village_df['block_code'] != 4851]
+        logger.info(f"lengt of village df is {len(village_df)}")
+        status_array = []
+        logger.info("Downloading payment report")
+        logger.info("First lets group districts and mandals")
+        logger.info(f"Length of village_df is {len(village_df)}")
+        dfgrouped = village_df.groupby(["district_name_telugu",
+                            "block_name_telugu"]).size().reset_index(name='counts')
+        dfgrouped.to_csv("~/thrash/grouped.csv")
+        status_columns = ['district_name_telugu', 'block_name_telugu',
+                          'village_name_telugu', 'district_code',
+                          'block_code', 'village_code',
+                          'data_rows', 'error']
+        logger.info(f"Length of rouped_df is {len(dfgrouped)}")
+        self.login(logger, auto_captcha=True)
+        dfgrouped_len = len(dfgrouped)
+        for index, row in dfgrouped.iterrows():
+            nindex = dfgrouped_len - index
+            district_name = row['district_name_telugu']
+            block_name = row['block_name_telugu']
+            logger.info(f"Processing group {index} with{district_name}-{block_name}")
+            self.driver.get(self.district_url)
+            ##Lets get the current window and save it as district_window
+            self.vars["window_handles"] = self.driver.window_handles
+            self.vars['district_window'] = self.driver.current_window_handle
+            self.print_current_window_handles(logger,
+                                              event_name="After district page fetch")
+            time.sleep(3)
+            #Now we will click the district which will open another window for
+            self.driver.switch_to.window(self.vars["district_window"])
+            #block
+            self.vars["window_handles"] = self.driver.window_handles
+            WebDriverWait(self.driver,
+                          5).until(EC.element_to_be_clickable((By.LINK_TEXT,
+                                                               district_name))).click()
+
+            logger.info("after district click")
+            self.print_current_window_handles(logger)
+
+            self.vars["mandal_window"] = self.wait_for_window(5)
+            self.vars["window_handles"] = self.driver.window_handles
+            logger.info("after waiting district click")
+            self.print_current_window_handles(logger)
+            ##Now we shall click the mandal and it will open another village
+            logger.info("Will sleep for 5 seconds")
+            time.sleep(3)
+            self.driver.switch_to.window(self.vars["mandal_window"])
+            logger.info(block_name)
+            WebDriverWait(self.driver,
+                          5).until(EC.element_to_be_clickable((By.LINK_TEXT,
+                                                               block_name))).click()
+            logger.info("after block click")
+            self.print_current_window_handles(logger)
+
+            self.vars["village_window"] = self.wait_for_window(5)
+            self.driver.switch_to.window(self.vars["village_window"])
+            self.vars["window_handles"] = self.driver.window_handles
+            ### Here I should do all theprocessing of downloading the stats
+            ### Also getting all the village codes.
+            time.sleep(2)
+
+
+
+            mandal_df = village_df[village_df['district_name_telugu'] == district_name]
+            vill_df = mandal_df[mandal_df['block_name_telugu'] == block_name]
+            #vill_df = vill_df.reset_index()
+            vill_df_len = len(vill_df)
+            logger.info(f"Lenth of village df is {vill_df_len}")
+            for vill_index, vill_row in vill_df.iterrows():
+                nvill_index = vill_df_len - vill_index
+                village_code = str(vill_row['village_code'])
+                district_code = vill_row['district_code']
+                block_code = vill_row['block_code']
+                village_name = vill_row['village_name']
+                district_code = vill_row['village_name']
+                block_code = vill_row['village_name']
+                land_type = vill_row['land_type']
+                land_sel_option = str(vill_row['land_sel_option'])
+                logger.info(f"Processing {vill_index} {village_code}-{village_name}")
+                error, dataframe = self.crawlPaymentvillReport(logger,
+                                                               village_code,
+                                                               village_name,
+                                                              land_sel_option,
+                                                              land_type)
+                #error = "error"
+                #dataframe = None
+                df_rows = 0
+                logger.info(f"Error is{vill_index}- {error}")
+                if error is None:
+                    error = "noError"
+                    base_df.loc[vill_index, "status"] = "processed"
+                if dataframe is not None:
+                    df_rows = len(dataframe)
+                    dataframe['village_name_tel']=village_name
+                    dataframe['village_code']=village_code
+                    dataframe['district_name_tel']=district_name
+                    dataframe['mandal_name_tel']=block_name
+                    dataframe['district_code']=district_code
+                    dataframe['block_code']=block_code
+                    dataframe.to_csv("~/thrash/vildata.csv")
+                    rb_location = RBLocation(logger, village_code)
+                    rb_location.save_report(logger, report_type, dataframe,
+                                          sample_name=sample_name,
+                                           land_type=land_type)
+                    base_df.loc[vill_index, "records"] = df_rows
+
+                status_row = [district_name, block_name, village_name, district_code,
+                       block_code, village_code, df_rows, error]
+                status_array.append(status_row)
+                status_df = pd.DataFrame(status_array, columns=status_columns)
+                base_df.loc[vill_index, "error"] = error
+                base_df.to_csv("sample_village_df.csv")
+                status_df.to_csv("~/thrash/crawlstatus.csv")
+                logger.info(f"Finished {vill_index} {village_code}-{village_name}")
+                self.print_current_window_handles(logger)
+                self.driver.switch_to.window(self.vars["village_window"])
+                time.sleep(3)
+                #input()
+
+            logger.info("closing village window")
+            self.driver.close()#This will close the village window
+            self.print_current_window_handles(logger)
+            self.driver.switch_to.window(self.vars["mandal_window"])
+            logger.info("closing mandal window")
+            self.driver.close()#This will close the mandal window
+            self.print_current_window_handles(logger)
+            self.driver.switch_to.window(self.vars["district_window"])
+
+        status_df = pd.DataFrame(status_array, columns=status_columns)
+        status_df.to_csv("~/thrash/crawlstatus.csv")
+    def crawlPaymentvillReport(self,logger, village_code, village_name,
+                              land_sel_option, land_type):
+        error = None
+        villageDFs=[]
+        villageName=village_name
+        value=village_code
+        village_extract_dict = {}
+        village_extract_dict['pattern'] = "Katha Number"
+        #WebDriverWait(self.driver, 10).until(EC.title_contains("వై ఎస్ ఆర్ రైతు భరోసా"))
+        #logger.info("Page Title is : "+self.driver.title)
+        url = self.payment_url
+        logger.info('Fetching URL[%s]' % url)
+        self.driver.get(url)
+        time.sleep(3)
+        dataframe = None
+        villageXPath="//select[1]"
+        landXpath="//select[2]"
+        landXpath="//*/select[@ng-model='landtypemdl']"
+        ##### Trying to locate village select Element
+        try:
+            villageSelect=Select(self.driver.find_element_by_xpath(villageXPath))
+        except Exception as e:
+            logger.error(f'Exception during villageSelect for {villageXPath} - EXCEPT[{type(e)}, {e}]')
+            error = f'Exception during villageSelect for {villageXPath} - EXCEPT[{type(e)}, {e}]'
+            return error, dataframe
+
+        ### Using village select element to select a village
+        try:
+            villageSelect.select_by_value(value)
+            time.sleep(3)
+        except Exception as e:
+            logger.error(f'Exception during select of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]')
+            error=f'Exception during select of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]'
+            return error, dataframe
+
+        ### Locating land select
+        landSelect=Select(self.driver.find_element_by_xpath(landXpath))
+        #Now we will select the landtype and click on input button
+        landValue=land_sel_option
+        landType=land_type
+        land_type = landType
+        try:
+            landSelect.select_by_value(landValue)
+            self.driver.find_element_by_xpath('//input[@value="submit"]').click()
+            logger.info(f"Submit clicked for vilageName[{villageName}], {slugify(villageName)}] landType[{landType}]")
+        except Exception as e:
+            logger.error(f'Exception during select for landType[{landType}] of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]')
+            error = f'Exception during select landType[{landType}] of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]'
+            return error, dataframe
+        ### Trying to catch an alert for no data
+        timeout=20            
+        try:
+            logger.debug(f'Timeout value is {timeout}')
+            WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='swal2-confirm swal2-styled']"))).click()
+            logger.info(f'Skipping for landType[{landType}] of Village[{villageName}]')
+            error = None
+            dataframe = None
+            return error, dataframe
+        except Exception as e:
+            logger.info(f'Moving Ahead for landType[{landType}] of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]')
+        #This loop will actually fetch the data
+        while True:
+            try:
+                WebDriverWait(self.driver, 5).until(EC.element_to_be_clickable((By.XPATH, "//input[@class='btn btn-primary']")))
+                logger.info(f'Found Data')
+                myhtml = self.driver.page_source
+            except Exception as e:
+                logger.error(f'When reading HTML source landType[{landType}] of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]')
+                error=f'unable to read html landType[{landType}] of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]'
+                #statusDF.loc[curIndex,'inProgress'] = 0
+                #statusDF.to_csv(self.status_file)
+                logger.warning(f'Skipping at HTML read level Village[{villageName}]')
+                myhtml = None
+                return error, dataframe
+            if myhtml is not None: 
+                df = get_dataframe_from_html(logger, myhtml,
+                                              mydict=village_extract_dict)
+                df['land_type']=landType
+                villageDFs.append(df)
+                logger.info(f'Adding the table for village[{villageName}] and type[{landType}]')
+
+            try:
+                elem = WebDriverWait(self.driver, 3).until(EC.element_to_be_clickable((By.LINK_TEXT, '›')))
+                parent = elem.find_element_by_xpath('..')
+                logger.info(f'parent[{parent.get_attribute("class")}] elem[{elem.get_attribute("class")}]')
+                if 'disabled' in parent.get_attribute("class"):
+                    logger.info(f'Disabled so end here!')
+                    break
+                else:
+                    elem.click()
+                    time.sleep(5)
+                    continue
+            except Exception as e:
+                logger.info(f'No pagination here!')
+                break
+                
+        if len(villageDFs) > 0:
+            villageDF=pd.concat(villageDFs)
+        else:
+            villageDF=None
+
+        
+        return error, villageDF
+  
+
+    def download_payment_report1(self, logger, village_df, report_type=None, sample_name=None):
         """This function will download the payment report from the villages"""
         village_stat_df_array = []
         village_name_df_array = []
@@ -918,8 +1166,6 @@ class Crawler():
 
                 logger.info("Will sleep for 5 seconds")
                 time.sleep(5)
-
-
                 WebDriverWait(self.driver,
                               5).until(EC.element_to_be_clickable((By.LINK_TEXT,
                                                                    mandal_name))).click()
@@ -966,7 +1212,7 @@ class Crawler():
         dataframe.to_csv("village_stat.csv")
  
         
-    def crawlPaymentvillReport(self,logger, district_name=None,
+    def crawlPaymentvillReport1(self,logger, district_name=None,
                                mandal_name=None, village_df=None,
                                sample_name=None):
         village_extract_dict = {}
@@ -1228,7 +1474,12 @@ class Crawler():
         villageDF.to_csv(filename, index=False)
                     
         return 'SUCCESS'
-  
+ 
+def get_unique_district_block(logger, dataframe):
+    logger.info(dataframe.columns)
+    df = dataframe.groupby(["district_name_telugu",
+                            "block_name_telugu"]).size().reset_index(name='counts')
+    logger.info(len(df))
 class TestSuite(unittest.TestCase):
     def setUp(self):
         self.logger = logger_fetch('info')
@@ -1277,21 +1528,27 @@ class TestSuite(unittest.TestCase):
                sample_name = "on_demand"
                village_df = rb_crawler.get_crawl_df(self.logger, block_code=location_code)
            elif sample_name is not None:
-               village_df = rb_crawler.get_crawl_df(self.logger, tag_name=sample_name)
+              #village_df = rb_crawler.get_crawl_df(self.logger,
+              #                                     tag_name=sample_name,
+              #                                     enum_land_type=True
+              #                                    )
+              #village_df.to_csv("sample_village_df.csv")
+              #exit(0)
+               village_df = pd.read_csv("sample_village_df.csv", index_col=0)
+               self.logger.info(f"lengt of village df is {len(village_df)}")
            else:
                logger.info("Either of location Code or Sample Name input is required")
                logger.info("Exiting!!!")
                exit(0)
-           self.logger.info(village_df.head())
            rb = Crawler()
-           rb.runCrawl(self.logger, report_type=report_type,
-                       sample_name=sample_name, village_df=village_df,
-                       auto_captcha=False)
+           rb.download_payment_report(self.logger, village_df,
+                                      report_type=report_type,
+                                      sample_name=sample_name)
            del rb
         else:
            rb = Crawler()
-           rb.runCrawl(self.logger, report_type='status',
-                       auto_captcha=False)
+           #rb.runCrawl(self.logger, report_type='status',
+                     #  auto_captcha=False)
            del rb
          
 if __name__ == '__main__':
