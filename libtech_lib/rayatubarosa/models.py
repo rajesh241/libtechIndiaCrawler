@@ -47,9 +47,12 @@ class RBLocation():
         else:
             filepath = None
         return filepath
-    def save_report(self, logger, report_type, data, sample_name=None):
+    def save_report(self, logger, report_type, data, sample_name=None,
+                    land_type=None):
         if sample_name is None:
             sample_name = "on_demand"
+        if land_type is None:
+            land_type = ''
         base_dir = f"data/samples/{sample_name}/"
         geography_path = self.get_geography_path(logger)
         if sample_name == "on_demand":
@@ -57,7 +60,7 @@ class RBLocation():
         else:
             today_date = datetime.date.today().strftime("%d_%m_%Y")
             filepath = f"{base_dir}{self.scheme}/{report_type}/{today_date}/{geography_path}"
-        filename = f"{self.code}_{report_type}.csv"
+        filename = f"{self.code}_{report_type}_{land_type}.csv"
         filename = filepath+filename
         logger.info(f"filename is {filename}")
         create_update_report(logger, self.id, report_type,
@@ -78,7 +81,7 @@ class RBCrawler():
     def __init__(self, logger):
         self.scheme = 'rayatubarosa'
     def get_crawl_df(self, logger, block_code = None,
-                    tag_name = None):
+                    tag_name = None, enum_land_type=False):
         """This is to get the crawer df with all the crawl parameters and file
         path parameters"""
         dataframe = None
@@ -86,6 +89,14 @@ class RBCrawler():
         col_headers = ["district_name_telugu", "block_name_telugu",
                        "village_name", "district_code",
                        "block_code", "village_code"]
+        extra_col_headers = ['status', 'records', 'error']
+        extra_row_values = ['pending', 0 , ""]
+        land_type_dict = [{'name': 'Webland', 'value': '1'},
+                               {'name':'ROFR','value':'2'},
+                               {'name': 'Tenant', 'value': '3'},
+                               {'name': 'UnseededWebland','value':'4'}] 
+
+
         if block_code is not None:
             rb_block = RBBlock(logger, block_code)
             village_code_array = rb_block.get_child_locations(logger)
@@ -105,8 +116,19 @@ class RBCrawler():
                    village_loc.block_code,
                    village_loc.code
                   ]
-            csv_array.append(row)
-        dataframe = pd.DataFrame(csv_array, columns=col_headers)
+            if enum_land_type:
+                for land_dict in land_type_dict:
+                    land_type = land_dict.get("name", "")
+                    land_value = land_dict.get("value", "")
+                    row1 = [land_type, land_value]
+                    csv_array.append(row+row1+extra_row_values)
+            else:
+                csv_array.append(row+extra_row_values)
+        if enum_land_type:
+            col_headers.append("land_type")
+            col_headers.append("land_sel_option")
+        dataframe = pd.DataFrame(csv_array,
+                                 columns=col_headers+extra_col_headers)
         return dataframe
 
 class RBLocationInit():
