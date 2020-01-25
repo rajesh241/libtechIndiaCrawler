@@ -184,10 +184,9 @@ def fetch_captcha(logger, cookies=None, url=None):
         logger.info('Writing [%s]' % filename)
         html_file.write(response.content)
 
-    #check_output(['convert', filename, '-resample', '35', filename])
+    check_output(['convert', filename, '-resample', '35', filename])
 
-   # return pytesseract.image_to_string(Image.open(filename), lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
-    return pytesseract.image_to_string(Image.open(filename), lang='eng', config='--psm 8 --dpi 300 -c tessedit_char_whitelist=ABCDEF0123456789')
+    return pytesseract.image_to_string(Image.open(filename), lang='eng', config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
     #return pytesseract.image_to_string(Image.open(filename), lang='eng', config='-c tessedit_char_whitelist=0123456789')
 
 
@@ -723,8 +722,8 @@ class Crawler():
     def __init__(self):
         self.status_file = 'status.csv'
         self.dir = 'data/csv'
-        self.mandal = "జి.మాడుగుల"
-        self.district = "విశాఖపట్నం"
+        self.mandal = 'జి.మాడుగుల'
+        self.district = 'విశాఖపట్నం'
         try:
             os.makedirs(self.dir)
         except OSError as e:
@@ -735,7 +734,8 @@ class Crawler():
         self.district_url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDistrictPaymentAbstract'
         self.payment_url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/PaymentvillReport'
         self.display = displayInitialize(isDisabled = True, isVisible = is_visible)
-        self.driver = driverInitialize(timeout=3) # driverInitialize(path='/opt/firefox/', timeout=3)
+        self.driver = driverInitialize(timeout=3)
+        #self.driver = driverInitialize(path='/opt/firefox/', timeout=3)
         self.land_type_dict = [{'name': 'Webland', 'value': '1'},
                                {'name':'ROFR','value':'2'},
                                {'name': 'Tenant', 'value': '3'},
@@ -750,7 +750,8 @@ class Crawler():
         wh_then = self.vars["window_handles"]
         if len(wh_now) > len(wh_then):
             return set(wh_now).difference(set(wh_then)).pop()
-    def login(self, logger, auto_captcha=True):
+        
+    def login(self, logger, auto_captcha=False):
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/RB/Login'
         logger.info('Fetching URL[%s]' % url)
         self.driver.get(url)
@@ -778,8 +779,8 @@ class Crawler():
                 self.driver.save_screenshot(fname)
                 img = Image.open(fname)
                 # box = (815, 455, 905, 495)   Captcha Box
-                #box = (830, 470, 905, 485)   # Captcha text only
-                box = (1170, 940, 1315, 965)   # Captcha text only
+                # box = (830, 470, 905, 485)   # Captcha text only
+                # box = (1170, 940, 1315, 965)   # Captcha text only
                 box = (1025, 940, 1170, 965)   # Captcha text only
                 area = img.crop(box)
                 filename = 'cropped_' + fname 
@@ -791,8 +792,8 @@ class Crawler():
                 filename = 'processed_captcha.png'
                 cv2.imwrite(filename, img)
                 fname = 'converted_captcha.png'
-                #check_output(['convert', filename, '-resample', '10', fname])
-                captcha_text = pytesseract.image_to_string(Image.open(filename), lang='eng', config='--psm 8  --dpi 300 -c tessedit_char_whitelist=ABCDEF0123456789')
+                check_output(['convert', filename, '-resample', '10', fname])
+                captcha_text = pytesseract.image_to_string(Image.open(fname), lang='eng', config='--psm 8  --dpi 300 -c tessedit_char_whitelist=ABCDEF0123456789')
                 
                 elem = self.driver.find_element_by_xpath('(//input[@type="text"])[2]')
                 logger.info('Entering Captcha_Text[%s]' % captcha_text)
@@ -803,7 +804,7 @@ class Crawler():
                 logger.info('Clicking Login Button')
                 elem.click()
                 try:
-                    WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='swal2-confirm swal2-styled']"))).click()
+                    WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@class ='swal2-confirm swal2-styled']"))).click()
                     logger.info(f'Invalid Captcha [{captcha_text}]')
                     retries += 1                
                     WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.LINK_TEXT, 'Refresh'))).click()
@@ -813,8 +814,13 @@ class Crawler():
                     break
                 except Exception as e:
                     logger.error(f'Error guessing [{captcha_text}] - EXCEPT[{type(e)}, {e}]')
-            
+
+            if retries == 3:
+                return 'FAILURE'
+            else:
+                return 'SUCCESS'
         else:
+            logger.info('Please ennter the catpcha on the webpage and hit any key...')
             input()
 
     def print_current_window_handles(self, logger, event_name=None):
@@ -824,7 +830,7 @@ class Crawler():
         for index, handle in enumerate(handles):
             logger.info(f"{index}-{handle}")
 
-    def runCrawl(self,logger, sample_name=None, village_df=None,
+    def run_crawl(self,logger, sample_name=None, village_df=None,
                  district=None, mandal=None, report_type=None,
                  auto_captcha=False):
         self.login(logger, auto_captcha=auto_captcha)
@@ -832,37 +838,10 @@ class Crawler():
             self.download_payment_report(logger, village_df,
                                          report_type=report_type,
                                          sample_name=sample_name)
-        else:
-            if not district:
-                district = self.district
-
-            if not mandal:
-                mandal = self.mandal
-
-            if not report_type:
-                report_type = 'status'
-            
-            url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDistrictPaymentAbstract'
-            logger.info('Fetching URL[%s]' % url)
-            self.driver.get(url)
-            self.vars["window_handles"] = self.driver.window_handles
-            WebDriverWait(self.driver, 15).until(EC.element_to_be_clickable((By.LINK_TEXT, district))).click()
-            
-            self.vars["win9760"] = self.wait_for_window(2000)
-            self.driver.switch_to.window(self.vars["win9760"])
-            self.vars["window_handles"] = self.driver.window_handles
-            WebDriverWait(self.driver, 15).until(EC.element_to_be_clickable((By.LINK_TEXT, mandal))).click()
-            self.vars["win3091"] = self.wait_for_window(2000)
-            self.driver.switch_to.window(self.vars["win3091"])
-            time.sleep(3)
-
-            crawl_function = self.crawlPaymentvillReport
-            if report_type == 'status':
-                crawl_function = self.crawlStatusUpdateReport
-            
+        elif report_type == 'status':
             retries = 0
-            while(True and retries < 3):
-                result = crawl_function(logger, district, mandal)
+            while(True and retries < 10):
+                result = sefl.crawlStatusUpdateReport(logger, district, mandal)
                 if result == 'SUCCESS':
                     return result
                 retries += 1
@@ -870,6 +849,7 @@ class Crawler():
                 time.sleep(3)
 
             return 'FAILURE'
+
     def download_payment_report(self, logger, base_df, report_type=None, sample_name=None):
         today_date = datetime.date.today().strftime("%d_%m_%Y")
         if sample_name == "on_demand":
@@ -1009,6 +989,7 @@ class Crawler():
 
         status_df = pd.DataFrame(status_array, columns=status_columns)
         status_df.to_csv("~/thrash/crawlstatus.csv")
+
     def crawlPaymentvillReport(self,logger, village_code, village_name,
                               land_sel_option, land_type):
         error = None
@@ -1109,7 +1090,6 @@ class Crawler():
             villageDF=pd.concat(villageDFs)
         else:
             villageDF=None
-
         
         return error, villageDF
   
@@ -1287,10 +1267,10 @@ class Crawler():
                     return 'FAILURE'
                     
                 try:
-                    if landValue == 1:
+                    if landValue == '1':
                         timeout = 2
                     else:
-                        timeout = 5
+                        timeout = 25
                     logger.debug(f'Timeout value is {timeout}')
                     WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='swal2-confirm swal2-styled']"))).click()
                     #statusDF.loc[curIndex, landType] = 'failed'
@@ -1303,7 +1283,7 @@ class Crawler():
                 while True:
                     try:
                         #WebDriverWait(self.driver, 3).until(EC.presence_of_element_located((By.LINK_TEXT, 'Name Of Beneficiary')))
-                        WebDriverWait(self.driver, 5).until(EC.element_to_be_clickable((By.XPATH, "//input[@class='btn btn-primary']")))
+                        WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((By.XPATH, "//input[@class='btn btn-primary']")))
                         logger.info(f'Found Data')
                         myhtml = self.driver.page_source
                     except Exception as e:
@@ -1311,10 +1291,11 @@ class Crawler():
                         #statusDF.loc[curIndex,'inProgress'] = 0
                         #statusDF.to_csv(self.status_file)
                         logger.warning(f'Skipping at HTML read level Village[{villageName}]')
+                        #continue
                         return 'FAILURE'
                         
-                   # dfs=pd.read_html(myhtml)
-                   # df=dfs[0]
+                    #dfs=pd.read_html(myhtml)
+                    #df=dfs[0]
                     df = get_dataframe_from_html(logger, myhtml,
                                                   mydict=village_extract_dict)
                     #logger.info('Before')
@@ -1375,6 +1356,7 @@ class Crawler():
         return 'SUCCESS'
   
     def crawlStatusUpdateReport(self,logger, district=None, mandal=None):
+        self.login(logger, auto_captcha=True)
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/Statusupdate'
         logger.info('Fetching URL[%s]' % url)
         self.driver.get(url)
@@ -1474,12 +1456,132 @@ class Crawler():
         villageDF.to_csv(filename, index=False)
                     
         return 'SUCCESS'
+
+    def set_district(self, district_name=None, district_code=None):
+        if not district_name:
+            district_name = 'విశాఖపట్నం'
+
+        # district_code = lookup[district_name]  # Goli has the lookup?
+        if not district_code:
+            district_code = '520' # Vishakapatnam is hard coded
+            
+        self.driver.execute_script(f"sessionStorage.setItem('district', '{district_code}'); sessionStorage.setItem('districtname', '{district_name}');");
+
+    def set_mandal(self, mandal_name=None, mandal_code=None):
+        if not mandal_name:
+            mandal_name = 'జి.మాడుగుల'  # put lookup here in case only code was given
+
+        if not mandal_code:
+            mandal_code = '4848'        # put lookup here in case only name was given
+
+        self.driver.execute_script(f"sessionStorage.setItem('mandal', '{mandal_code}'); sessionStorage.setItem('mandalname', '{mandal_name}');");
+            
+    def crawl_death_abstract_report(self, logger, district=None, mandal=None, village=None):
+        #url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractMandal'
+        url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractvillage'
+        self.login(logger, auto_captcha=True)
+
+        # Debug before and after statements can be removed - FIXME
+        session_storage = self.driver.execute_script("return sessionStorage;");
+        logger.info(f'Before sessionStorage[{session_storage}]')
+
+        self.set_district(district)  # could give both name and code depending on input
+        self.set_mandal(mandal)
+        
+        session_storage = self.driver.execute_script("return sessionStorage;");
+        logger.info(f'After sessionStorage[{session_storage}]')
+        
+        logger.info('Fetching URL[%s]' % url)
+        self.driver.get(url)
+        try:
+            WebDriverWait(self.driver, 25).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='btn btn-primary']")))
+            logger.info(f'Fetching Death Abstract for [{mandal}]...')
+        except TimeoutException:
+            logger.timeout(f'Timed out waiting for Death Abstract for [{mandal}]')
+            #break
+            #return 'FAILURE'
+        except Exception as e:
+            logger.error(f'Errored Waiting for Death Abstract for [{mandal}] - EXCEPT[{type(e)}, {e}]')
+            #break
+            #return 'FAILURE'
+
+        filename=f'{self.dir}/{district}_{mandal}.csv'
+        html_source = self.driver.page_source
+        df = pd.read_html(html_source)[0]
+        logger.debug(f'{df}')
+        logger.info(f'Writing [{filename}]') 
+        df.to_csv(filename, index=False)
+        
+        table_id = 'tblreject'
+        logger.info('Waiting for the table ID[{table_id}] to load')
+        table = WebDriverWait(self.driver, timeout).until(
+            EC.presence_of_element_located((By.ID, table_id))
+        )
+        for elem in table.find_elements_by_css_selector('a'):
+            value = elem.get_attribute('text')
+            if value == '0':
+                continue
+            logger.info(f'Clicking for village[{village}] > value[{value}]')
+            logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
+            elem.click()
+            time.sleep(3) #FIXME
+            elem.click()
+            time.sleep(3) #FIXME
+            parent_handle = self.driver.current_window_handle
+            #logger.info("Handles : %s" % self.driver.window_handles + "Number : %d" % len(self.driver.window_handles))
+            logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
+        
+            if len(self.driver.window_handles) > 1:
+                logger.info('Switching Window...')
+                self.driver.switch_to.window(self.driver.window_handles[-1])
+                logger.info('Switched!!!')
+                html_source = self.driver.page_source
+                #time.sleep(2)
+            else:
+                logger.error(f'Handlers gone wrong [{str(self.driver.window_handles)}]')
+                self.driver.save_screenshot('./button_'+captcha_text+'.png')
+                return 'FAILURE'
+            '''
+            try:
+                logger.info('Waiting for page to load')
+                elem = WebDriverWait(driver, timeout).until(
+                    #EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lbl_village"))
+                    EC.presence_of_element_located((By.XPATH, '/html/body/div[3]/div[3]/div/div[2]/div/div/table/thead/tr/th[4]'))
+                )
+            except TimeoutException as e:
+                logger.error('Timeout waiting for dialog box - EXCEPT[%s:%s]' % (type(e), e))
+                self.driver.close()
+                self.driver.switch_to.window(parent_handle)
+                return 'ABORT'
+            except Exception as e:
+                logger.error('Exception on WebDriverWait(10) - EXCEPT[%s:%s]' % (type(e), e))
+                self.driver.save_screenshot('./button_'+captcha_text+'.png')
+                self.driver.close()
+                self.driver.switch_to.window(parent_handle)
+                return 'ABORT'
+            WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located((By.XPATH, '/html/body/div[3]/div[3]/div/div[2]/div/div/table/thead/tr/th[4]'))
+            )
+            '''
+            df = pd.read_html(html_source)[0]
+            logger.debug(f'{df}')
+            filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
+            logger.info(f'Writing [{filename}]') 
+            df.to_csv(filename, index=False)
+            self.driver.close()
+            self.driver.switch_to.window(parent_handle)
+            logger.info('Press any key')
+            input()
+            exit(0)
+        
+        return 'SUCCESS'
  
 def get_unique_district_block(logger, dataframe):
     logger.info(dataframe.columns)
     df = dataframe.groupby(["district_name_telugu",
                             "block_name_telugu"]).size().reset_index(name='counts')
     logger.info(len(df))
+    
 class TestSuite(unittest.TestCase):
     def setUp(self):
         self.logger = logger_fetch('info')
@@ -1547,9 +1649,18 @@ class TestSuite(unittest.TestCase):
            del rb
         else:
            rb = Crawler()
-           #rb.runCrawl(self.logger, report_type='status',
-                     #  auto_captcha=False)
+           rb.run_crawl(self.logger, report_type='status',
+                       auto_captcha=False)
            del rb
          
+    def test_crawl_death_abstract_report(self):
+        self.logger.info("Running Crawler Tests")
+        # Start a RhythuBharosa Crawl
+        rb = Crawler()
+        rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', 
+                                       village='దేవరాపల్లి')
+        del rb
+        
+        
 if __name__ == '__main__':
     unittest.main()
