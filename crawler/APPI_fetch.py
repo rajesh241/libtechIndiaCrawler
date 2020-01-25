@@ -779,9 +779,10 @@ class Crawler():
                 self.driver.save_screenshot(fname)
                 img = Image.open(fname)
                 # box = (815, 455, 905, 495)   Captcha Box
-                # box = (830, 470, 905, 485)   # Captcha text only
-                # box = (1170, 940, 1315, 965)   # Captcha text only
-                box = (1025, 940, 1170, 965)   # Captcha text only
+                # box = (830, 470, 905, 485)   # Mynk Desktop
+                # box = (1170, 940, 1315, 965)   # Mynk Mac
+                box = (1025, 940, 1170, 965)   # Goli Mac
+                
                 area = img.crop(box)
                 filename = 'cropped_' + fname 
                 area.save(filename, 'PNG')
@@ -1355,12 +1356,17 @@ class Crawler():
             
         return 'SUCCESS'
   
-    def crawlStatusUpdateReport(self,logger, district=None, mandal=None):
+    def crawl_status_update_report(self, logger, district=None, mandal=None):
         self.login(logger, auto_captcha=True)
+        
+        self.set_district(district)  # could give both name and code depending on input
+        self.set_mandal(mandal)
+        
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/Statusupdate'
         logger.info('Fetching URL[%s]' % url)
         self.driver.get(url)
         time.sleep(3)
+        
         villageXPath="//select[1]"
         try:
             villageSelect=Select(self.driver.find_element_by_xpath(villageXPath))
@@ -1477,8 +1483,6 @@ class Crawler():
         self.driver.execute_script(f"sessionStorage.setItem('mandal', '{mandal_code}'); sessionStorage.setItem('mandalname', '{mandal_name}');");
             
     def crawl_death_abstract_report(self, logger, district=None, mandal=None, village=None):
-        #url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractMandal'
-        url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractvillage'
         self.login(logger, auto_captcha=True)
 
         # Debug before and after statements can be removed - FIXME
@@ -1491,6 +1495,8 @@ class Crawler():
         session_storage = self.driver.execute_script("return sessionStorage;");
         logger.info(f'After sessionStorage[{session_storage}]')
         
+        #url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractMandal'
+        url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractvillage'
         logger.info('Fetching URL[%s]' % url)
         self.driver.get(url)
         try:
@@ -1653,8 +1659,15 @@ class TestSuite(unittest.TestCase):
                        auto_captcha=False)
            del rb
          
+    def test_crawl_status_update_report(self):
+        self.logger.info("Running test for Status Update Report")
+        # Start a RhythuBharosa Crawl
+        rb = Crawler()
+        rb.crawl_status_update_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల')
+        del rb
+
     def test_crawl_death_abstract_report(self):
-        self.logger.info("Running Crawler Tests")
+        self.logger.info("Running test for Death Abstract Report")
         # Start a RhythuBharosa Crawl
         rb = Crawler()
         rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', 
