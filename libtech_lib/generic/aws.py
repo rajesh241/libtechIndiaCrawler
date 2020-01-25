@@ -57,6 +57,13 @@ def put_object_s3(bucket, filename, filedata, content_type):
         ACL='public-read'
         )
 
+def get_aws_bucket(logger, bucket_name=None):
+    """Returns the bucket object"""
+    s3_instance = aws_init()
+    if bucket_name is None:
+        bucket_name = AWS_DATA_BUCKET
+    bucket = s3_instance.Bucket(bucket_name)
+    return bucket
 
 def upload_s3(logger, filename, data, bucket_name=None):
     """
