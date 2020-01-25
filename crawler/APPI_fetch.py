@@ -1395,7 +1395,6 @@ class Crawler():
             self.driver.get(url)
             time.sleep(3)
             logger.info(villageCode)
-            input()
             
             villageXPath="//select[1]"
             try:
