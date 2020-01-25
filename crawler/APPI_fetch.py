@@ -1270,10 +1270,10 @@ class Crawler():
                     return 'FAILURE'
                     
                 try:
-                    if landValue == '1':
-                        timeout = 2
-                    else:
+                    if landValue == '4':
                         timeout = 25
+                    else:
+                        timeout = 2
                     logger.debug(f'Timeout value is {timeout}')
                     WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='swal2-confirm swal2-styled']"))).click()
                     #statusDF.loc[curIndex, landType] = 'failed'
@@ -1360,22 +1360,7 @@ class Crawler():
   
     def crawl_status_update_report(self, logger, district=None, mandal=None):
         self.login(logger, auto_captcha=True)
-        
-        self.set_district(district)  # could give both name and code depending on input
-        self.set_mandal(mandal)
-        
-        url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/Statusupdate'
-        logger.info('Fetching URL[%s]' % url)
-        self.driver.get(url)
-        time.sleep(3)
-        
-        villageXPath="//select[1]"
-        try:
-            villageSelect=Select(self.driver.find_element_by_xpath(villageXPath))
-        except Exception as e:
-            logger.error(f'Exception during villageSelect for {villageXPath} - EXCEPT[{type(e)}, {e}]')
-            return 'FAILURE'
-        
+
         statusDF=pd.read_csv(self.status_file,index_col=0)
         #logger.info(statusDF)
         filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
@@ -1392,9 +1377,28 @@ class Crawler():
         
         while curIndex is not None:
             row = filteredDF.loc[curIndex]
-            villageName = row['villageName']
+            district = row['districtName']
+            mandal = row['mandalName']
+            villagename = row['villageName']
             villageCode = str(row['villageCode'])
             kathaNo = str(row['kathaNo'])
+
+            self.set_district(district)  # could give both name and code depending on input
+            self.set_mandal(mandal)
+            
+            url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/Statusupdate'
+            logger.info('Fetching URL[%s]' % url)
+            self.driver.get(url)
+            time.sleep(3)
+            
+            villageXPath="//select[1]"
+            try:
+                villageSelect=Select(self.driver.find_element_by_xpath(villageXPath))
+            except Exception as e:
+                logger.error(f'Exception during villageSelect for {villageXPath} - EXCEPT[{type(e)}, {e}]')
+                return 'FAILURE'
+        
+            
             filename=f"{self.dir}/{district}_{mandal}_{villageName}_{kathaNo}.csv"                          
             if os.path.exists(filename):
                 logger.info('File already downloaded. Reading [%s]...' % filename)
