@@ -56,7 +56,7 @@ base_url = 'https://meebhoomi.ap.gov.in/'
 village_list = [('విశాఖపట్నం', 'అచ్యుతాపురం', 'జోగన్నపాలెం'), ('విశాఖపట్నం', 'అనంతగిరి', 'నిన్నిమామిడి'), ('విశాఖపట్నం', 'అనందపురం', 'ముచ్చెర్ల')]
 skip_district = ['3',]
 is_visible = True
-
+is_mynk = False
 
 #############
 # Functions
@@ -779,9 +779,11 @@ class Crawler():
                 self.driver.save_screenshot(fname)
                 img = Image.open(fname)
                 # box = (815, 455, 905, 495)   Captcha Box
-                # box = (830, 470, 905, 485)   # Mynk Desktop
-                # box = (1170, 940, 1315, 965)   # Mynk Mac
-                box = (1025, 940, 1170, 965)   # Goli Mac
+                if is_mynk:
+                    box = (830, 470, 905, 485)   # Mynk Desktop
+                    # box = (1170, 940, 1315, 965)   # Mynk Mac
+                else:
+                    box = (1025, 940, 1170, 965)   # Goli Mac
                 
                 area = img.crop(box)
                 filename = 'cropped_' + fname 
@@ -1517,26 +1519,36 @@ class Crawler():
         logger.debug(f'{df}')
         logger.info(f'Writing [{filename}]') 
         df.to_csv(filename, index=False)
+
+        villages = df['Village Name']
         
         table_id = 'tblreject'
         logger.info('Waiting for the table ID[{table_id}] to load')
         table = WebDriverWait(self.driver, timeout).until(
             EC.presence_of_element_located((By.ID, table_id))
         )
-        for elem in table.find_elements_by_css_selector('a'):
+        for index, elem in enumerate(table.find_elements_by_css_selector('a')):
             value = elem.get_attribute('text')
             if value == '0':
                 continue
+            village = villages[int(index/2)]
             logger.info(f'Clicking for village[{village}] > value[{value}]')
             logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
+            #elem.click()
+            #time.sleep(3) #FIXME
             elem.click()
-            time.sleep(3) #FIXME
-            elem.click()
-            time.sleep(3) #FIXME
+            time.sleep(5) #FIXME
             parent_handle = self.driver.current_window_handle
             #logger.info("Handles : %s" % self.driver.window_handles + "Number : %d" % len(self.driver.window_handles))
             logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
-        
+            '''
+            html_source = self.driver.page_source
+            df = pd.read_html(html_source)[0]
+            logger.debug(f'{df}')
+            filename=f'{self.dir}/{district}_{mandal}_{village}_base.csv'
+            logger.info(f'Writing [{filename}]') 
+            df.to_csv(filename, index=False)
+            '''
             if len(self.driver.window_handles) > 1:
                 logger.info('Switching Window...')
                 self.driver.switch_to.window(self.driver.window_handles[-1])
@@ -1574,11 +1586,13 @@ class Crawler():
             filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
             logger.info(f'Writing [{filename}]') 
             df.to_csv(filename, index=False)
+            logger.info('Closing Current Window')
             self.driver.close()
+            logger.info('Switching back to Parent Window')            
             self.driver.switch_to.window(parent_handle)
-            logger.info('Press any key')
-            input()
-            exit(0)
+            if False:
+                logger.info('Press any key')
+                input()
         
         return 'SUCCESS'
  
