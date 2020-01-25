@@ -56,7 +56,7 @@ base_url = 'https://meebhoomi.ap.gov.in/'
 village_list = [('విశాఖపట్నం', 'అచ్యుతాపురం', 'జోగన్నపాలెం'), ('విశాఖపట్నం', 'అనంతగిరి', 'నిన్నిమామిడి'), ('విశాఖపట్నం', 'అనందపురం', 'ముచ్చెర్ల')]
 skip_district = ['3',]
 is_visible = True
-is_mynk = False
+is_mynk = True
 
 #############
 # Functions
@@ -1505,7 +1505,7 @@ class Crawler():
             WebDriverWait(self.driver, 25).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='btn btn-primary']")))
             logger.info(f'Fetching Death Abstract for [{mandal}]...')
         except TimeoutException:
-            logger.timeout(f'Timed out waiting for Death Abstract for [{mandal}]')
+            logger.error(f'Timed out waiting for Death Abstract for [{mandal}]')
             #break
             #return 'FAILURE'
         except Exception as e:
@@ -1527,11 +1527,26 @@ class Crawler():
         table = WebDriverWait(self.driver, timeout).until(
             EC.presence_of_element_located((By.ID, table_id))
         )
-        for index, elem in enumerate(table.find_elements_by_css_selector('a')):
+        specific_index = None
+        if village:
+            logger.info(f'The village list [{villages}]')
+            specific_index = village.find(village)
+            logger.info(f'Yippie! We have a hit for {village} {specific_index}')
+
+        for i, elem in enumerate(table.find_elements_by_css_selector('a')):
             value = elem.get_attribute('text')
             if value == '0':
                 continue
-            village = villages[int(index/2)]
+            index = int(i/2)
+            village = villages[index]
+            logger.info(f'specific_index[{specific_index}] vs index[{index}]')
+            if specific_index:
+                logger.info(f'Entered index[{index}]')
+                if specific_index != index:
+                    logger.info(f'Skipping {village}')
+                    continue
+                else:
+                    logger.info(f'Chose index[{index}]')
             logger.info(f'Clicking for village[{village}] > value[{value}]')
             logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
             #elem.click()
