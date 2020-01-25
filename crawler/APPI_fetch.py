@@ -56,7 +56,7 @@ base_url = 'https://meebhoomi.ap.gov.in/'
 village_list = [('విశాఖపట్నం', 'అచ్యుతాపురం', 'జోగన్నపాలెం'), ('విశాఖపట్నం', 'అనంతగిరి', 'నిన్నిమామిడి'), ('విశాఖపట్నం', 'అనందపురం', 'ముచ్చెర్ల')]
 skip_district = ['3',]
 is_visible = True
-is_mynk = True
+is_mynk = False
 
 #############
 # Functions
@@ -721,6 +721,7 @@ def dump_gram_1b_reports(logger, dirname=None):
 class Crawler():
     def __init__(self):
         self.status_file = 'status.csv'
+        self.status_file = 'rejected_at_village_10_sample.csv'
         self.dir = 'data/csv'
         self.mandal = 'జి.మాడుగుల'
         self.district = 'విశాఖపట్నం'
@@ -1380,16 +1381,21 @@ class Crawler():
             district = row['districtName']
             mandal = row['mandalName']
             villagename = row['villageName']
+            villageName=villagename
             villageCode = str(row['villageCode'])
-            kathaNo = str(row['kathaNo'])
+            district_code = str(row['district_code'])
+            mandal_code = str(row['block_code'])
+            kathaNo = str(int(row['kathaNo']))
 
-            self.set_district(district)  # could give both name and code depending on input
-            self.set_mandal(mandal)
-            
+            self.set_district(district_name=district,district_code=district_code)  # could give both name and code depending on input
+            self.set_mandal(mandal_name=mandal,mandal_code=mandal_code)
+            time.sleep(5) 
             url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/Statusupdate'
             logger.info('Fetching URL[%s]' % url)
             self.driver.get(url)
             time.sleep(3)
+            logger.info(villageCode)
+            input()
             
             villageXPath="//select[1]"
             try:
