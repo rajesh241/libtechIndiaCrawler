@@ -55,7 +55,8 @@ base_url = 'https://meebhoomi.ap.gov.in/'
 
 village_list = [('విశాఖపట్నం', 'అచ్యుతాపురం', 'జోగన్నపాలెం'), ('విశాఖపట్నం', 'అనంతగిరి', 'నిన్నిమామిడి'), ('విశాఖపట్నం', 'అనందపురం', 'ముచ్చెర్ల')]
 skip_district = ['3',]
-is_visible = False
+is_visible = True  # Make False before commmitting
+is_mac = True      # Make False before commmitting
 is_mynk = True
 
 #############
@@ -734,7 +735,7 @@ class Crawler():
         self.vars = {}
         self.district_url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDistrictPaymentAbstract'
         self.payment_url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/PaymentvillReport'
-        self.display = displayInitialize(isDisabled = False, isVisible = is_visible)
+        self.display = displayInitialize(isDisabled = is_mac, isVisible = is_visible)
         self.driver = driverInitialize(timeout=3)
         #self.driver = driverInitialize(path='/opt/firefox/', timeout=3)
         self.land_type_dict = [{'name': 'Webland', 'value': '1'},
@@ -782,7 +783,8 @@ class Crawler():
                 # box = (815, 455, 905, 495)   Captcha Box
                 if is_mynk:
                     box = (830, 470, 905, 485)   # Mynk Desktop
-                    # box = (1170, 940, 1315, 965)   # Mynk Mac
+                    if is_mac:
+                        box = (1170, 940, 1315, 965)   # Mynk Mac
                 else:
                     box = (1025, 940, 1170, 965)   # Goli Mac
 
@@ -1512,7 +1514,7 @@ class Crawler():
         self.driver.get(url)
         try:
             WebDriverWait(self.driver, 25).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='btn btn-primary']")))
-            logger.info(f'Fetching Death Abstract for [{mandal}]...')
+            logger.info(f'Fetching Death Abstract Report for [{mandal}]...')
         except TimeoutException:
             logger.error(f'Timed out waiting for Death Abstract for [{mandal}]')
             #break
@@ -1541,38 +1543,23 @@ class Crawler():
             logger.info(f'The village list [{villages}]')
             specific_index = village.find(village)
             logger.info(f'Yippie! We have a hit for {village} {specific_index}')
-
-        for i, elem in enumerate(table.find_elements_by_css_selector('a')):
+        
+        for row, village in enumerate(villages, 1):
+            village_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[2]'
+            elem = self.driver.find_element_by_xpath(village_path)        
+            village_value = elem.get_attribute('text')
+            
+            link_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[4]/a'
+            elem = self.driver.find_element_by_xpath(link_path)        
             value = elem.get_attribute('text')
-            if value == '0':
-                continue
-            index = int(i/2)
-            village = villages[index]
-            logger.info(f'specific_index[{specific_index}] vs index[{index}]')
-            if specific_index:
-                logger.info(f'Entered index[{index}]')
-                if specific_index != index:
-                    logger.info(f'Skipping {village}')
-                    continue
-                else:
-                    logger.info(f'Chose index[{index}]')
-            logger.info(f'Clicking for village[{village}] > value[{value}]')
+
             logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
-            #elem.click()
-            #time.sleep(3) #FIXME
+            logger.info(f'Clicking for village[{village}] vs village_value[{village_value}] > value[{value}]')
             elem.click()
             time.sleep(5) #FIXME
             parent_handle = self.driver.current_window_handle
-            #logger.info("Handles : %s" % self.driver.window_handles + "Number : %d" % len(self.driver.window_handles))
             logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
-            '''
-            html_source = self.driver.page_source
-            df = pd.read_html(html_source)[0]
-            logger.debug(f'{df}')
-            filename=f'{self.dir}/{district}_{mandal}_{village}_base.csv'
-            logger.info(f'Writing [{filename}]')
-            df.to_csv(filename, index=False)
-            '''
+            
             if len(self.driver.window_handles) > 1:
                 logger.info('Switching Window...')
                 self.driver.switch_to.window(self.driver.window_handles[-1])
@@ -1583,28 +1570,6 @@ class Crawler():
                 logger.error(f'Handlers gone wrong [{str(self.driver.window_handles)}]')
                 self.driver.save_screenshot('./button_'+captcha_text+'.png')
                 return 'FAILURE'
-            '''
-            try:
-                logger.info('Waiting for page to load')
-                elem = WebDriverWait(driver, timeout).until(
-                    #EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_lbl_village"))
-                    EC.presence_of_element_located((By.XPATH, '/html/body/div[3]/div[3]/div/div[2]/div/div/table/thead/tr/th[4]'))
-                )
-            except TimeoutException as e:
-                logger.error('Timeout waiting for dialog box - EXCEPT[%s:%s]' % (type(e), e))
-                self.driver.close()
-                self.driver.switch_to.window(parent_handle)
-                return 'ABORT'
-            except Exception as e:
-                logger.error('Exception on WebDriverWait(10) - EXCEPT[%s:%s]' % (type(e), e))
-                self.driver.save_screenshot('./button_'+captcha_text+'.png')
-                self.driver.close()
-                self.driver.switch_to.window(parent_handle)
-                return 'ABORT'
-            WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_element_located((By.XPATH, '/html/body/div[3]/div[3]/div/div[2]/div/div/table/thead/tr/th[4]'))
-            )
-            '''
             df = pd.read_html(html_source)[0]
             logger.debug(f'{df}')
             filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
@@ -1614,9 +1579,6 @@ class Crawler():
             self.driver.close()
             logger.info('Switching back to Parent Window')
             self.driver.switch_to.window(parent_handle)
-            if False:
-                logger.info('Press any key')
-                input()
 
         return 'SUCCESS'
 
