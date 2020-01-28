@@ -1547,8 +1547,8 @@ class Crawler():
         for row, village in enumerate(villages, 1):
             village_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[2]'
             elem = self.driver.find_element_by_xpath(village_path)        
-            village_value = elem.get_attribute('text')
-            
+            village_value = elem.get_attribute('text') # FIXME why is this not working. Returns None always
+
             link_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[4]/a'
             elem = self.driver.find_element_by_xpath(link_path)        
             value = elem.get_attribute('text')
@@ -1557,6 +1557,13 @@ class Crawler():
             logger.info(f'Clicking for village[{village}] vs village_value[{village_value}] > value[{value}]')
             elem.click()
             time.sleep(5) #FIXME
+            '''
+            path = f'/html/body/div[3]/div[2]/h6/b[contains(text(),"{village}")]'
+            logger.info(f'Waiting for page with village[{village}] to load on "{path}"')
+            WebDriverWait(self.driver, 25).until(
+                EC.presence_of_element_located((By.XPATH,  path))
+            )
+            '''
             parent_handle = self.driver.current_window_handle
             logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
             
