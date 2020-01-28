@@ -1538,29 +1538,31 @@ class Crawler():
         table = WebDriverWait(self.driver, timeout).until(
             EC.presence_of_element_located((By.ID, table_id))
         )
-        specific_index = None
+
         if village:
             logger.info(f'The village list [{villages}]')
             specific_index = village.find(village)
-            logger.info(f'Yippie! We have a hit for {village} {specific_index}')
-            
+            row = specific_index+1
+            logger.info(f'Yippie! We have a hit for {village} {specific_index} [{row}]')
+            df = self.fetch_death_abstract_report(logger, district, mandal, village, row)
+            return df
         
         for row, village in enumerate(villages, 1):
-            village_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[2]'
-            elem = self.driver.find_element_by_xpath(village_path)        
-            village_value = elem.get_attribute('text') # FIXME why is this not working. Returns None always
+            self.fetch_death_abstract_report(logger, district, mandal, village, row)
 
-            link_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[4]/a'
-            elem = self.driver.find_element_by_xpath(link_path)        
-            value = elem.get_attribute('text')
+        return None
 
-            logger.info(f'Clicking for village[{village}] vs village_value[{village_value}] > value[{value}]')
-            self.fetch_death_abstract_report(logger, district, mandal, village, elem)
+    def fetch_death_abstract_report(self, logger, district, mandal, village, row):
+        village_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[2]'
+        elem = self.driver.find_element_by_xpath(village_path)        
+        village_value = elem.get_attribute('text') # FIXME why is this not working. Returns None always
+        
+        link_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[4]/a'
+        elem = self.driver.find_element_by_xpath(link_path)        
+        value = elem.get_attribute('text')
 
-        return 'SUCCESS'
-
-    def fetch_death_abstract_report(self, logger, district, mandal, village, elem):
         logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
+        logger.info(f'Clicking for village[{village}] vs village_value[{village_value}] > value[{value}]')
         elem.click()
         time.sleep(5) #FIXME
         '''
@@ -1592,6 +1594,8 @@ class Crawler():
         self.driver.close()
         logger.info('Switching back to Parent Window')
         self.driver.switch_to.window(parent_handle)
+
+        return df
 
 def get_unique_district_block(logger, dataframe):
     logger.info(dataframe.columns)
