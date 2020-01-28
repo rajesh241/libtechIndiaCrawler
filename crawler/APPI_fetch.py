@@ -55,8 +55,8 @@ base_url = 'https://meebhoomi.ap.gov.in/'
 
 village_list = [('విశాఖపట్నం', 'అచ్యుతాపురం', 'జోగన్నపాలెం'), ('విశాఖపట్నం', 'అనంతగిరి', 'నిన్నిమామిడి'), ('విశాఖపట్నం', 'అనందపురం', 'ముచ్చెర్ల')]
 skip_district = ['3',]
-is_visible = True  # Make False before commmitting
-is_mac = True      # Make False before commmitting
+is_visible = False  # Make False before commmitting - need to make Firefox headless for Mac
+is_mac = False      # Make False before commmitting
 is_mynk = True
 
 #############
@@ -1537,11 +1537,11 @@ class Crawler():
 
         if village:
             logger.info(f'The village list [{villages}]')
-            logger.info(f'fetch row for ({district}, {mandal}, {village})')
+            logger.info(f'fetch row for ({district}, {mandal}, {village}[{village_code}])')
             try:
                 row = villages.index(village)+1
             except Exception as e:
-                logger.critical(f'Exception during index find - EXCEPT[{type(e)}:{e}]')
+                logger.critical(f'Exception during index find for village_code[{village_code}]- EXCEPT[{type(e)}:{e}]')
                 return None
 
             logger.info(f'fetch_death_abstract_report({district}, {mandal}, {village}, {row})')
