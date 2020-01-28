@@ -1543,6 +1543,7 @@ class Crawler():
             logger.info(f'The village list [{villages}]')
             specific_index = village.find(village)
             logger.info(f'Yippie! We have a hit for {village} {specific_index}')
+            
         
         for row, village in enumerate(villages, 1):
             village_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[2]'
@@ -1553,41 +1554,44 @@ class Crawler():
             elem = self.driver.find_element_by_xpath(link_path)        
             value = elem.get_attribute('text')
 
-            logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
             logger.info(f'Clicking for village[{village}] vs village_value[{village_value}] > value[{value}]')
-            elem.click()
-            time.sleep(5) #FIXME
-            '''
-            path = f'/html/body/div[3]/div[2]/h6/b[contains(text(),"{village}")]'
-            logger.info(f'Waiting for page with village[{village}] to load on "{path}"')
-            WebDriverWait(self.driver, 25).until(
-                EC.presence_of_element_located((By.XPATH,  path))
-            )
-            '''
-            parent_handle = self.driver.current_window_handle
-            logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
-            
-            if len(self.driver.window_handles) > 1:
-                logger.info('Switching Window...')
-                self.driver.switch_to.window(self.driver.window_handles[-1])
-                logger.info('Switched!!!')
-                html_source = self.driver.page_source
-                #time.sleep(2)
-            else:
-                logger.error(f'Handlers gone wrong [{str(self.driver.window_handles)}]')
-                self.driver.save_screenshot('./button_'+captcha_text+'.png')
-                return 'FAILURE'
-            df = pd.read_html(html_source)[0]
-            logger.debug(f'{df}')
-            filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
-            logger.info(f'Writing [{filename}]')
-            df.to_csv(filename, index=False)
-            logger.info('Closing Current Window')
-            self.driver.close()
-            logger.info('Switching back to Parent Window')
-            self.driver.switch_to.window(parent_handle)
+            self.fetch_death_abstract_report(logger, district, mandal, village, elem)
 
         return 'SUCCESS'
+
+    def fetch_death_abstract_report(self, logger, district, mandal, village, elem):
+        logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
+        elem.click()
+        time.sleep(5) #FIXME
+        '''
+        path = f'/html/body/div[3]/div[2]/h6/b[contains(text(),"{village}")]'
+        logger.info(f'Waiting for page with village[{village}] to load on "{path}"')
+        WebDriverWait(self.driver, 25).until(
+            EC.presence_of_element_located((By.XPATH,  path))
+        )
+        '''
+        parent_handle = self.driver.current_window_handle
+        logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
+        
+        if len(self.driver.window_handles) > 1:
+            logger.info('Switching Window...')
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            logger.info('Switched!!!')
+            html_source = self.driver.page_source
+            #time.sleep(2)
+        else:
+            logger.error(f'Handlers gone wrong [{str(self.driver.window_handles)}]')
+            self.driver.save_screenshot('./button_'+captcha_text+'.png')
+            return 'FAILURE'
+        df = pd.read_html(html_source)[0]
+        logger.debug(f'{df}')
+        filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
+        logger.info(f'Writing [{filename}]')
+        df.to_csv(filename, index=False)
+        logger.info('Closing Current Window')
+        self.driver.close()
+        logger.info('Switching back to Parent Window')
+        self.driver.switch_to.window(parent_handle)
 
 def get_unique_district_block(logger, dataframe):
     logger.info(dataframe.columns)
