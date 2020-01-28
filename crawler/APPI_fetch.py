@@ -726,6 +726,7 @@ class Crawler():
         self.dir = 'data/csv'
         self.mandal = 'జి.మాడుగుల'
         self.district = 'విశాఖపట్నం'
+        self.logged_in = False
         try:
             os.makedirs(self.dir)
         except OSError as e:
@@ -754,6 +755,8 @@ class Crawler():
             return set(wh_now).difference(set(wh_then)).pop()
 
     def login(self, logger, auto_captcha=False):
+        if self.logged_in:
+            return
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/RB/Login'
         logger.info('Fetching URL[%s]' % url)
         self.driver.get(url)
@@ -824,10 +827,12 @@ class Crawler():
             if retries == 3:
                 return 'FAILURE'
             else:
+                self.logged_in = True
                 return 'SUCCESS'
         else:
             logger.info('Please ennter the catpcha on the webpage and hit any key...')
             input()
+            self.logged_in = True
 
     def print_current_window_handles(self, logger, event_name=None):
         """Debug function to print all the window handles"""
@@ -1497,18 +1502,9 @@ class Crawler():
 
     def crawl_death_abstract_report(self, logger, district=None, mandal=None, village=None):
         self.login(logger, auto_captcha=True)
-
-        # Debug before and after statements can be removed - FIXME
-        session_storage = self.driver.execute_script("return sessionStorage;");
-        logger.info(f'Before sessionStorage[{session_storage}]')
-
         self.set_district(district)  # could give both name and code depending on input
         self.set_mandal(mandal)
 
-        session_storage = self.driver.execute_script("return sessionStorage;");
-        logger.info(f'After sessionStorage[{session_storage}]')
-
-        #url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractMandal'
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractvillage'
         logger.info('Fetching URL[%s]' % url)
         self.driver.get(url)
@@ -1685,9 +1681,17 @@ class TestSuite(unittest.TestCase):
         self.logger.info("Running test for Death Abstract Report")
         # Start a RhythuBharosa Crawl
         rb = Crawler()
-        rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల') # village='దేవరాపల్లి')
-        #del rb
+        rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల')
+        del rb
 
+    def test_fetch_death_report(self):
+        self.logger.info("Running test for Death Abstract Report")
+        # Start a RhythuBharosa Crawl
+        rb = Crawler()
+        rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', village='దేవరాపల్లి')
+        rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', village='క్రిష్ణాపురం')
+        rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', village='కె.బందవీధి')
+        del rb
 
 if __name__ == '__main__':
     unittest.main()
