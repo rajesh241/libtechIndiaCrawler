@@ -55,8 +55,8 @@ base_url = 'https://meebhoomi.ap.gov.in/'
 
 village_list = [('విశాఖపట్నం', 'అచ్యుతాపురం', 'జోగన్నపాలెం'), ('విశాఖపట్నం', 'అనంతగిరి', 'నిన్నిమామిడి'), ('విశాఖపట్నం', 'అనందపురం', 'ముచ్చెర్ల')]
 skip_district = ['3',]
-is_visible = True
-is_mynk = False
+is_visible = False
+is_mynk = True
 
 #############
 # Functions
@@ -119,7 +119,7 @@ def fetch_parent(logger, driver, url=None):
     try:
         driver.get(url)
         # time.sleep(5)
-        
+
         logger.info('Waiting for the base page to load...')
         elem = WebDriverWait(driver, 10).until(
           EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_txtCaptcha"))
@@ -127,15 +127,15 @@ def fetch_parent(logger, driver, url=None):
     except Exception as e:
         logger.critical('Exception on WebDriverWait(10) - EXCEPT[%s:%s]' % (type(e), e))
         return 'ABORT'
-        
+
     html_source = driver.page_source.replace('<head>',
                                                  '<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>')
     logger.debug("HTML Fetched [%s]" % html_source)
-    
+
     with open(filename, 'w') as html_file:
         logger.info('Writing [%s]' % filename)
         html_file.write(html_source)
-        
+
     return BeautifulSoup(html_source, 'html.parser')
 
 
@@ -145,11 +145,11 @@ def fetch_lookup(logger, filename, url=None, cookies=None, headers=None, data=No
         with open(filename) as json_file:
             lookup = json.load(json_file)
         return lookup
-    
+
     logger.info('Fetching URL[%s]...' % url)
     response = requests.post(url, headers=headers, cookies=cookies, data=data)
     logger.info(response.content)
-    
+
     data = pd.read_json(response.content)
     if data['d'].empty:
         logger.error('Why empty?')
@@ -162,10 +162,10 @@ def fetch_lookup(logger, filename, url=None, cookies=None, headers=None, data=No
     with open(filename, 'w') as json_file:
         logger.info('Writing [%s]' % filename)
         json_file.write(json.dumps(lookup))
-        
+
     return lookup
 
-    
+
 def fetch_captcha(logger, cookies=None, url=None):
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:70.0) Gecko/20100101 Firefox/70.0',
@@ -178,7 +178,7 @@ def fetch_captcha(logger, cookies=None, url=None):
 
     #response = requests.get('https://meebhoomi.ap.gov.in/CaptchaImage.axd', headers=headers, params=params, cookies=cookies)
     response = requests.get(url, headers=headers, cookies=cookies)
-    
+
     filename = 'captcha.jpg'
     with open(filename, 'wb') as html_file:
         logger.info('Writing [%s]' % filename)
@@ -197,16 +197,16 @@ def fetch_appi_gram1b_report(logger, driver, cookies=None, dirname=None, url=Non
 
     if not url:
         url = base_url + 'ROR.aspx'
-    
+
     captcha_text = ''
-    
+
     logger.info('Verifying File [%s]' % filename)
     if os.path.exists(filename):
         logger.info('File already downloaded. Skipping [%s]' % filename)
         return 'SUCCESS'
 
     bs = fetch_parent(logger, driver)
-    
+
     #timeout = 2
     try:
         select = Select(driver.find_element_by_id('ContentPlaceHolder1_ddlDist'))
@@ -242,7 +242,7 @@ def fetch_appi_gram1b_report(logger, driver, cookies=None, dirname=None, url=Non
         if len(captcha_text) != 5 or not captcha_text.isdigit():
             logger.warning('Incorrect Captcha length[%s] or non digit data' % len(captcha_text))
             return 'FAILURE'
-        
+
         elem = driver.find_element_by_id('ContentPlaceHolder1_txtCaptcha')
         elem.send_keys(captcha_text)
         elem.click()
@@ -250,7 +250,7 @@ def fetch_appi_gram1b_report(logger, driver, cookies=None, dirname=None, url=Non
         logger.info('Clicking Submit')
         elem = driver.find_element_by_id('ContentPlaceHolder1_btn_go')
         elem.click()
-        
+
     except Exception as e:
         logger.error('Exception for Captcha[%s] - EXCEPT[%s:%s]' % (captcha_text, type(e), e))
         time.sleep(timeout)
@@ -268,11 +268,11 @@ def fetch_appi_gram1b_report(logger, driver, cookies=None, dirname=None, url=Non
         logger.debug('Time Out waiting for ALERT')
     except Exception as e:
         logger.error('Exception during wait for alert captcha_id[%s] - EXCEPT[%s:%s]' % (captcha_text, type(e), e))
-        
+
     parent_handle = driver.current_window_handle
     #logger.info("Handles : %s" % driver.window_handles + "Number : %d" % len(driver.window_handles))
     logger.info("Handles : [%s]    Number : [%d]" % (driver.window_handles, len(driver.window_handles)))
-        
+
     if len(driver.window_handles) == 2:
         logger.info('Switching Window...')
         driver.switch_to.window(driver.window_handles[1])
@@ -311,7 +311,7 @@ def fetch_appi_gram1b_report(logger, driver, cookies=None, dirname=None, url=Non
         with open(filename, 'w') as html_file:
             logger.info('Writing [%s]' % filename)
             html_file.write(html_source)
-            
+
         driver.close()
         driver.switch_to.window(parent_handle)
     except WebDriverException:
@@ -323,7 +323,7 @@ def fetch_appi_gram1b_report(logger, driver, cookies=None, dirname=None, url=Non
     except Exception as e:
         logger.error('Exception for captcha_id[%s] - EXCEPT[%s:%s]' % (captcha_text, type(e), e))
         return 'FAILURE'
-        
+
     return 'SUCCESS'
 
 
@@ -333,12 +333,12 @@ def fetch_gram_1b_reports(logger, dirname=None, url=None):
     display = displayInitialize(is_visible)
     driver = driverInitialize(timeout=3, options='--headless') # driverInitialize(path='/opt/firefox/', timeout=3)
     #driver = driverInitialize(timeout=3) # driverInitialize(path='/opt/firefox/', timeout=3)
-    
+
     try:
         os.makedirs(dirname)
     except OSError as e:
         if e.errno != errno.EEXIST:
-            raise    
+            raise
 
     #driver.get(base_url)
     fetch_parent(logger, driver)
@@ -349,13 +349,13 @@ def fetch_gram_1b_reports(logger, dirname=None, url=None):
         logger.info('Requesting URL[%s]' % url)
         response = requests.get(url, timeout=timeout, cookies=cookies)
     except Exception as e:
-        logger.error('Caught Exception[%s]' % e) 
+        logger.error('Caught Exception[%s]' % e)
     '''
 
     cookies = driver.get_cookies()
     logger.info('Cookies[%s]' % cookies)
     logger.debug('Cookie -> Session ID[%s]' % cookies[0]['value'])
-    
+
     cookies = {
         'hibext_instdsigdipv2': '1',
         'ASP.NET_SessionId': cookies[0]['value'],
@@ -374,7 +374,7 @@ def fetch_gram_1b_reports(logger, dirname=None, url=None):
     }
 
     data = '{"knownCategoryValues":"","category":"District"}'
-    
+
     filename = '%s/district.json' % directory
     district_url = base_url + 'UtilityWebService.asmx/GetDistricts'
     district_lookup = fetch_lookup(logger, filename, url=district_url, cookies=cookies, headers=headers, data=data)
@@ -383,7 +383,7 @@ def fetch_gram_1b_reports(logger, dirname=None, url=None):
     mandal_url = base_url + 'UtilityWebService.asmx/GetMandals'
     for district_no, district_name in district_lookup.items():
         district_name = district_name.strip()
-        
+
         if district_no in skip_district:
             continue
         logger.info('Fetch Mandals for District[%s] = [%s]' % (district_name, district_no))
@@ -408,7 +408,7 @@ def fetch_gram_1b_reports(logger, dirname=None, url=None):
             for village_no, village_name in village_lookup.items():
                 village_name = village_name.strip()
                 logger.info('Fetch Gram 1B Report for District[%s] > Mandal[%s] > Village[%s]' % (district_name, mandal_name, village_name))
-                filename = '%s/%s_%s_%s_rejected_payments.html' % (dirname, district_name, mandal_name, village_name)                
+                filename = '%s/%s_%s_%s_rejected_payments.html' % (dirname, district_name, mandal_name, village_name)
                 result = fetch_appi_gram1b_report(logger, driver, cookies=cookies,
                                                   district_no=district_no,
                                                   mandal_no=mandal_no,
@@ -416,11 +416,11 @@ def fetch_gram_1b_reports(logger, dirname=None, url=None):
                                                   filename=filename)
                 if result == 'ABORT':
                     logger.critical('Aborting Mission!')
-                    driverFinalize(driver) 
+                    driverFinalize(driver)
                     displayFinalize(display)
                     return result
-    
-    driverFinalize(driver) 
+
+    driverFinalize(driver)
     displayFinalize(display)
     return result # 'SUCCESS'
 
@@ -430,19 +430,19 @@ def fetch_gram_1b_reports_for(logger, dirname=None, url=None, villages=None):
 
     display = displayInitialize(is_visible)
     driver = driverInitialize(timeout=3) # driverInitialize(path='/opt/firefox/', timeout=3)
-    
+
     try:
         os.makedirs(dirname)
     except OSError as e:
         if e.errno != errno.EEXIST:
-            raise    
+            raise
 
     fetch_parent(logger, driver)
 
     cookies = driver.get_cookies()
     logger.info('Cookies[%s]' % cookies)
     logger.debug('Cookie -> Session ID[%s]' % cookies[0]['value'])
-    
+
     cookies = {
         'hibext_instdsigdipv2': '1',
         'ASP.NET_SessionId': cookies[0]['value'],
@@ -453,8 +453,8 @@ def fetch_gram_1b_reports_for(logger, dirname=None, url=None, villages=None):
         result = fetch_appi_gram1b_report_orig(logger, driver, cookies=cookies,
                                           district_name=district_name.strip(),
                                           mandal_name=mandal_name.strip(),
-                                          village_name=village_name.strip())    
-    driverFinalize(driver) 
+                                          village_name=village_name.strip())
+    driverFinalize(driver)
     displayFinalize(display)
     return result # 'SUCCESS'
 
@@ -469,7 +469,7 @@ def parse_gram_1b_report(logger, filename=None, panchayat_name=None, village_nam
     except Exception as e:
         logger.error('Exception when opening file for captcha_id[%s] - EXCEPT[%s:%s]' % (captcha_text, type(e), e))
         raise e
-        
+
     data = pd.DataFrame([], columns=['S.No', 'Mandal Name', 'Gram Panchayat', 'Village', 'Job card number/worker ID', 'Name of the wageseeker', 'Credited Date', 'Deposit (INR)', 'Debited Date', 'Withdrawal (INR)', 'Available Balance (INR)', 'Diff. time credit and debit'])
     try:
         df = pd.read_html(filename, attrs = {'id': 'ctl00_MainContent_dgLedgerReport'}, index_col='S.No.', header=0)[0]
@@ -478,7 +478,7 @@ def parse_gram_1b_report(logger, filename=None, panchayat_name=None, village_nam
         logger.error('Exception when reading transaction table for captcha_id[%s] - EXCEPT[%s:%s]' % (captcha_text, type(e), e))
         return data
     logger.info('The transactions table read:\n%s' % df)
-    
+
     bs = BeautifulSoup(html_source, 'html.parser')
 
     # tabletop = bs.find(id='ctl00_MainContent_PrintContent')
@@ -557,12 +557,12 @@ def parse_gram_1b_report(logger, filename=None, panchayat_name=None, village_nam
             diff_days = 0
             continue
         logger.info('After Reset diff_days[%s]' % diff_days)
-        
+
         #csv_buffer.append('%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' %(serial_no, mandal_name, bo_name, so_name, captcha_id_id, account_holder_name, credited_date, debited_date, withdrawal_inr, availalbe_balance, diff_time))
         data = data.append({'S.No': serial_no, 'Mandal Name': mandal_name, 'Gram Panchayat': panchayat_name, 'Village': village_name, 'Job card number/worker ID': captcha_id_id, 'Name of the wageseeker': account_holder_name, 'Credited Date': credited_date, 'Deposit (INR)': deposit_inr, 'Debited Date': debited_date, 'Withdrawal (INR)': withdrawal_inr, 'Available Balance (INR)': availalbe_balance, 'Diff. time credit and debit': diff_days}, ignore_index=True)
 
     data = data.set_index('S.No')
-    data = data.iloc[::-1]  # Reverse the order back to normal        
+    data = data.iloc[::-1]  # Reverse the order back to normal
     logger.info('The final table:\n%s' % data)
 
     return data
@@ -611,7 +611,7 @@ def dump_gram_1b_reports(logger, dirname=None):
             continue
         if skip and (panchayat_name in skip):
             logger.info('To skip [%s]' % panchayat_name)
-            continue        
+            continue
         workers = Worker.objects.filter(captcha_id__panchayat=panchayat)
         logger.info(workers)
         for worker in workers:
@@ -623,18 +623,18 @@ def dump_gram_1b_reports(logger, dirname=None):
                 logger.error('tcaptcha_id is NULL for [%s]' % worker)
                 continue
             logger.debug('Parse HTML for captcha_text[%s]' % captcha_text)
-            
+
             filename = '%s/%s_%s_%s_ledger_details.html' % (dirname, block_name, panchayat_name, captcha_text)
             village_name = worker.captcha_id.village.name
             try:
                 data = parse_appi_report(logger, filename=filename, panchayat_name=panchayat_name, village_name=village_name, captcha_text=captcha_text)
             except Exception as e:
-                logger.error('Caught Exception[%s]' % e) 
+                logger.error('Caught Exception[%s]' % e)
                 csv_filename = filename.replace('.html','.XXX')
                 open(csv_filename, 'a').close()
                 logger.info('Marking the file [%s]' % csv_filename)
-                continue # break 
-                
+                continue # break
+
             csv_filename = filename.replace('.html','.csv')
             logger.info('Writing to CSV [%s]' % csv_filename)
             data.to_csv(csv_filename)
@@ -645,20 +645,20 @@ def dump_gram_1b_reports(logger, dirname=None):
             '''
             # break
         # break
-    
+
     '''
 
     url = 'http://b.libtech.info:8000/api/panchayats/?bid=%s' % block_id
-    
+
     try:
         logger.info('Requesting URL[%s]' % url)
         response = requests.get(url, timeout=timeout) # , cookies=cookies)
     except Exception as e:
-        logger.error('Caught Exception[%s]' % e) 
+        logger.error('Caught Exception[%s]' % e)
 
     panchayats_json = response.json()
     logger.debug('Panchayats JSON[%s]' % panchayats_json)
-    
+
     is_panchayat = True
     for panchayat_object in panchayats_json:
         panchayat_name = panchayat_object['name'].strip()
@@ -676,12 +676,12 @@ def dump_gram_1b_reports(logger, dirname=None):
         for captcha_id_object in captcha_ids_json:
             #logger.info(captcha_id_object)
             captcha_text = '%s-0%s' % (captcha_id_object['captcha_id']['tcaptcha_id'], captcha_id_object['applicantNo'])
-            if False and (panchayat_name == 'VITHALAPUR' and is_downloaded and (captcha_id != '142000501002010385-01')): 
+            if False and (panchayat_name == 'VITHALAPUR' and is_downloaded and (captcha_id != '142000501002010385-01')):
                 logger.debug('Skipping[%s]' % captcha_id)
-                continue            
+                continue
             is_downloaded = False
             logger.debug('Parse HTML for captcha_text[%s]' % captcha_text)
-            
+
             filename = '%s/%s_%s_%s_ledger_details.html' % (dirname, block_name, panchayat_name, captcha_text)
             # village_name = captcha_id_object['village']['name']
             # logger.debug('Village Name[%s]' % village_name)
@@ -693,7 +693,7 @@ def dump_gram_1b_reports(logger, dirname=None):
                 open(csv_filename, 'a').close()
                 logger.info('Marking the file [%s]' % csv_filename)
                 continue
-                
+
             csv_filename = filename.replace('.html','.csv')
             with open(csv_filename, 'w') as csv_file:
                 logger.info('Writing to CSV [%s]' % csv_filename)
@@ -729,29 +729,29 @@ class Crawler():
             os.makedirs(self.dir)
         except OSError as e:
             if e.errno != errno.EEXIST:
-                raise    
-        
+                raise
+
         self.vars = {}
         self.district_url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDistrictPaymentAbstract'
         self.payment_url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/PaymentvillReport'
-        self.display = displayInitialize(isDisabled = True, isVisible = is_visible)
+        self.display = displayInitialize(isDisabled = False, isVisible = is_visible)
         self.driver = driverInitialize(timeout=3)
         #self.driver = driverInitialize(path='/opt/firefox/', timeout=3)
         self.land_type_dict = [{'name': 'Webland', 'value': '1'},
                                {'name':'ROFR','value':'2'},
                                {'name': 'Tenant', 'value': '3'},
-                               {'name': 'UnseededWebland','value':'4'}] 
+                               {'name': 'UnseededWebland','value':'4'}]
     def __del__(self):
-        driverFinalize(self.driver) 
+        driverFinalize(self.driver)
         displayFinalize(self.display)
-      
+
     def wait_for_window(self, timeout = 2):
         time.sleep(round(timeout / 1000))
         wh_now = self.driver.window_handles
         wh_then = self.vars["window_handles"]
         if len(wh_now) > len(wh_then):
             return set(wh_now).difference(set(wh_then)).pop()
-        
+
     def login(self, logger, auto_captcha=False):
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/RB/Login'
         logger.info('Fetching URL[%s]' % url)
@@ -774,7 +774,7 @@ class Crawler():
                 #input()
                 WebDriverWait(self.driver, 15).until(EC.element_to_be_clickable((By.ID, "captchdis")))
                 time.sleep(3)
-                
+
                 captcha_text = '12345'
                 fname = 'captcha.png'
                 self.driver.save_screenshot(fname)
@@ -785,9 +785,9 @@ class Crawler():
                     # box = (1170, 940, 1315, 965)   # Mynk Mac
                 else:
                     box = (1025, 940, 1170, 965)   # Goli Mac
-                
+
                 area = img.crop(box)
-                filename = 'cropped_' + fname 
+                filename = 'cropped_' + fname
                 area.save(filename, 'PNG')
                 img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
                 img = cv2.resize(img, None, fx=10, fy=10, interpolation=cv2.INTER_LINEAR)
@@ -798,19 +798,19 @@ class Crawler():
                 fname = 'converted_captcha.png'
                 check_output(['convert', filename, '-resample', '10', fname])
                 captcha_text = pytesseract.image_to_string(Image.open(fname), lang='eng', config='--psm 8  --dpi 300 -c tessedit_char_whitelist=ABCDEF0123456789')
-                
+
                 elem = self.driver.find_element_by_xpath('(//input[@type="text"])[2]')
                 logger.info('Entering Captcha_Text[%s]' % captcha_text)
                 elem.send_keys(captcha_text)
-                
-                login_button = '(//button[@type="button"])[2]'            
+
+                login_button = '(//button[@type="button"])[2]'
                 elem = self.driver.find_element_by_xpath(login_button)
                 logger.info('Clicking Login Button')
                 elem.click()
                 try:
                     WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@class ='swal2-confirm swal2-styled']"))).click()
                     logger.info(f'Invalid Captcha [{captcha_text}]')
-                    retries += 1                
+                    retries += 1
                     WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.LINK_TEXT, 'Refresh'))).click()
                     continue
                 except TimeoutException:
@@ -1044,7 +1044,7 @@ class Crawler():
             error = f'Exception during select landType[{landType}] of Village[{villageName}, {slugify(villageName)}] - EXCEPT[{type(e)}, {e}]'
             return error, dataframe
         ### Trying to catch an alert for no data
-        timeout=20            
+        timeout=20
         try:
             logger.debug(f'Timeout value is {timeout}')
             WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='swal2-confirm swal2-styled']"))).click()
@@ -1068,7 +1068,7 @@ class Crawler():
                 logger.warning(f'Skipping at HTML read level Village[{villageName}]')
                 myhtml = None
                 return error, dataframe
-            if myhtml is not None: 
+            if myhtml is not None:
                 df = get_dataframe_from_html(logger, myhtml,
                                               mydict=village_extract_dict)
                 df['land_type']=landType
@@ -1089,14 +1089,14 @@ class Crawler():
             except Exception as e:
                 logger.info(f'No pagination here!')
                 break
-                
+
         if len(villageDFs) > 0:
             villageDF=pd.concat(villageDFs)
         else:
             villageDF=None
-        
+
         return error, villageDF
-  
+
 
     def download_payment_report1(self, logger, village_df, report_type=None, sample_name=None):
         """This function will download the payment report from the villages"""
@@ -1107,7 +1107,7 @@ class Crawler():
         village_extract_dict = {}
         village_extract_dict['pattern'] = "Katha Number"
         ##CSV to be built for village names
-        
+
         district_list = village_df['district_name_telugu'].unique().tolist()
         logger.info(district_list)
         #district_list = [self.district]
@@ -1176,9 +1176,9 @@ class Crawler():
                                        mandal_name=mandal_name,
                                        village_df=vill_df,
                                         sample_name=sample_name)
-       
 
-               
+
+
                 logger.info(f"Now I am going to close the village Window")
                 self.print_current_window_handles(logger,
                                                   event_name="beforevllageclose")
@@ -1194,8 +1194,8 @@ class Crawler():
             self.print_current_window_handles(logger)
         dataframe = pd.concat(village_stat_df_array, ignore_index=True)
         dataframe.to_csv("village_stat.csv")
- 
-        
+
+
     def crawlPaymentvillReport1(self,logger, district_name=None,
                                mandal_name=None, village_df=None,
                                sample_name=None):
@@ -1269,7 +1269,7 @@ class Crawler():
                    # statusDF.to_csv(self.status_file)
                     logger.warning(f'Skipping at landSelect level Village[{villageName}]')
                     return 'FAILURE'
-                    
+
                 try:
                     if landValue == '4':
                         timeout = 25
@@ -1297,7 +1297,7 @@ class Crawler():
                         logger.warning(f'Skipping at HTML read level Village[{villageName}]')
                         #continue
                         return 'FAILURE'
-                        
+
                     #dfs=pd.read_html(myhtml)
                     #df=dfs[0]
                     df = get_dataframe_from_html(logger, myhtml,
@@ -1329,7 +1329,7 @@ class Crawler():
                     except Exception as e:
                         logger.info(f'No pagination here!')
                         break
-                
+
             if len(villageDFs) > 0:
                 villageDF=pd.concat(villageDFs)
                 report_type = "rb_payment"
@@ -1347,8 +1347,8 @@ class Crawler():
             #statusDF.loc[curIndex,'inProgress'] = 0
             #logger.info(f'Updating [{self.status_file}]')
             #statusDF.to_csv(self.status_file)
-            
-            #statusDF=pd.read_csv(self.status_file, index_col=0)            
+
+            #statusDF=pd.read_csv(self.status_file, index_col=0)
             #filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
             #if len(filteredDF) > 0:
             #    curIndex=filteredDF.index[0]
@@ -1356,9 +1356,9 @@ class Crawler():
             #    statusDF.to_csv(self.status_file)
             #else:
             #    curIndex=None
-            
+
         return 'SUCCESS'
-  
+
     def crawl_status_update_report(self, logger, district=None, mandal=None):
         self.login(logger, auto_captcha=True)
 
@@ -1375,7 +1375,7 @@ class Crawler():
         statusDF.to_csv(self.status_file)
         prev_village = ''
         villageDFs=[]
-        
+
         while curIndex is not None:
             row = filteredDF.loc[curIndex]
             district = row['districtName']
@@ -1389,22 +1389,22 @@ class Crawler():
 
             self.set_district(district_name=district,district_code=district_code)  # could give both name and code depending on input
             self.set_mandal(mandal_name=mandal,mandal_code=mandal_code)
-            time.sleep(5) 
+            time.sleep(5)
             url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/Statusupdate'
             logger.info('Fetching URL[%s]' % url)
             self.driver.get(url)
             time.sleep(3)
             logger.info(villageCode)
-            
+
             villageXPath="//select[1]"
             try:
                 villageSelect=Select(self.driver.find_element_by_xpath(villageXPath))
             except Exception as e:
                 logger.error(f'Exception during villageSelect for {villageXPath} - EXCEPT[{type(e)}, {e}]')
                 return 'FAILURE'
-        
-            
-            filename=f"{self.dir}/{district}_{mandal}_{villageName}_{kathaNo}.csv"                          
+
+
+            filename=f"{self.dir}/{district}_{mandal}_{villageName}_{kathaNo}.csv"
             if os.path.exists(filename):
                 logger.info('File already downloaded. Reading [%s]...' % filename)
                 df = pd.read_csv(filename)
@@ -1412,16 +1412,16 @@ class Crawler():
                 try:
                     if villageCode != prev_village:
                         villageSelect.select_by_value(villageCode)
-                
+
                     elem = self.driver.find_element_by_xpath('//input[@type="text"]')
                     logger.info(f'Entering kathaNo[{kathaNo}]')
                     elem.clear()
                     elem.send_keys(kathaNo)
                     #time.sleep(1)
-                    
+
                     self.driver.find_element_by_xpath('//input[@value="submit"]').click()
                     logger.info(f'Submit clicked for vilageName[{villageName}], {slugify(villageName)}] kathaNo[{kathaNo}]')
-                
+
                     time.sleep(1)
                     #WebDriverWait(self.driver, 3).until(EC.presence_of_element_located((By.LINK_TEXT, kathaNo)))
                     myhtml = self.driver.page_source
@@ -1434,7 +1434,7 @@ class Crawler():
                     #exit(0)
                     #continue
                     return 'FAILURE'
-                
+
                 dfs=pd.read_html(myhtml)
                 df=dfs[0]
                 df['village_name_tel']=villageName
@@ -1444,7 +1444,7 @@ class Crawler():
                 df['katha_no']=kathaNo
                 logger.info('Writing to [%s]' % filename)
                 df.to_csv(filename, index=False)
-                
+
             logger.info(f'{df}')
             villageDFs.append(df)
             statusDF.loc[curIndex, 'status'] = 'done'
@@ -1452,7 +1452,7 @@ class Crawler():
             statusDF.to_csv(self.status_file)
             logger.info(f'Adding the table for village[{villageName}] and kathaNo[{kathaNo}]')
 
-            statusDF=pd.read_csv(self.status_file, index_col=0)            
+            statusDF=pd.read_csv(self.status_file, index_col=0)
             filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
             if len(filteredDF) > 0:
                 curIndex=filteredDF.index[0]
@@ -1467,11 +1467,11 @@ class Crawler():
         else: # FIXME
             colHeaders = ['S No', 'Name Of Beneficiary', 'Father Name', 'PSS Name', 'Katha Number', 'Aadhaar', 'Bank Name', 'Bank Account Number(Last 4 Digits)', 'Status,Remarks', 'village_name_tel', 'village_code', 'district_name_tel', 'mandal_name_tel', 'land_type']
             villageDF=pd.DataFrame(columns = colHeaders)
-        
+
         filename=f"{self.dir}/{district}.csv"
         logger.info('Writing to [%s]' % filename)
         villageDF.to_csv(filename, index=False)
-                    
+
         return 'SUCCESS'
 
     def set_district(self, district_name=None, district_code=None):
@@ -1481,7 +1481,7 @@ class Crawler():
         # district_code = lookup[district_name]  # Goli has the lookup?
         if not district_code:
             district_code = '520' # Vishakapatnam is hard coded
-            
+
         self.driver.execute_script(f"sessionStorage.setItem('district', '{district_code}'); sessionStorage.setItem('districtname', '{district_name}');");
 
     def set_mandal(self, mandal_name=None, mandal_code=None):
@@ -1492,7 +1492,7 @@ class Crawler():
             mandal_code = '4848'        # put lookup here in case only name was given
 
         self.driver.execute_script(f"sessionStorage.setItem('mandal', '{mandal_code}'); sessionStorage.setItem('mandalname', '{mandal_name}');");
-            
+
     def crawl_death_abstract_report(self, logger, district=None, mandal=None, village=None):
         self.login(logger, auto_captcha=True)
 
@@ -1502,10 +1502,10 @@ class Crawler():
 
         self.set_district(district)  # could give both name and code depending on input
         self.set_mandal(mandal)
-        
+
         session_storage = self.driver.execute_script("return sessionStorage;");
         logger.info(f'After sessionStorage[{session_storage}]')
-        
+
         #url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractMandal'
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractvillage'
         logger.info('Fetching URL[%s]' % url)
@@ -1526,11 +1526,11 @@ class Crawler():
         html_source = self.driver.page_source
         df = pd.read_html(html_source)[0]
         logger.debug(f'{df}')
-        logger.info(f'Writing [{filename}]') 
+        logger.info(f'Writing [{filename}]')
         df.to_csv(filename, index=False)
 
         villages = df['Village Name']
-        
+
         table_id = 'tblreject'
         logger.info('Waiting for the table ID[{table_id}] to load')
         table = WebDriverWait(self.driver, timeout).until(
@@ -1570,7 +1570,7 @@ class Crawler():
             df = pd.read_html(html_source)[0]
             logger.debug(f'{df}')
             filename=f'{self.dir}/{district}_{mandal}_{village}_base.csv'
-            logger.info(f'Writing [{filename}]') 
+            logger.info(f'Writing [{filename}]')
             df.to_csv(filename, index=False)
             '''
             if len(self.driver.window_handles) > 1:
@@ -1608,24 +1608,24 @@ class Crawler():
             df = pd.read_html(html_source)[0]
             logger.debug(f'{df}')
             filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
-            logger.info(f'Writing [{filename}]') 
+            logger.info(f'Writing [{filename}]')
             df.to_csv(filename, index=False)
             logger.info('Closing Current Window')
             self.driver.close()
-            logger.info('Switching back to Parent Window')            
+            logger.info('Switching back to Parent Window')
             self.driver.switch_to.window(parent_handle)
             if False:
                 logger.info('Press any key')
                 input()
-        
+
         return 'SUCCESS'
- 
+
 def get_unique_district_block(logger, dataframe):
     logger.info(dataframe.columns)
     df = dataframe.groupby(["district_name_telugu",
                             "block_name_telugu"]).size().reset_index(name='counts')
     logger.info(len(df))
-    
+
 class TestSuite(unittest.TestCase):
     def setUp(self):
         self.logger = logger_fetch('info')
@@ -1696,7 +1696,7 @@ class TestSuite(unittest.TestCase):
            rb.run_crawl(self.logger, report_type='status',
                        auto_captcha=False)
            del rb
-         
+
     def test_crawl_status_update_report(self):
         self.logger.info("Running test for Status Update Report")
         # Start a RhythuBharosa Crawl
@@ -1708,10 +1708,9 @@ class TestSuite(unittest.TestCase):
         self.logger.info("Running test for Death Abstract Report")
         # Start a RhythuBharosa Crawl
         rb = Crawler()
-        rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', 
-                                       village='దేవరాపల్లి')
-        del rb
-        
-        
+        rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల') # village='దేవరాపల్లి')
+        #del rb
+
+
 if __name__ == '__main__':
     unittest.main()
