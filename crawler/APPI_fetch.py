@@ -115,7 +115,7 @@ def fetch_parent(logger, driver, url=None):
     if not url:
         url = base_url + 'ROR.aspx'
     filename = '%s/parent.html' % (directory)
-    logger.info("Fetching...[%s]" % url)
+    logger.info(f'Fetching URL[{url}]')
 
     try:
         driver.get(url)
@@ -147,7 +147,7 @@ def fetch_lookup(logger, filename, url=None, cookies=None, headers=None, data=No
             lookup = json.load(json_file)
         return lookup
 
-    logger.info('Fetching URL[%s]...' % url)
+    logger.info(f'Fetching URL[{url}]...')
     response = requests.post(url, headers=headers, cookies=cookies, data=data)
     logger.info(response.content)
 
@@ -235,7 +235,7 @@ def fetch_appi_gram1b_report(logger, driver, cookies=None, dirname=None, url=Non
         logger.debug('Yippie [%s]' % img.attrs)
 
         url = base_url + img['src']
-        logger.info('Fetching URL[%s]' % url)
+        logger.info(f'Fetching URL[{url}]...')
 
         captcha_text = fetch_captcha(logger, cookies, url)
         time.sleep(timeout)
@@ -722,7 +722,6 @@ def dump_gram_1b_reports(logger, dirname=None):
 class Crawler():
     def __init__(self):
         self.status_file = 'status.csv'
-        self.status_file = 'rejected_at_village_10_sample.csv'
         self.dir = 'data/csv'
         self.mandal = 'జి.మాడుగుల'
         self.district = 'విశాఖపట్నం'
@@ -758,7 +757,7 @@ class Crawler():
         if self.logged_in:
             return
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/RB/Login'
-        logger.info('Fetching URL[%s]' % url)
+        logger.info(f'Fetching URL[{url}]...')
         self.driver.get(url)
         time.sleep(3)
 
@@ -1012,7 +1011,7 @@ class Crawler():
         #WebDriverWait(self.driver, 10).until(EC.title_contains("వై ఎస్ ఆర్ రైతు భరోసా"))
         #logger.info("Page Title is : "+self.driver.title)
         url = self.payment_url
-        logger.info('Fetching URL[%s]' % url)
+        logger.info(f'Fetching URL[{url}]...')
         self.driver.get(url)
         time.sleep(3)
         dataframe = None
@@ -1209,7 +1208,7 @@ class Crawler():
         village_extract_dict = {}
         village_extract_dict['pattern'] = "Katha Number"
         url = self.payment_url
-        logger.info('Fetching URL[%s]' % url)
+        logger.info(f'Fetching URL[{url}]...')
         self.driver.get(url)
         time.sleep(3)
         villageXPath="//select[1]"
@@ -1398,7 +1397,7 @@ class Crawler():
             self.set_mandal(mandal_name=mandal,mandal_code=mandal_code)
             time.sleep(5)
             url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/Statusupdate'
-            logger.info('Fetching URL[%s]' % url)
+            logger.info(f'Fetching URL[{url}]...')
             self.driver.get(url)
             time.sleep(3)
             logger.info(villageCode)
@@ -1500,13 +1499,14 @@ class Crawler():
 
         self.driver.execute_script(f"sessionStorage.setItem('mandal', '{mandal_code}'); sessionStorage.setItem('mandalname', '{mandal_name}');");
 
-    def crawl_death_abstract_report(self, logger, district=None, mandal=None, village=None):
+    def crawl_death_abstract_report(self, logger, district=None, district_code=None, mandal=None, mandal_code=None, village=None, village_code=None):
         self.login(logger, auto_captcha=True)
-        self.set_district(district)  # could give both name and code depending on input
-        self.set_mandal(mandal)
+        self.set_district(district_name=district,district_code=district_code)
+        self.set_mandal(mandal_name=mandal,mandal_code=mandal_code)
+        #time.sleep(5)
 
         url = 'https://ysrrythubharosa.ap.gov.in/RBApp/Reports/RBDeathAbstractvillage'
-        logger.info('Fetching URL[%s]' % url)
+        logger.info(f'Fetching URL[{url}]...')
         self.driver.get(url)
         try:
             WebDriverWait(self.driver, 25).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='btn btn-primary']")))
@@ -1524,10 +1524,10 @@ class Crawler():
         html_source = self.driver.page_source
         df = pd.read_html(html_source)[0]
         logger.debug(f'{df}')
-        logger.info(f'Writing [{filename}]')
+        logger.info(f'Writing [{filename}]...')
         df.to_csv(filename, index=False)
 
-        villages = df['Village Name']
+        villages = df['Village Name'].tolist()
 
         table_id = 'tblreject'
         logger.info('Waiting for the table ID[{table_id}] to load')
@@ -1537,24 +1537,40 @@ class Crawler():
 
         if village:
             logger.info(f'The village list [{villages}]')
-            specific_index = village.find(village)
-            row = specific_index+1
-            logger.info(f'Yippie! We have a hit for {village} {specific_index} [{row}]')
-            df = self.fetch_death_abstract_report(logger, district, mandal, village, row)
+            logger.info(f'fetch row for ({district}, {mandal}, {village})')
+            try:
+                row = villages.index(village)+1
+            except Exception as e:
+                logger.critical(f'Exception during index find - EXCEPT[{type(e)}:{e}]')
+                return None
+
+            logger.info(f'fetch_death_abstract_report({district}, {mandal}, {village}, {row})')
+            df = self.fetch_death_abstract_report(logger, district, district_code, mandal, mandal_code, village, village_code, row)
             return df
         
         for row, village in enumerate(villages, 1):
-            self.fetch_death_abstract_report(logger, district, mandal, village, row)
+            self.fetch_death_abstract_report(logger, district, district_code, mandal, mandal_code, village, village_code, row)
 
         return None
 
-    def fetch_death_abstract_report(self, logger, district, mandal, village, row):
+    def fetch_death_abstract_report(self, logger, district, district_code, mandal, mandal_code, village, village_code, row):
         village_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[2]'
         elem = self.driver.find_element_by_xpath(village_path)        
-        village_value = elem.get_attribute('text') # FIXME why is this not working. Returns None always
+        village_value = elem.get_attribute('innerHTML')
+
+        if village_value != village_value:
+            logger.critical('This should not happen village[{village}] vs village_value[{village_value}]')
+            return None
         
+        filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
+        logger.info(f'File [{filename}]')
+        if os.path.exists(filename):
+            logger.info(f'File already downloaded. Reading [{filename}]...')
+            df = pd.read_csv(filename)
+            return df
+
         link_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[4]/a'
-        elem = self.driver.find_element_by_xpath(link_path)        
+        elem = self.driver.find_element_by_xpath(link_path)
         value = elem.get_attribute('text')
 
         logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
@@ -1582,8 +1598,15 @@ class Crawler():
             self.driver.save_screenshot('./button_'+captcha_text+'.png')
             return 'FAILURE'
         df = pd.read_html(html_source)[0]
+        df['district_name_tel']=district
+        df['district_code']=district_code
+        df['mandal_name_tel']=mandal
+        df['mandal_code']=mandal
+        df['village_name_tel']=village
+        df['village_code']=village_code
         logger.debug(f'{df}')
-        filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
+        
+        # filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
         logger.info(f'Writing [{filename}]')
         df.to_csv(filename, index=False)
         logger.info('Closing Current Window')
@@ -1593,6 +1616,67 @@ class Crawler():
 
         return df
 
+    def dump_sample_death_abstract_report(self, logger, sample=None):
+        if not sample:
+            sample = 'AP_ITDA_10_SAMPLE'
+
+        self.login(logger, auto_captcha=True)
+
+        statusDF=pd.read_csv(self.status_file,index_col=0)
+        #logger.info(statusDF)
+        filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
+        if len(filteredDF) > 0:
+            curIndex=filteredDF.index[0]
+        else:
+            curIndex=None
+            logger.info('No more requests to process')
+            return 'SUCCESS'
+        statusDF.loc[curIndex,'inProgress'] = 1
+        statusDF.to_csv(self.status_file)
+        prev_village = ''
+        villageDFs=[]
+
+        while curIndex is not None:
+            row = filteredDF.loc[curIndex]
+            district = row['district_name_telugu']
+            district_code = str(row['district_code'])
+            mandal = row['block_name_telugu']
+            mandal_code = str(row['block_code'])
+            village = row['village_name']
+            village_code = str(row['village_code'])
+
+            df = self.crawl_death_abstract_report(logger, district=district, mandal=mandal, village=village, district_code=district_code, mandal_code=mandal_code, village_code=village_code)
+            logger.info(f'After appending details: {df}')
+            villageDFs.append(df)
+            statusDF.loc[curIndex, 'status'] = 'done'
+            statusDF.loc[curIndex,'inProgress'] = 0
+            statusDF.to_csv(self.status_file)
+            logger.info(f'Adding the table for {district} > {mandal} > {village}')
+
+            statusDF=pd.read_csv(self.status_file, index_col=0)
+            filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
+            if len(filteredDF) > 0:
+                curIndex=filteredDF.index[0]
+                statusDF.loc[curIndex,'inProgress'] = 1
+                statusDF.to_csv(self.status_file)
+            else:
+                curIndex=None
+
+        if len(villageDFs) > 0:
+            villageDF=pd.concat(villageDFs)
+        else: # FIXME
+            columns = ['SNO', 'FarmerName', 'Fathername', 'Katha Number', 'Nominee Name', 'Nominee Relation', 'district_name_tel', 'district_code', 'mandal_name_tel', 'mandal_code', 'village_name_tel', 'village_code']
+            villageDF=pd.DataFrame(columns = columns)
+
+        filename=f"{self.dir}/{sample}.csv"
+        logger.info('Writing to [%s]' % filename)
+        villageDF.to_csv(filename, index=False)
+
+        return 'SUCCESS'
+
+
+
+    
 def get_unique_district_block(logger, dataframe):
     logger.info(dataframe.columns)
     df = dataframe.groupby(["district_name_telugu",
@@ -1628,7 +1712,10 @@ class TestSuite(unittest.TestCase):
 
     @unittest.skip('Skipping direct command approach')
     def test_dump_gram_1b_report(self):
-        result = dump_gram_1b_reports(self.logger, dirname=directory)
+        retries = 20
+        while True and retries:
+            result = dump_gram_1b_reports(self.logger, dirname=directory)
+            retries -= 1
         self.assertEqual(result, 'SUCCESS')
 
     def test_crawler(self):
@@ -1678,14 +1765,14 @@ class TestSuite(unittest.TestCase):
         del rb
 
     def test_crawl_death_abstract_report(self):
-        self.logger.info("Running test for Death Abstract Report")
+        self.logger.info("Running test for Death Abstract Report for G. Madugula Block")
         # Start a RhythuBharosa Crawl
         rb = Crawler()
         rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల')
         del rb
 
     def test_fetch_death_report(self):
-        self.logger.info("Running test for Death Abstract Report")
+        self.logger.info("Running test for Death Abstract Report for specified village")
         # Start a RhythuBharosa Crawl
         rb = Crawler()
         rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', village='దేవరాపల్లి')
@@ -1693,5 +1780,13 @@ class TestSuite(unittest.TestCase):
         rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', village='కె.బందవీధి')
         del rb
 
+    def test_dump_death_abstract_report(self):
+        sample = 'AP_ITDA_10_SAMPLE'
+        self.logger.info("Running test for Death Abstract Report for {sample}")
+        # Start a RhythuBharosa Crawl
+        rb = Crawler()
+        rb.dump_sample_death_abstract_report(self.logger, sample=sample)
+        del rb
+        
 if __name__ == '__main__':
     unittest.main()
