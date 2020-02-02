@@ -55,8 +55,14 @@ base_url = 'https://meebhoomi.ap.gov.in/'
 
 village_list = [('విశాఖపట్నం', 'అచ్యుతాపురం', 'జోగన్నపాలెం'), ('విశాఖపట్నం', 'అనంతగిరి', 'నిన్నిమామిడి'), ('విశాఖపట్నం', 'అనందపురం', 'ముచ్చెర్ల')]
 skip_district = ['3',]
-is_visible = False  # Make False before commmitting - need to make Firefox headless for Mac
-is_mac = False      # Make False before commmitting
+
+if True:
+    is_visible = False  # Make False before commmitting - need to make Firefox headless for Mac
+    is_mac = False      # Make False before commmitting
+else:
+    is_visible = True
+    is_mac = True
+    
 is_mynk = True
 
 #############
@@ -1542,7 +1548,7 @@ class Crawler():
                 row = villages.index(village)+1
             except Exception as e:
                 logger.critical(f'Exception during index find for village_code[{village_code}]- EXCEPT[{type(e)}:{e}]')
-                return None
+                return pd.DataFrame()  # return empty DataFrame
 
             logger.info(f'fetch_death_abstract_report({district}, {mandal}, {village}, {row})')
             df = self.fetch_death_abstract_report(logger, district, district_code, mandal, mandal_code, village, village_code, row)
@@ -1558,7 +1564,7 @@ class Crawler():
         elem = self.driver.find_element_by_xpath(village_path)        
         village_value = elem.get_attribute('innerHTML')
 
-        if village_value != village_value:
+        if village != village_value:
             logger.critical('This should not happen village[{village}] vs village_value[{village_value}]')
             return None
         
@@ -1573,24 +1579,36 @@ class Crawler():
         elem = self.driver.find_element_by_xpath(link_path)
         value = elem.get_attribute('text')
 
-        logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
+        logger.info(f'Handles : {self.driver.window_handles}    Number : [{len(self.driver.window_handles)}]')
         logger.info(f'Clicking for village[{village}] vs village_value[{village_value}] > value[{value}]')
         elem.click()
         time.sleep(5) #FIXME
+
         '''
-        path = f'/html/body/div[3]/div[2]/h6/b[contains(text(),"{village}")]'
+        path = f'/html/body/div[3]/div[2]/h6/b'  # '[contains(@innerHTML,"{village}")]'
         logger.info(f'Waiting for page with village[{village}] to load on "{path}"')
+        elem = self.driver.find_element_by_xpath(path)
+        logger.info(elem.text)
         WebDriverWait(self.driver, 25).until(
             EC.presence_of_element_located((By.XPATH,  path))
         )
         '''
         parent_handle = self.driver.current_window_handle
-        logger.info("Handles : [%s]    Number : [%d]" % (self.driver.window_handles, len(self.driver.window_handles)))
+        logger.info(f'Handles : {self.driver.window_handles}    Number : [{len(self.driver.window_handles)}]')
         
         if len(self.driver.window_handles) > 1:
             logger.info('Switching Window...')
             self.driver.switch_to.window(self.driver.window_handles[-1])
             logger.info('Switched!!!')
+
+            path = f'/html/body/div[3]/div[2]/h6/b[contains(text(),"{village}")]'
+            logger.info(f'Waiting for page with village[{village}] to load on "{path}"')
+            WebDriverWait(self.driver, 15).until(
+                EC.presence_of_element_located((By.XPATH,  path))
+            )
+            elem = self.driver.find_element_by_xpath(path)
+            logger.info(elem.text)
+
             html_source = self.driver.page_source
             #time.sleep(2)
         else:
@@ -1647,11 +1665,15 @@ class Crawler():
 
             df = self.crawl_death_abstract_report(logger, district=district, mandal=mandal, village=village, district_code=district_code, mandal_code=mandal_code, village_code=village_code)
             logger.info(f'After appending details: {df}')
-            villageDFs.append(df)
-            statusDF.loc[curIndex, 'status'] = 'done'
+            if not df.empty:
+                villageDFs.append(df)
+                statusDF.loc[curIndex, 'status'] = 'done'
+                logger.info(f'Adding the table for {district} > {mandal} > {village}')
+            else:
+                statusDF.loc[curIndex, 'status'] = 'failed'   # Village not there
+                logger.info(f'Village not found! {district} > {mandal} > {village}')
             statusDF.loc[curIndex,'inProgress'] = 0
             statusDF.to_csv(self.status_file)
-            logger.info(f'Adding the table for {district} > {mandal} > {village}')
 
             statusDF=pd.read_csv(self.status_file, index_col=0)
             filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
