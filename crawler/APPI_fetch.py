@@ -62,7 +62,7 @@ if True:
 else:
     is_visible = True
     is_mac = True
-    
+
 is_mynk = True
 
 #############
@@ -788,9 +788,11 @@ class Crawler():
                 fname = 'captcha.png'
                 self.driver.save_screenshot(fname)
                 img = Image.open(fname)
-                # box = (815, 455, 905, 495)   Captcha Box
+
                 if is_mynk:
                     box = (830, 470, 905, 485)   # Mynk Desktop
+                    if rb_server:
+                        box = (830, 470, 905, 489)   # rb.libtech.in
                     if is_mac:
                         box = (1170, 940, 1315, 965)   # Mynk Mac
                 else:
@@ -806,9 +808,12 @@ class Crawler():
                 filename = 'processed_captcha.png'
                 cv2.imwrite(filename, img)
                 fname = 'converted_captcha.png'
-                check_output(['convert', filename, '-resample', '10', fname])
-                captcha_text = pytesseract.image_to_string(Image.open(fname), lang='eng', config='--psm 8  --dpi 300 -c tessedit_char_whitelist=ABCDEF0123456789')
-
+                if is_mac:
+                    fname = filename
+                    captcha_text = pytesseract.image_to_string(Image.open(fname), lang='eng', config='--psm 8  --dpi 300 -c tessedit_char_whitelist=ABCDEF0123456789')
+                else:
+                    check_output(['convert', filename, '-resample', '10', fname])
+                    captcha_text = pytesseract.image_to_string(Image.open(fname), lang='eng', config='--psm 8  --dpi 300 -c tessedit_char_whitelist=ABCDEF0123456789')
                 elem = self.driver.find_element_by_xpath('(//input[@type="text"])[2]')
                 logger.info('Entering Captcha_Text[%s]' % captcha_text)
                 elem.send_keys(captcha_text)
@@ -1553,7 +1558,7 @@ class Crawler():
             logger.info(f'fetch_death_abstract_report({district}, {mandal}, {village}, {row})')
             df = self.fetch_death_abstract_report(logger, district, district_code, mandal, mandal_code, village, village_code, row)
             return df
-        
+
         for row, village in enumerate(villages, 1):
             self.fetch_death_abstract_report(logger, district, district_code, mandal, mandal_code, village, village_code, row)
 
@@ -1561,13 +1566,13 @@ class Crawler():
 
     def fetch_death_abstract_report(self, logger, district, district_code, mandal, mandal_code, village, village_code, row):
         village_path = f'/html/body/div[3]/div[3]/div/div[2]/div/div/table/tbody/tr[{row}]/td[2]'
-        elem = self.driver.find_element_by_xpath(village_path)        
+        elem = self.driver.find_element_by_xpath(village_path)
         village_value = elem.get_attribute('innerHTML')
 
         if village != village_value:
             logger.critical('This should not happen village[{village}] vs village_value[{village_value}]')
             return None
-        
+
         filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
         logger.info(f'File [{filename}]')
         if os.path.exists(filename):
@@ -1595,7 +1600,7 @@ class Crawler():
         '''
         parent_handle = self.driver.current_window_handle
         logger.info(f'Handles : {self.driver.window_handles}    Number : [{len(self.driver.window_handles)}]')
-        
+
         if len(self.driver.window_handles) > 1:
             logger.info('Switching Window...')
             self.driver.switch_to.window(self.driver.window_handles[-1])
@@ -1623,7 +1628,7 @@ class Crawler():
         df['village_name_tel']=village
         df['village_code']=village_code
         logger.debug(f'{df}')
-        
+
         # filename=f'{self.dir}/{district}_{mandal}_{village}.csv'
         logger.info(f'Writing [{filename}]')
         df.to_csv(filename, index=False)
@@ -1696,9 +1701,6 @@ class Crawler():
 
         return 'SUCCESS'
 
-
-
-    
 def get_unique_district_block(logger, dataframe):
     logger.info(dataframe.columns)
     df = dataframe.groupby(["district_name_telugu",
@@ -1809,6 +1811,6 @@ class TestSuite(unittest.TestCase):
         rb = Crawler()
         rb.dump_sample_death_abstract_report(self.logger, sample=sample)
         del rb
-        
+
 if __name__ == '__main__':
     unittest.main()
