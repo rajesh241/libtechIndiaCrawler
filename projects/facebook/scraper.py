@@ -58,6 +58,15 @@ def make_login(session, base_url, credentials):
             logging.info('[*] Logged in.')
             break
 
+def get_post_id(profile_bs):
+        try:
+            posts_id = 'recent'
+            posts = profile_bs.find('div', id=posts_id).div.div.contents
+        except Exception:
+            posts_id = 'structured_composer_async_container'
+            posts = profile_bs.find('div', id=posts_id).div.div.contents
+        return posts_id
+
 def crawl_profile(logger, session, base_url, profile_url, post_limit):
     """Goes to profile URL, crawls it and extracts posts URLs.
     """
@@ -66,7 +75,19 @@ def crawl_profile(logger, session, base_url, profile_url, post_limit):
     n_scraped_posts = 0
     scraped_posts = list()
     posts_id = None
+    a = []
     posts_urls = [a['href'] for a in profile_bs.find_all('a', text='Full Story')] 
+    a= a+posts_urls
+    logger.info(f"posts urls {len(posts_urls)}")
+    posts_id = get_post_id(profile_bs)
+    logger.info(f"Post ID is {posts_id}")
+    show_more_posts_url = profile_bs.find('div', id=posts_id).next_sibling.a['href']
+    logger.info(f"show more posts url is {show_more_posts_url}")
+    profile_bs = get_bs(session, base_url+show_more_posts_url)
+    posts_urls = [a['href'] for a in profile_bs.find_all('a', text='Full Story')] 
+    logger.info(f"posts urls {len(posts_urls)}")
+    a= a+posts_urls
+    posts_urls = a
     logger.info(f"posts urls {len(posts_urls)}")
     for post_url in posts_urls:
        logger.info(f"Currentply processing {post_url}")
