@@ -6,7 +6,7 @@ import re
 import json
 import time
 import logging
-import pandas
+import pandas as pd
 from collections import OrderedDict
 from bs4 import BeautifulSoup
 
@@ -67,6 +67,19 @@ def get_post_id(profile_bs):
             posts = profile_bs.find('div', id=posts_id).div.div.contents
         return posts_id
 
+def get_posts(logger, number_of_posts):
+    a = []
+    posts_urls = [a['href'] for a in profile_bs.find_all('a', text='Full Story')] 
+    a= a+posts_urls
+    current_number_posts = len(a)
+    logger.info(f"posts urls {len(posts_urls)}")
+    posts_id = get_post_id(profile_bs)
+    logger.info(f"Post ID is {posts_id}")
+    show_more_posts_url = profile_bs.find('div', id=posts_id).next_sibling.a['href']
+    logger.info(f"show more posts url is {show_more_posts_url}")
+    profile_bs = get_bs(session, base_url+show_more_posts_url)
+    posts_urls = [a['href'] for a in profile_bs.find_all('a', text='Full Story')] 
+ 
 def crawl_profile(logger, session, base_url, profile_url, post_limit):
     """Goes to profile URL, crawls it and extracts posts URLs.
     """
@@ -256,7 +269,50 @@ def save_data(data):
     with open('profile_posts_data.json', 'w') as json_file:
         json.dump(data, json_file, indent=4)
 
+def extract_posts(logger, mysoup):
+    #post_divs = mysoup.findAll("div", data-testid="post_message")
+    post_divs = mysoup.findAll("div", attrs={"class":"userContentWrapper"})
+    sr_no = 0
+    csv_array = []
+    csv_headers = ["post_date", "post_content"]
+    i = 0
+    for post_div in post_divs:
+        post_data = ''
+        date_string = ''
+        likes_string = ''
+        comments_string = ''
+        sr_no = sr_no + 1
+        logger.info(f"serial number is {sr_no}")
+        post_data_div = post_div.find("div",
+                                         attrs={"data-testid":"post_message"})
+        if post_data_div is not None:
+            post_data = post_data_div.text.lstrip().rstrip().replace("\n"," ")
+        
+        meta_data_div = post_div.find("div",
+                                         attrs={"data-testid":"story-subtitle"})
+        if meta_data_div is not None:
+            date_span = meta_data_div.find("span", attrs={"class":"timestampContent"})
+            date_string = date_span.text.lstrip().rstrip()
+        comments_a = post_div.find("a",
+                                    attrs={"data-testid":"FI2CommentsCount/root"}) 
+        if comments_a is not None:
+            comments_string = comments_a.text.lstrip().rstrip()
+        logger.info(date_string)
+        logger.info(comments_string)
+        a = [date_string, post_data]
+        csv_array.append(a)
+    dataframe = pd.DataFrame(csv_array, columns=csv_headers)
+    dataframe.to_csv("posts.csv")
 
+    exit(0) 
+    post_divs = mysoup.findAll("div", attrs={"data-testid":"post_message"})
+    sr_no = 0
+    for post_div in post_divs:
+        sr_no = sr_no + 1
+        post_text = post_div.text.lstrip().rstrip()
+        likes_div = post_div.find_next("div", attrs={"class":"_1vx9"})
+        logger.info(likes_div.text)
+        logger.info(f"serial number is {sr_no}")
 
 def main():
     """Main Module of this program"""
@@ -264,6 +320,17 @@ def main():
     logger = logger_fetch(args.get('log_level'))
     if args['test']:
         logger.info("Testing phase")
+        with open("himanta_cleaned.html", "rb") as f:
+            myhtml = f.read()
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        extract_posts(logger, mysoup)
+        exit(0)
+        
+        with open("himanta.html", "rb") as f:
+            myhtml = f.read()
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        with open("himanta_cleaned.html", "w") as f:
+            f.write(mysoup.prettify())
     if args['crawl']:
         logger.info("Crawling facebook")
         base_url = 'https://mobile.facebook.com'
