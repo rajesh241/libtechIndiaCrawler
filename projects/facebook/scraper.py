@@ -1,4 +1,6 @@
 """Blank file which can server as starting point for writing any script file"""
+from os import listdir
+from os.path import isfile, join
 import argparse
 import requests
 from libtech_lib.generic.commons import logger_fetch
@@ -22,6 +24,8 @@ def args_fetch():
                         required=False, action='store_const', const=1)
     parser.add_argument('-t', '--test', help='Test Loop',
                         required=False, action='store_const', const=1)
+    parser.add_argument('-id', '--inputDir', help='Input directory for HTML', required=False)
+    parser.add_argument('-od', '--outputDir', help='Output Directory', required=False)
     parser.add_argument('-ti1', '--testInput1', help='Test Input 1', required=False)
     parser.add_argument('-ti2', '--testInput2', help='Test Input 2', required=False)
     args = vars(parser.parse_args())
@@ -268,19 +272,35 @@ def save_data(data):
     """
     with open('profile_posts_data.json', 'w') as json_file:
         json.dump(data, json_file, indent=4)
+def process_text(s):
+    """Process the text to remove new lines and conver multiple spaces to
+    single space"""
+    s = s.replace("\n", " ")
+    s = s.replace("\r", " ")
+    s = re.sub('\s+',' ',s)
+    return s
 
 def extract_posts(logger, mysoup):
+    posts_dict = {}
     #post_divs = mysoup.findAll("div", data-testid="post_message")
     post_divs = mysoup.findAll("div", attrs={"class":"userContentWrapper"})
+    post_divs = mysoup.findAll("div", attrs={"data-fte":"1"})
+    ##Comment div = data-testid="UFI2Comment/body
+    ##Comment Count = data-testid="UFI2CommentsCount/root
+    ##share count = data-testid="UFI2SharesCount/root"
     sr_no = 0
     csv_array = []
     csv_headers = ["post_date", "post_content"]
     i = 0
     for post_div in post_divs:
+        p = {}
         post_data = ''
         date_string = ''
         likes_string = ''
         comments_string = ''
+        shares_string = ''
+        comments_a = None
+        shares_a = None
         sr_no = sr_no + 1
         logger.info(f"serial number is {sr_no}")
         post_data_div = post_div.find("div",
@@ -293,32 +313,66 @@ def extract_posts(logger, mysoup):
         if meta_data_div is not None:
             date_span = meta_data_div.find("span", attrs={"class":"timestampContent"})
             date_string = date_span.text.lstrip().rstrip()
+
         comments_a = post_div.find("a",
-                                    attrs={"data-testid":"FI2CommentsCount/root"}) 
+                                    attrs={"data-testid":"UFI2CommentsCount/root"}) 
         if comments_a is not None:
             comments_string = comments_a.text.lstrip().rstrip()
+        shares_a = post_div.find("a",
+                                 attrs={"data-testid":"UFI2SharesCount/root"}) 
+        if shares_a is not None:
+            shares_string = shares_a.text.lstrip().rstrip()
+        p['post_date'] = date_string
+        p['post_content'] = process_text(post_data)
+        p['comment_count'] = comments_string
+        p['share_count'] = shares_string
         logger.info(date_string)
         logger.info(comments_string)
-        a = [date_string, post_data]
-        csv_array.append(a)
-    dataframe = pd.DataFrame(csv_array, columns=csv_headers)
-    dataframe.to_csv("posts.csv")
+        logger.info(shares_string)
+        comment_dict = {}
+        comment_divs = post_div.findAll("div",
+                                      attrs={"data-testid":"UFI2Comment/body"})
+        comment_no = 0
+        for comment_div in comment_divs:
+            comment_no = comment_no + 1
+            comment_span_div = comment_div.find("span",
+                                                attrs={"dir":"ltr"})
+            if comment_span_div is not None:
+                comment_text = comment_span_div.text.lstrip().rstrip()
+                comment_dict[comment_no] = process_text(comment_text)
 
-    exit(0) 
-    post_divs = mysoup.findAll("div", attrs={"data-testid":"post_message"})
-    sr_no = 0
-    for post_div in post_divs:
-        sr_no = sr_no + 1
-        post_text = post_div.text.lstrip().rstrip()
-        likes_div = post_div.find_next("div", attrs={"class":"_1vx9"})
-        logger.info(likes_div.text)
-        logger.info(f"serial number is {sr_no}")
+        p['comments'] = comment_dict
+        logger.info(p)
+        posts_dict[sr_no] = p
+    return posts_dict
+    #with open('profile_posts_data.json', 'w', encoding='utf8') as json_file:
+    #    json.dump(posts_dict, json_file, indent=4, ensure_ascii=False)
+
 
 def main():
     """Main Module of this program"""
     args = args_fetch()
     logger = logger_fetch(args.get('log_level'))
     if args['test']:
+        input_dir = args['inputDir']
+        if input_dir is None:
+            input_dir = "data/profiles/"
+        output_dir = args['outputDir']
+        if output_dir is None:
+            output_dir = "data/json/"
+        file_list = [f for f in listdir(input_dir) if isfile(join(input_dir, f))]
+        logger.info(file_list)
+        posts_dict = {}
+        for each_file in file_list:
+            filename = f"{input_dir}{each_file}"
+            with open(filename, "rb") as f:
+                myhtml = f.read()
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            my_dict = extract_posts(logger, mysoup)
+            posts_dict[each_file] = my_dict
+        with open(f'{output_dir}profile_posts_data.json', 'w', encoding='utf8') as json_file:
+            json.dump(posts_dict, json_file, indent=4, ensure_ascii=False)
+        exit(0)
         logger.info("Testing phase")
         with open("himanta_cleaned.html", "rb") as f:
             myhtml = f.read()
