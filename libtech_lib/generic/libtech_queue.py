@@ -5,7 +5,7 @@ from threading import Thread
 import threading
 from queue import Queue
 import pandas as pd
-import queue_functions
+import libtech_lib.generic.queue_functions as queue_functions
 
 def libtech_queue_manager(logger, joblist, num_threads=100):
     """This is the Queue Manager Function. It takes the joblist creates a queue
@@ -31,8 +31,11 @@ def libtech_queue_manager(logger, joblist, num_threads=100):
         result = result_queue.get()
         if result is not None:
             result_array.append(result)
-    dataframe = pd.concat(result_array, ignore_index=True)
-    dataframe = dataframe.reset_index(drop=True)
+    if len(result_array) > 0:
+        dataframe = pd.concat(result_array, ignore_index=True)
+        dataframe = dataframe.reset_index(drop=True)
+    else:
+        dataframe = None
     return dataframe
 
 
@@ -51,7 +54,8 @@ def libtech_queue_worker(logger, job_queue, result_queue):
             #result = globals()[func_name](logger, func_args, threadName=name)
             method_to_call = getattr(queue_functions, func_name)
             result = method_to_call(logger, func_args, thread_name=name)
-            result_queue.put(result)
+            if result is not None:
+                result_queue.put(result)
         except Exception as e_text:
             logger.error(e_text, exc_info=True)
         job_queue.task_done()
