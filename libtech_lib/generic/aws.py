@@ -84,14 +84,14 @@ def upload_s3(logger, filename, data, bucket_name=None):
         #If the data passed is a pandas dataframe
         data['lastUpdateDate'] = datetime.datetime.now().date()
         csv_buffer = StringIO()
-        data.to_csv(csv_buffer, encoding='utf-8-sig')
+        data.to_csv(csv_buffer, encoding='utf-8-sig', index=False)
         filedata = csv_buffer.getvalue()
         content_type = 'text/csv'
         put_object_s3(bucket, filename, filedata, content_type)
         excelfilename = filename.rstrip('csv')+"xlsx"
         output = BytesIO()
-        writer = pd.ExcelWriter(output, engine='xlsxwriter', options={'strings_to_urls': False})
-        data.to_excel(writer)
+        writer = pd.ExcelWriter(output, engine='xlsxwriter',  options={'strings_to_urls': False})
+        data.to_excel(writer, index=False)
         writer.save()
         filedata = output.getvalue()
         content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

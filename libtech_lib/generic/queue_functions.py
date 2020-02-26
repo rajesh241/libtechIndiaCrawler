@@ -2,11 +2,13 @@
 import requests
 import pandas as pd
 import json
-from html_functions import (get_dataframe_from_html,
+from bs4 import BeautifulSoup
+from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                             get_dataframe_from_url,
-                            get_urldataframe_from_url
+                            get_urldataframe_from_url,
+                            delete_divs_by_classes
                            )
-from commons import (standardize_dates_in_dataframe,
+from libtech_lib.generic.commons import (standardize_dates_in_dataframe,
                      insert_finyear_in_dataframe,
                      get_default_start_fin_year,
                      get_fto_finyear
@@ -127,3 +129,55 @@ def fetch_jobcard_details(logger, func_args, thread_name=None):
     else:
         dataframe = None
     return dataframe
+
+
+def parse_save_insidene(logger, func_args, thread_name=None):
+    """Downloads and Saves data from Inside NE Magazine"""
+    headers = func_args[0]
+    outfile = func_args[1]
+    post_dict = func_args[2]
+    url = post_dict.get("post_link", None)
+    post_title = post_dict.get("post_title", '')
+    post_date = post_dict.get("post_date", '')
+    post_content = ''
+    post_div = None
+    if url is not None:
+        response = requests.get(url, headers=headers)
+        logger.info(response.status_code)
+        if response.status_code == 200:
+            mysoup = BeautifulSoup(response.content, "lxml")
+            post_div = mysoup.find("div", attrs={"class" : "td-post-content"})
+        if post_div is not None:
+            class_array = ["code-block", "google-auto-placed",
+                           "addtoany_share_save_container",
+                           "jp-relatedposts"]
+            post_div = delete_divs_by_classes(logger, post_div, class_array)
+            code_div = post_div.find("div", attrs={"class" : "code-block"})
+            strong_p = post_div.findAll("strong")
+            for strong in strong_p:
+                strong_text = strong.text.lstrip().rstrip()
+                strong_a = strong.find("a")
+                if ("ALSO READ:" in strong_text) and (strong_a is not None):
+                    parent_p = strong.parent
+                    parent_p.decompose()
+            em_p = post_div.findAll("em")
+            for strong in em_p:
+                strong_text = strong.text.lstrip().rstrip()
+                if ("Support Inside Northeast" in strong_text):
+                    parent_p = strong.parent
+                    parent_p.decompose()
+
+
+            paras = post_div.findAll("p")
+            for para in paras:
+                para_text = para.text.lstrip().rstrip()
+                post_content = f"{post_content}{para_text}\n"
+        post_data = {}
+        post_data['post_title'] = post_title
+        post_data['post_link'] = url
+        post_data['post_date'] = post_date
+        post_data['post_content'] = post_content
+        with open(outfile, 'w', encoding='utf8') as json_file:
+            json.dump(post_data, json_file, indent=4, ensure_ascii=False)
+    return None
+ 

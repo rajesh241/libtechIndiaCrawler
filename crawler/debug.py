@@ -1,8 +1,9 @@
 """This is the Debug Script for testing the Library"""
 import argparse
 
-from commons import logger_fetch
-from models import NREGAPanchayat, NREGABlock
+from libtech_lib.generic.commons import logger_fetch
+from libtech_lib.nrega.models import NREGAPanchayat, NREGABlock, APPanchayat
+from libtech_lib.nrega import models
 
 def args_fetch():
     '''
@@ -13,6 +14,8 @@ def args_fetch():
                                                   'you can copy this base script '))
     parser.add_argument('-l', '--log-level', help='Log level defining verbosity', required=False)
     parser.add_argument('-t', '--test', help='Test Loop',
+                        required=False, action='store_const', const=1)
+    parser.add_argument('-notnic', '--notnic', help='Not an NIC',
                         required=False, action='store_const', const=1)
     parser.add_argument('-lc', '--locationCode', help='Location Code for input', required=False)
     parser.add_argument('-lt', '--locationType',
@@ -34,11 +37,18 @@ def main():
         func_name = args.get('func_name', None)
         location_type = args.get('locationType', 'panchayat')
         location_codes = []
+        if args['notnic']:
+            BLOCK_CLASS = "APBlock"
+            PANCHAYAT_CLASS = "APPanchayat"
+        else:
+            BLOCK_CLASS = "NREGABlock"
+            PANCHAYAT_CLASS = "NREGAPanchayat"
+
         if location_type == 'block':
             location_codes.append(location_code)
         else:
             if len(location_code) == 7:
-                block_location = NREGABlock(logger=logger,
+                block_location = getattr(models, BLOCK_CLASS)(logger=logger,
                                             location_code=location_code)
                 location_codes = block_location.get_all_panchayats(logger)
             else:
@@ -46,9 +56,9 @@ def main():
 
         for location_code in location_codes:
             if location_type == 'block':
-                my_location = NREGABlock(logger=logger, location_code=location_code)
+                my_location = getattr(models, BLOCK_CLASS)(logger=logger, location_code=location_code)
             else:
-                my_location = NREGAPanchayat(logger=logger, location_code=location_code)
+                my_location = getattr(models, PANCHAYAT_CLASS)(logger=logger, location_code=location_code)
             logger.info(my_location.__dict__)
            # my_location.muster_list(logger)
             method_to_call = getattr(my_location, func_name)
