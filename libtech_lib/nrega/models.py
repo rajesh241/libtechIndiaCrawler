@@ -23,7 +23,8 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                       get_block_rejected_transactions,
                       get_muster_transactions
                      )
-from libtech_lib.nrega.apnrega import (get_ap_jobcard_register
+from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
+                                       get_ap_muster_transactions
                     )
 class Location():
     """This is the base Location Class"""
@@ -77,6 +78,12 @@ class APPanchayat(Location):
         logger.info(f"Going to fetch Jobcard register for {self.code}")
         dataframe = get_ap_jobcard_register(self, logger)
         report_type = "ap_jobcard_register"
+        self.save_report(logger, dataframe, report_type)
+    def ap_muster_transactions(self, logger):
+        """Will Fetch the AP Muster Transactions"""
+        logger.info(f"Going to fetch Jobcard register for {self.code}")
+        dataframe = get_ap_muster_transactions(self, logger)
+        report_type = "ap_muster_transactions"
         self.save_report(logger, dataframe, report_type)
 
 class NREGAPanchayat(Location):
