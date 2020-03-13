@@ -154,3 +154,14 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
 
         dataframe = pd.DataFrame(dataframe_array, columns=dataframe_columns)
     return dataframe
+
+
+
+def delete_divs_by_classes(logger, mysoup, class_array):
+    '''This function will Delete all the divs which have the class attributes
+    as in class_array'''
+    for my_class in class_array:
+        my_div = mysoup.find("div", attrs={"class" : my_class})
+        if my_div is not None:
+            my_div.decompose()
+    return mysoup

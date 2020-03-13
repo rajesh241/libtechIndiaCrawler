@@ -10,7 +10,7 @@ import json
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
-from commons import  (get_current_finyear,
+from libtech_lib.generic.commons import  (get_current_finyear,
                       get_full_finyear,
                       standardize_dates_in_dataframe,
                       get_default_start_fin_year,
@@ -18,9 +18,9 @@ from commons import  (get_current_finyear,
                       get_finyear_from_muster_url,
                       get_fto_finyear
                      )
-from api_interface import api_get_report_url, api_get_report_dataframe
-from html_functions import get_dataframe_from_html, get_dataframe_from_url
-from libtech_queue import libtech_queue_manager
+from libtech_lib.generic.api_interface import api_get_report_url, api_get_report_dataframe
+from libtech_lib.generic.html_functions import get_dataframe_from_html, get_dataframe_from_url
+from libtech_lib.generic.libtech_queue import libtech_queue_manager
 
 def get_jobcard_register(lobj, logger):
     """Download Jobcard Register for a given panchayat
