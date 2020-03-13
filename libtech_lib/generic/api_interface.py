@@ -218,6 +218,7 @@ def create_update_report(logger, location_id, report_type, data,
     if the report does not exists this will create the report
     or update to an existing report"""
     headers = get_authentication_header()
+    logger.info(headers)
     if finyear is None:
         finyear = 'NA'
     #Upload report to s3 and get the url
@@ -242,6 +243,8 @@ def create_update_report(logger, location_id, report_type, data,
             'report_url': report_url,
             'excel_url': excel_url,
             }
+        logger.info(REPORTURL)
+        logger.info(post_data)
         res = requests.post(REPORTURL, headers=headers, data=json.dumps(post_data))
         logger.debug(f"Post status {res.status_code} and response {res.content}")
     else:

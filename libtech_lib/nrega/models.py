@@ -3,22 +3,29 @@ there is a class for each location type, and associated methods related to that
 """
 #pylint: disable-msg = no-member
 #pylint: disable-msg = too-few-public-methods
-from commons import (get_full_finyear,
+#File Path for on Demand
+#data/samples/on_demand/<scheme>/<report_type>/district/block/panchayat/
+##Archive data
+AP_STATE_CODE = "02"
+from libtech_lib.generic.commons import (get_full_finyear,
                      get_current_finyear
                     )
-from api_interface import (get_location_dict,
+from libtech_lib.generic.api_interface import (get_location_dict,
                            create_update_report,
                            api_get_report_dataframe,
                            api_get_child_locations,
                            api_get_child_location_ids
                           )
-from nicnrega import (get_jobcard_register,
+from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                       get_worker_register,
                       get_muster_list,
                       get_jobcard_transactions,
                       get_block_rejected_transactions,
                       get_muster_transactions
                      )
+from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
+                                       get_ap_muster_transactions
+                    )
 class Location():
     """This is the base Location Class"""
     def __init__(self, logger, location_code, scheme='nrega'):
@@ -31,16 +38,54 @@ class Location():
         """Fetches the report dataframe from amazon S3"""
         dataframe = api_get_report_dataframe(logger, self.id, report_type, finyear=finyear)
         return dataframe
+    def get_file_path(self, logger):
+        filepath = f"data/samples/on_demand/{self.scheme}/reportType/{self.state_code}"
+        if self.location_type == "state":
+            return filepath
+        filepath = f"{filepath}/{self.district_code}"
+        if self.location_type == "district":
+            return filepath
+        filepath = f"{filepath}/{self.block_code}"
+        if self.location_type == "block":
+            return filepath
+        filepath = f"{filepath}/{self.panchayat_code}"
+        return filepath
     def save_report(self, logger, data, report_type, finyear=None):
         """Standard function to save report to the location"""
         if finyear is None:
             report_filename = f"{self.slug}_{self.code}_{report_type}.csv"
         else:
             report_filename = f"{self.slug}_{self.code}_{report_type}_{finyear}.csv"
-        filename = f"{self.s3_filepath}{report_filename}"
+        filepath = self.get_file_path(logger)
+        filepath = filepath.replace("reportType", report_type)
+        filename = f"{filepath}/{report_filename}"
         logger.info(f"file name is {filename}")
         create_update_report(logger, self.id, report_type,
                              data, filename, finyear=finyear)
+class APPanchayat(Location):
+    """This is the AP Panchayat subclass for Location Class"""
+    def __init__(self, logger, location_code):
+        self.scheme = 'nrega'
+        self.code = location_code
+        Location.__init__(self, logger, self.code, self.scheme)
+        full_finyear = get_full_finyear(get_current_finyear())
+        if self.state_code == AP_STATE_CODE:
+            self.home_url = "http://www.nrega.ap.gov.in/Nregs/FrontServlet"
+        else:
+            self.home_url = "http://www.nrega.telangana.gov.in/Nregs/FrontServlet"
+    def ap_jobcard_register(self, logger):
+        """Will Fetch the Jobcard Register"""
+        logger.info(f"Going to fetch Jobcard register for {self.code}")
+        dataframe = get_ap_jobcard_register(self, logger)
+        report_type = "ap_jobcard_register"
+        self.save_report(logger, dataframe, report_type)
+    def ap_muster_transactions(self, logger):
+        """Will Fetch the AP Muster Transactions"""
+        logger.info(f"Going to fetch Jobcard register for {self.code}")
+        dataframe = get_ap_muster_transactions(self, logger)
+        report_type = "ap_muster_transactions"
+        self.save_report(logger, dataframe, report_type)
+
 class NREGAPanchayat(Location):
     """This is the Panchayat subclass for Location Class"""
     def __init__(self, logger, location_code):
@@ -94,6 +139,24 @@ class NREGAPanchayat(Location):
         report_type = "muster_transactions"
         self.save_report(logger, dataframe, report_type)
 
+class APBlock(Location):
+    """This is the AP Block subclass for Location Class"""
+    def __init__(self, logger, location_code):
+        self.scheme = 'nrega'
+        self.code = location_code
+        Location.__init__(self, logger, self.code, self.scheme)
+    def get_all_panchayats(self, logger):
+        """Getting all child Locations, in this case getting all panchayat
+        locations"""
+        panchayat_array = api_get_child_locations(logger, self.code,
+                                                  scheme='nrega')
+        return panchayat_array
+    def get_all_panchayat_ids(self, logger):
+        """Getting all child Locations, in this case getting all panchayat
+        locations IDs"""
+        panchayat_array = api_get_child_location_ids(logger, self.code,
+                                                     scheme='nrega')
+        return panchayat_array
 
 class NREGABlock(Location):
     """This is the Panchayat subclass for Location Class"""
