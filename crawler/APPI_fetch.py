@@ -157,6 +157,16 @@ class MeeBhoomi():
             logger.critical('Exception on WebDriverWait(10) - EXCEPT[%s:%s]' % (type(e), e))
             return 'ABORT'
             
+        cookies = driver.get_cookies()
+        logger.info(f'Cookies[{cookies}]')
+        session_id = cookies[0]['value']
+        logger.debug(f'Cookie -> Session ID[{session_id}]')
+        
+        self.cookies = {
+            'hibext_instdsigdipv2': '1',
+            'ASP.NET_SessionId': session_id,
+        }
+    
         html_source = driver.page_source.replace('<head>',
                                                      '<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>')
         logger.debug("HTML Fetched [%s]" % html_source)
@@ -175,6 +185,9 @@ class MeeBhoomi():
             with open(filename) as json_file:
                 lookup = json.load(json_file)
             return lookup
+
+        if not cookies:
+            cookies = self.cookies
         
         logger.info('Fetching URL[%s]...' % url)
         response = requests.post(url, headers=headers, cookies=cookies, data=data)
@@ -196,8 +209,9 @@ class MeeBhoomi():
         return lookup
     
         
-    def fetch_captcha(self, cookies=None, url=None):
+    def fetch_captcha(self, url=None):
         logger = self.logger
+
         headers = {
             'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:70.0) Gecko/20100101 Firefox/70.0',
             'Accept': 'image/webp,*/*',
@@ -208,7 +222,7 @@ class MeeBhoomi():
         }
     
         #response = requests.get('https://meebhoomi.ap.gov.in/CaptchaImage.axd', headers=headers, params=params, cookies=cookies)
-        response = requests.get(url, headers=headers, cookies=cookies)
+        response = requests.get(url, headers=headers, cookies=self.cookies)
         
         filename = 'captcha.jpg'
         with open(filename, 'wb') as html_file:
@@ -221,16 +235,16 @@ class MeeBhoomi():
         #return pytesseract.image_to_string(Image.open(filename), lang='eng', config='-c tessedit_char_whitelist=0123456789')
     
     
-    def fetch_appi_gram1b_report(self, cookies=None, url=None, district_no=None, mandal_no=None, village_no=None, filename=None):
+    def fetch_gram1b_report(self, district_no=None, mandal_no=None, village_no=None):
         logger = self.logger
         driver = self.driver
-        logger.info('Verify District[%s] > Mandal[%s] > Village[%s]' % (district_no, mandal_no, village_no))
+        logger.info('Fetch Gram 1B Report for District[%s] > Mandal[%s] > Village[%s]' % (district_no, mandal_no, village_no))
     
-        if not url:
-            url = self.base_url + 'ROR.aspx'
+        url = self.base_url + 'ROR.aspx'
         
         captcha_text = ''
         
+        filename = f'{self.dir}/{district_no}_{mandal_no}_{village_no}_gram1b.html'
         logger.info('Verifying File [%s]' % filename)
         if os.path.exists(filename):
             logger.info('File already downloaded. Skipping [%s]' % filename)
@@ -264,15 +278,20 @@ class MeeBhoomi():
                 img = imgs[3]
             logger.debug('Yippie [%s]' % img.attrs)
     
-            url = base_url + img['src']
+            url = self.base_url + img['src']
             logger.info('Fetching URL[%s]' % url)
-    
-            captcha_text = self.fetch_captcha(cookies, url)
-            time.sleep(timeout)
-            logger.info('Captcha Text[%s]' % captcha_text)
-            if len(captcha_text) != 5 or not captcha_text.isdigit():
-                logger.warning('Incorrect Captcha length[%s] or non digit data' % len(captcha_text))
-                return 'FAILURE'
+
+            retries = 3
+            while retries > 0:
+                retries -= 1 
+                captcha_text = self.fetch_captcha(url)
+                time.sleep(timeout)
+                logger.info('Captcha Text[%s]' % captcha_text)
+                if len(captcha_text) != 5 or not captcha_text.isdigit():
+                    logger.warning('Incorrect Captcha length[%s] or non digit data' % len(captcha_text))
+                    continue
+                else:
+                    break
             
             elem = driver.find_element_by_id('ContentPlaceHolder1_txtCaptcha')
             elem.send_keys(captcha_text)
@@ -358,30 +377,12 @@ class MeeBhoomi():
         return 'SUCCESS'
     
     
-    def fetch_gram_1b_reports(self, dirname=None, url=None):
+    def fetch_gram1b_reports(self, dirname=None, url=None):
         logger = self.logger
         driver = self.driver
         logger.info('Fetch the Gram 1B reports into dir[%s]' % dirname)
     
-        self.fetch_parent()
-        '''
-        url = base_url
-    
-        try:
-            logger.info('Requesting URL[%s]' % url)
-            response = requests.get(url, timeout=timeout, cookies=cookies)
-        except Exception as e:
-            logger.error('Caught Exception[%s]' % e) 
-        '''
-    
-        cookies = driver.get_cookies()
-        logger.info('Cookies[%s]' % cookies)
-        logger.debug('Cookie -> Session ID[%s]' % cookies[0]['value'])
-        
-        cookies = {
-            'hibext_instdsigdipv2': '1',
-            'ASP.NET_SessionId': cookies[0]['value'],
-        }
+        bs = self.fetch_parent()
     
         headers = {
             'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:70.0) Gecko/20100101 Firefox/70.0',
@@ -399,7 +400,7 @@ class MeeBhoomi():
         
         filename = '%s/district.json' % directory
         district_url = base_url + 'UtilityWebService.asmx/GetDistricts'
-        district_lookup = self.fetch_lookup(filename, url=district_url, cookies=cookies, headers=headers, data=data)
+        district_lookup = self.fetch_lookup(filename, url=district_url, headers=headers, data=data)
         logger.info(district_lookup)
     
         mandal_url = self.base_url + 'UtilityWebService.asmx/GetMandals'
@@ -413,7 +414,7 @@ class MeeBhoomi():
             logger.info('With Data[%s]' % data)
     
             filename = '%s/%s_%s_mandal_list.json' % (directory, district_no, district_name)
-            mandal_lookup = self.fetch_lookup(filename, url=mandal_url, cookies=cookies, headers=headers, data=data)
+            mandal_lookup = self.fetch_lookup(filename, url=mandal_url, headers=headers, data=data)
             logger.info(mandal_lookup)
     
             village_url = self.base_url + 'UtilityWebService.asmx/GetVillages'
@@ -424,44 +425,34 @@ class MeeBhoomi():
                 logger.info('With Data[%s]' % data)
     
                 filename = '%s/%s_%s_village_list.json' % (directory, district_name, mandal_name)
-                village_lookup = self.fetch_lookup(filename, url=village_url, cookies=cookies, headers=headers, data=data)
+                village_lookup = self.fetch_lookup(filename, url=village_url, headers=headers, data=data)
                 logger.info(village_lookup)
     
                 for village_no, village_name in village_lookup.items():
                     village_name = village_name.strip()
                     logger.info('Fetch Gram 1B Report for District[%s] > Mandal[%s] > Village[%s]' % (district_name, mandal_name, village_name))
-                    filename = '%s/%s_%s_%s_rejected_payments.html' % (dirname, district_name, mandal_name, village_name)                
-                    result = self.fetch_appi_gram1b_report(cookies=cookies,
-                                                      district_no=district_no,
-                                                      mandal_no=mandal_no,
-                                                      village_no=village_no,
-                                                      filename=filename)
+                    result = self.fetch_gram1b_report(
+                        district_no=district_no,
+                        mandal_no=mandal_no,
+                        village_no=village_no,
+                    )
                     if result == 'ABORT':
                         logger.critical('Aborting Mission!')
                         return result
         
-        return result # 'SUCCESS'
+        return result
     
     
-    def fetch_gram_1b_reports_for(self, villages=None):
+    def fetch_gram1b_reports_for(self, villages=None):
         logger = self.logger
         driver = self.driver
         logger.info(f'Fetch the Gram 1B reports for village list[{villages}]')
 
-        self.fetch_parent()
-    
-        cookies = driver.get_cookies()
-        logger.info('Cookies[%s]' % cookies)
-        logger.debug('Cookie -> Session ID[%s]' % cookies[0]['value'])
-        
-        self.cookies = {
-            'hibext_instdsigdipv2': '1',
-            'ASP.NET_SessionId': cookies[0]['value'],
-        }
+        bs = self.fetch_parent()
     
         for (district_name, mandal_name, village_name) in villages:
             logger.info('Fetch Gram 1B Report for District[%s] > Mandal[%s] > Village[%s]' % (district_name, mandal_name, village_name))
-            result = self.fetch_appi_gram1b_report(
+            result = self.fetch_gram1b_report(
                 district_name=district_name.strip(),
                 mandal_name=mandal_name.strip(),
                 village_name=village_name.strip()
@@ -470,7 +461,7 @@ class MeeBhoomi():
         return result # 'SUCCESS'
     
     
-    def parse_gram_1b_report(self, filename=None, panchayat_name=None, village_name=None, captcha_text=None):
+    def parse_gram1b_report(self, filename=None, panchayat_name=None, village_name=None, captcha_text=None):
         logger = self.logger
         logger.info('Parse the 1B HTML file')
     
@@ -579,7 +570,7 @@ class MeeBhoomi():
     
         return data
     
-    def dump_gram_1b_reports(self, dirname=None):
+    def dump_gram1b_reports(self, dirname=None):
         logger = self.logger
         #from datetime import datetime
     
@@ -659,59 +650,6 @@ class MeeBhoomi():
                 # break
             # break
         
-        '''
-    
-        url = 'http://b.libtech.info:8000/api/panchayats/?bid=%s' % block_id
-        
-        try:
-            logger.info('Requesting URL[%s]' % url)
-            response = requests.get(url, timeout=timeout) # , cookies=cookies)
-        except Exception as e:
-            logger.error('Caught Exception[%s]' % e) 
-    
-        panchayats_json = response.json()
-        logger.debug('Panchayats JSON[%s]' % panchayats_json)
-        
-        is_panchayat = True
-        for panchayat_object in panchayats_json:
-            panchayat_name = panchayat_object['name'].strip()
-            panchayat_code = panchayat_object['code'].strip()
-            logger.info('Fetch captcha_ids for Panchayat[%s, %s]' % (panchayat_name, panchayat_code))
-            url = 'http://b.libtech.info:8000/api/getworkers/?pcode=%s' % panchayat_code
-            try:
-                logger.info('Requesting URL[%s]' % url)
-                response = requests.get(url, timeout=timeout)
-            except Exception as e:
-                logger.error('Caught Exception[%s]' % e)
-            captcha_ids_json = response.json()
-            logger.debug('Captcha_Ids JSON[%s]' % captcha_ids_json)
-            is_downloaded = True
-            for captcha_id_object in captcha_ids_json:
-                #logger.info(captcha_id_object)
-                captcha_text = '%s-0%s' % (captcha_id_object['captcha_id']['tcaptcha_id'], captcha_id_object['applicantNo'])
-                if False and (panchayat_name == 'VITHALAPUR' and is_downloaded and (captcha_id != '142000501002010385-01')): 
-                    logger.debug('Skipping[%s]' % captcha_id)
-                    continue            
-                is_downloaded = False
-                logger.debug('Parse HTML for captcha_text[%s]' % captcha_text)
-                
-                filename = '%s/%s_%s_%s_ledger_details.html' % (dirname, block_name, panchayat_name, captcha_text)
-                # village_name = captcha_id_object['village']['name']
-                # logger.debug('Village Name[%s]' % village_name)
-                try:
-                    data = parse_appi_report(logger, filename=filename, panchayat_name=panchayat_name, captcha_text=captcha_text) # Village Name
-                except Exception as e:
-                    logger.error('Exception when reading transaction table for captcha_id - EXCEPT[%s:%s]' % (type(e), e))
-                    csv_filename = filename.replace('.html','.XXX')
-                    open(csv_filename, 'a').close()
-                    logger.info('Marking the file [%s]' % csv_filename)
-                    continue
-                    
-                csv_filename = filename.replace('.html','.csv')
-                with open(csv_filename, 'w') as csv_file:
-                    logger.info('Writing to CSV [%s]' % csv_filename)
-                    csv_file.write(data.to_csv())
-        '''
         tarball_filename = '%s_%s.bz2' % (block_name, pd.Timestamp.now())
         tarball_filename = tarball_filename.replace(' ','-').replace(':','-')
         cmd = 'tar cjf %s %s/*.csv' % (tarball_filename, dirname)
@@ -1647,7 +1585,7 @@ class TestSuite(unittest.TestCase):
         self.logger.info('...END PROCESSING')
 
     @unittest.skip('Skipping direct command approach')
-    def test_fetch_gram_1b_report(self):
+    def test_fetch_gram1b_report(self):
         count = 0
         url = base_url + 'ROR.aspx'
 
@@ -1659,17 +1597,29 @@ class TestSuite(unittest.TestCase):
                 break
         self.assertEqual(result, 'SUCCESS')
 
-    def test_fetch_gram_1b_report_for(self):
+    def test_fetch_gram1b_report(self):
+        self.logger.info('Test Suite for a single Gram 1B report')
+        mb = MeeBhoomi(logger=self.logger, directory='ITDA/Gram1B', status_file='status.csv')
+        result = mb.fetch_gram1b_report(
+            district_no = '3',
+            mandal_no = '06',
+            village_no = '306101'
+        )
+        self.assertEqual(result, 'SUCCESS')
+        del mb
+
+    @unittest.skip('Need to implement the the name to no logic')
+    def test_fetch_gram1b_report_for(self):
         self.logger.info('Test Suite for a single Gram 1B report')
         mb = MeeBhoomi(logger=self.logger, status_file='status.csv')
         village_list = [('విశాఖపట్నం', 'అచ్యుతాపురం', 'జోగన్నపాలెం'), ('విశాఖపట్నం', 'అనంతగిరి', 'నిన్నిమామిడి'), ('విశాఖపట్నం', 'అనందపురం', 'ముచ్చెర్ల')]
-        result = mb.fetch_gram_1b_reports_for(villages=village_list)
+        result = mb.fetch_gram1b_reports_for(villages=village_list)
         self.assertEqual(result, 'SUCCESS')
         del mb
 
     @unittest.skip('Skipping direct command approach')
-    def test_dump_gram_1b_report(self):
-        result = dump_gram_1b_reports(self.logger, dirname=directory)
+    def test_dump_gram1b_report(self):
+        result = dump_gram1b_reports(self.logger, dirname=directory)
         self.assertEqual(result, 'SUCCESS')
 
     def test_crawler(self):
