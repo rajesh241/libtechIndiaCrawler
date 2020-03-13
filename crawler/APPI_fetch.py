@@ -1746,7 +1746,7 @@ class TestSuite(unittest.TestCase):
     def test_crawl_death_abstract_report(self):
         self.logger.info("Running test for Death Abstract Report for G. Madugula Block")
         # Start a RhythuBharosa Crawl
-        rb = Crawler()
+        rb = RhythuBharosa()
         rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల')
         del rb
 
