@@ -51,8 +51,16 @@ import urllib.parse as urlparse
 timeout = 3
 
 skip_district = ['3',]
-is_visible = True
+
+if True:
+    is_visible = False  # Make False before commmitting - need to make Firefox headless for Mac
+    is_mac = False      # Make False before commmitting
+else:
+    is_visible = True
+    is_mac = True
+
 is_mynk = True
+rb_server = False
 
 #############
 # Functions
@@ -1699,7 +1707,7 @@ class TestSuite(unittest.TestCase):
 
     def test_crawler(self):
         self.logger.info("Running RythuBharosa Tests")
-        # Start a RhythuBharosa Crawl
+        # Start a RythuBharosa Crawl
         report_type = "rb_payment"
         if report_type == "rb_payment":
            location_code = '4848'
@@ -1738,22 +1746,22 @@ class TestSuite(unittest.TestCase):
 
     def test_crawl_status_update_report(self):
         self.logger.info("Running test for Status Update Report")
-        # Start a RhythuBharosa Crawl
+        # Start a RythuBharosa Crawl
         rb = RythuBharosa()
         rb.crawl_status_update_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల')
         del rb
 
     def test_crawl_death_abstract_report(self):
         self.logger.info("Running test for Death Abstract Report for G. Madugula Block")
-        # Start a RhythuBharosa Crawl
-        rb = RhythuBharosa()
+        # Start a RythuBharosa Crawl
+        rb = RythuBharosa()
         rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల')
         del rb
 
     def test_fetch_death_report(self):
         self.logger.info("Running test for Death Abstract Report for specified village")
-        # Start a RhythuBharosa Crawl
-        rb = RhythuBharosa()
+        # Start a RythuBharosa Crawl
+        rb = RythuBharosa()
         rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', village='దేవరాపల్లి')
         rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', village='క్రిష్ణాపురం')
         rb.crawl_death_abstract_report(self.logger, district='విశాఖపట్నం', mandal='జి.మాడుగుల', village='కె.బందవీధి')
@@ -1762,8 +1770,8 @@ class TestSuite(unittest.TestCase):
     def test_dump_death_abstract_report(self):
         sample = 'AP_ITDA_10_SAMPLE'
         self.logger.info("Running test for Death Abstract Report for {sample}")
-        # Start a RhythuBharosa Crawl
-        rb = Crawler()
+        # Start a RythuBharosa Crawl
+        rb = RythuBharosa()
         rb.dump_sample_death_abstract_report(self.logger, sample=sample)
         del rb
 
