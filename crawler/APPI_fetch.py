@@ -579,16 +579,16 @@ class MeeBhoomi():
     
         return data
     
-    def sample_gram1b_report(self, logger, sample=None, status_file=None):
+    def sample_gram1b_report(self, sample_name=None, status_file=None):
         logger = self.logger
-        if not sample:
-            sample = 'AP_ITDA_10_SAMPLE'
+        if not sample_name:
+            sample_name = 'AP_ITDA_10_SAMPLE'
 
         if not status_file:
             status_file = self.status_file
             
-        aggregate_file = f'{self.dir}/{sample}_aggregate.csv'
-        logger.info(f'Generate Gram1 B Report for Sample[{sample}] over status_file[{status_file}] into aggregate_file[{aggregate_file}]')
+        aggregate_file = f'{self.dir}/{sample_name}_aggregate.csv'
+        logger.info(f'Generate Gram1 B Report for sample_name[{sample_name}] over status_file[{status_file}] into aggregate_file[{aggregate_file}]')
         
         statusDF=pd.read_csv(status_file,index_col=0)
         filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
@@ -612,14 +612,20 @@ class MeeBhoomi():
             village = row['village_name']
             village_code = str(row['village_code'])
 
-            df = self.fetch_gram1b_report(district=district, mandal=mandal, village=village, district_code=district_code, mandal_code=mandal_code, village_code=village_code)
+            df = self.fetch_gram1b_report(district=district,
+                                          mandal=mandal,
+                                          village=village,
+                                          district_code=district_code,
+                                          mandal_code=mandal_code,
+                                          village_code=village_code)
             logger.info(f'After appending details: {df}')
-            if not df.empty:
+            #if not df.empty:
+            if df == 'SUCCESS':
                 villageDFs.append(df)
                 statusDF.loc[curIndex, 'status'] = 'done'
                 logger.info(f'Adding the table for {district} > {mandal} > {village}')
             else:
-                statusDF.loc[curIndex, 'status'] = 'failed'   # Village not there
+                statusDF.loc[curIndex, 'status'] = 'failed'
                 logger.info(f'Village not found! {district} > {mandal} > {village}')
             statusDF.loc[curIndex,'inProgress'] = 0
             statusDF.to_csv(status_file)
@@ -639,7 +645,7 @@ class MeeBhoomi():
             columns = ['SNO', 'FarmerName', 'Fathername', 'Katha Number', 'Nominee Name', 'Nominee Relation', 'district_name_tel', 'district_code', 'mandal_name_tel', 'mandal_code', 'village_name_tel', 'village_code']
             villageDF=pd.DataFrame(columns = columns)
 
-        filename=f"{self.dir}/{sample}.csv"
+        filename=f"{self.dir}/{sample_name}.csv"
         logger.info('Writing to [%s]' % filename)
         villageDF.to_csv(filename, index=False)
 
@@ -1667,6 +1673,7 @@ class TestSuite(unittest.TestCase):
             if result == 'SUCCESS':
                 break
         self.assertEqual(result, 'SUCCESS')
+        del mb
 
     def test_fetch_gram1b_report(self):
         self.logger.info('TestCase: Single Gram 1B report')
@@ -1681,13 +1688,24 @@ class TestSuite(unittest.TestCase):
 
     def test_sample_gram1b_report(self):
         self.logger.info('TestCase: Single Gram 1B report')
-        mb = MeeBhoomi(logger=self.logger, directory='ITDA/Gram1B', status_file='status.csv')
+        mb = MeeBhoomi(logger=self.logger, directory='AP_ITDA_10_SAMPLE/Gram1B', status_file='status.csv')
         self.logger.info("Running test for Death Abstract Report for {sample}")
         # Start a RythuBharosa Crawl
         result = mb.sample_gram1b_report(sample_name='AP_ITDA_10_SAMPLE', status_file='status.csv')
         self.assertEqual(result, 'SUCCESS')
         del mb
+        '''
+        MAX_COUNT = 1
+        count = MAX_COUNT
 
+        while count:
+            count -= 1
+            self.logger.info(f'Beginning the download for the nth time, where n={MAX_COUNT-count}')
+            result = mb.fetch_gram1b_reports_all()
+            if result == 'SUCCESS':
+                break
+        self.assertEqual(result, 'SUCCESS')
+        '''
         
     @unittest.skip('Need to implement the the name to no logic')
     def test_fetch_gram1b_report_for(self):
