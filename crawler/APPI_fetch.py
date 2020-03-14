@@ -52,7 +52,7 @@ timeout = 3
 
 skip_district = ['3',]
 
-if True:
+if False:
     is_visible = False  # Make False before commmitting - need to make Firefox headless for Mac
     is_mac = False      # Make False before commmitting
 else:
@@ -189,7 +189,7 @@ class MeeBhoomi():
     def fetch_lookup(self, filename, url=None, cookies=None, headers=None, data=None):
         logger = self.logger
         if os.path.exists(filename):
-            logger.info('File already downloaded. Reading [%s]...' % filename)
+            logger.info(f'File already downloaded. Reading [{filename}]...')
             with open(filename) as json_file:
                 lookup = json.load(json_file)
             return lookup
@@ -197,9 +197,9 @@ class MeeBhoomi():
         if not cookies:
             cookies = self.cookies
         
-        logger.info('Fetching URL[%s]...' % url)
+        logger.info(f'Fetching URL[{url}]...')
         response = requests.post(url, headers=headers, cookies=cookies, data=data)
-        logger.info(response.content)
+        logger.debug(response.content)
         
         data = pd.read_json(response.content)
         if data['d'].empty:
@@ -211,7 +211,7 @@ class MeeBhoomi():
         logger.debug(lookup)
     
         with open(filename, 'w') as json_file:
-            logger.info('Writing [%s]' % filename)
+            logger.info(f'Writing [{filename}]')
             json_file.write(json.dumps(lookup))
             
         return lookup
@@ -243,7 +243,7 @@ class MeeBhoomi():
         #return pytesseract.image_to_string(Image.open(filename), lang='eng', config='-c tessedit_char_whitelist=0123456789')
     
     
-    def fetch_gram1b_report(self, district_no=None, mandal_no=None, village_no=None):
+    def fetch_gram1b_report(self, district_no, mandal_no, village_no):
         logger = self.logger
         driver = self.driver
         logger.info('Fetch Gram 1B Report for District[%s] > Mandal[%s] > Village[%s]' % (district_no, mandal_no, village_no))
@@ -385,10 +385,10 @@ class MeeBhoomi():
         return 'SUCCESS'
     
     
-    def fetch_gram1b_reports(self, dirname=None, url=None):
+    def fetch_gram1b_reports_all(self):
         logger = self.logger
         driver = self.driver
-        logger.info('Fetch the Gram 1B reports into dir[%s]' % dirname)
+        logger.info('Fetch the Gram 1B reports for ALL')
     
         bs = self.fetch_parent()
     
@@ -406,8 +406,8 @@ class MeeBhoomi():
     
         data = '{"knownCategoryValues":"","category":"District"}'
         
-        filename = '%s/district.json' % directory
-        district_url = base_url + 'UtilityWebService.asmx/GetDistricts'
+        filename = f'{self.dir}/district.json'
+        district_url = self.base_url + 'UtilityWebService.asmx/GetDistricts'
         district_lookup = self.fetch_lookup(filename, url=district_url, headers=headers, data=data)
         logger.info(district_lookup)
     
@@ -421,18 +421,18 @@ class MeeBhoomi():
             data = '{"knownCategoryValues":"District:%s;","category":"Mandal"}' % (district_no)
             logger.info('With Data[%s]' % data)
     
-            filename = '%s/%s_%s_mandal_list.json' % (directory, district_no, district_name)
+            filename = f'{self.dir}/{district_no}_{district_name}_mandal_list.json'
             mandal_lookup = self.fetch_lookup(filename, url=mandal_url, headers=headers, data=data)
             logger.info(mandal_lookup)
     
             village_url = self.base_url + 'UtilityWebService.asmx/GetVillages'
             for mandal_no, mandal_name in mandal_lookup.items():
                 mandal_name = mandal_name.strip()
-                logger.info('Fetch Villages for Mandal[%s] = [%s]' % (mandal_name, mandal_no))
+                logger.info(f'Fetch Villages for Mandal[{mandal_name}] = [{mandal_no}]')
                 data = '{"knownCategoryValues":"District:%s;Mandal:%02s;","category":"Mandal"}' % (district_no, mandal_no)
                 logger.info('With Data[%s]' % data)
     
-                filename = '%s/%s_%s_village_list.json' % (directory, district_name, mandal_name)
+                filename = f'{self.dir}/{district_name}_{mandal_name}_village_list.json'
                 village_lookup = self.fetch_lookup(filename, url=village_url, headers=headers, data=data)
                 logger.info(village_lookup)
     
@@ -1667,21 +1667,22 @@ class TestSuite(unittest.TestCase):
     def tearDown(self):
         self.logger.info('...END PROCESSING')
 
-    @unittest.skip('Skipping direct command approach')
-    def test_fetch_gram1b_report(self):
-        count = 0
-        url = base_url + 'ROR.aspx'
+    def test_fetch_gram1b_reports_all(self):
+        self.logger.info('TestCase: Fetch All Gram 1B reports')
+        mb = MeeBhoomi(logger=self.logger, directory='ITDA/Gram1B', status_file='status.csv')
+        MAX_COUNT = 1
+        count = MAX_COUNT
 
-        while True:
-            count += 1
-            self.logger.info('Beginning the download for the nth time, where n=%d' % count)
-            result = fetch_appi_reports(self.logger, dirname=directory, url=url)
-            if result == 'SUCCESS' or count == 100:
+        while count:
+            count -= 1
+            self.logger.info(f'Beginning the download for the nth time, where n={MAX_COUNT-count}')
+            result = mb.fetch_gram1b_reports_all()
+            if result == 'SUCCESS':
                 break
         self.assertEqual(result, 'SUCCESS')
 
     def test_fetch_gram1b_report(self):
-        self.logger.info('Test Suite for a single Gram 1B report')
+        self.logger.info('TestCase: Single Gram 1B report')
         mb = MeeBhoomi(logger=self.logger, directory='ITDA/Gram1B', status_file='status.csv')
         result = mb.fetch_gram1b_report(
             district_no = '3',
