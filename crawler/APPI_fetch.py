@@ -243,16 +243,17 @@ class MeeBhoomi():
         #return pytesseract.image_to_string(Image.open(filename), lang='eng', config='-c tessedit_char_whitelist=0123456789')
     
     
-    def fetch_gram1b_report(self, district_no, mandal_no, village_no):
+    def fetch_gram1b_report(self, district_code, mandal_code, village_code, district=None, mandal=None, village=None, filename=None):
         logger = self.logger
         driver = self.driver
-        logger.info('Fetch Gram 1B Report for District[%s] > Mandal[%s] > Village[%s]' % (district_no, mandal_no, village_no))
+        logger.info('Fetch Gram 1B Report for District[%s] > Mandal[%s] > Village[%s]' % (district_code, mandal_code, village_code))
     
         url = self.base_url + 'ROR.aspx'
         
         captcha_text = ''
-        
-        filename = f'{self.dir}/{district_no}_{mandal_no}_{village_no}_gram1b.html'
+
+        if not filename:
+            filename = f'{self.dir}/{district_code}_{mandal_code}_{village_code}_gram1b.html'
         logger.info('Verifying File [%s]' % filename)
         if os.path.exists(filename):
             logger.info('File already downloaded. Skipping [%s]' % filename)
@@ -263,18 +264,18 @@ class MeeBhoomi():
         #timeout = 2
         try:
             select = Select(driver.find_element_by_id('ContentPlaceHolder1_ddlDist'))
-            select.select_by_value(district_no)
-            logger.info('Selected District [%s]' % district_no)
+            select.select_by_value(district_code)
+            logger.info('Selected District [%s]' % district_code)
             time.sleep(timeout)
     
             select = Select(driver.find_element_by_id('ContentPlaceHolder1_ddlMandals'))
-            select.select_by_value(mandal_no)
-            logger.info('Selected Mandal [%s]' % mandal_no)
+            select.select_by_value(mandal_code)
+            logger.info('Selected Mandal [%s]' % mandal_code)
             time.sleep(timeout)
     
             select = Select(driver.find_element_by_id('ContentPlaceHolder1_ddlVillageName'))
-            select.select_by_value(village_no)
-            logger.info('Selected Village [%s]' % village_no)
+            select.select_by_value(village_code)
+            logger.info('Selected Village [%s]' % village_code)
             time.sleep(timeout)
     
             imgs = bs.findAll("img")
@@ -412,37 +413,37 @@ class MeeBhoomi():
         logger.info(district_lookup)
     
         mandal_url = self.base_url + 'UtilityWebService.asmx/GetMandals'
-        for district_no, district_name in district_lookup.items():
+        for district_code, district_name in district_lookup.items():
             district_name = district_name.strip()
             
-            if district_no in skip_district:
+            if district_code in skip_district:
                 continue
-            logger.info('Fetch Mandals for District[%s] = [%s]' % (district_name, district_no))
-            data = '{"knownCategoryValues":"District:%s;","category":"Mandal"}' % (district_no)
+            logger.info('Fetch Mandals for District[%s] = [%s]' % (district_name, district_code))
+            data = '{"knownCategoryValues":"District:%s;","category":"Mandal"}' % (district_code)
             logger.info('With Data[%s]' % data)
     
-            filename = f'{self.dir}/{district_no}_{district_name}_mandal_list.json'
+            filename = f'{self.dir}/{district_code}_{district_name}_mandal_list.json'
             mandal_lookup = self.fetch_lookup(filename, url=mandal_url, headers=headers, data=data)
             logger.info(mandal_lookup)
     
             village_url = self.base_url + 'UtilityWebService.asmx/GetVillages'
-            for mandal_no, mandal_name in mandal_lookup.items():
+            for mandal_code, mandal_name in mandal_lookup.items():
                 mandal_name = mandal_name.strip()
-                logger.info(f'Fetch Villages for Mandal[{mandal_name}] = [{mandal_no}]')
-                data = '{"knownCategoryValues":"District:%s;Mandal:%02s;","category":"Mandal"}' % (district_no, mandal_no)
+                logger.info(f'Fetch Villages for Mandal[{mandal_name}] = [{mandal_code}]')
+                data = '{"knownCategoryValues":"District:%s;Mandal:%02s;","category":"Mandal"}' % (district_code, mandal_code)
                 logger.info('With Data[%s]' % data)
     
                 filename = f'{self.dir}/{district_name}_{mandal_name}_village_list.json'
                 village_lookup = self.fetch_lookup(filename, url=village_url, headers=headers, data=data)
                 logger.info(village_lookup)
     
-                for village_no, village_name in village_lookup.items():
+                for village_code, village_name in village_lookup.items():
                     village_name = village_name.strip()
                     logger.info('Fetch Gram 1B Report for District[%s] > Mandal[%s] > Village[%s]' % (district_name, mandal_name, village_name))
                     result = self.fetch_gram1b_report(
-                        district_no=district_no,
-                        mandal_no=mandal_no,
-                        village_no=village_no,
+                        district_code=district_code,
+                        mandal_code=mandal_code,
+                        village_code=village_code,
                     )
                     if result == 'ABORT':
                         logger.critical('Aborting Mission!')
@@ -578,86 +579,72 @@ class MeeBhoomi():
     
         return data
     
-    def dump_gram1b_reports(self, dirname=None):
+    def sample_gram1b_report(self, logger, sample=None, status_file=None):
         logger = self.logger
-        #from datetime import datetime
-    
-        logger.info('Dump the RN6 HTMLs into [%s]' % dirname)
-    
-        if not isGM:
-            state = None
-            district_name = 'MAHABUBNAGAR'
-            block_name = 'Damaragidda'
-            # block_id = block_lookup[block_name]
-            block_id = '4378'
-    
-            block_name = 'Maddur'
-            block_code = '3614006'
-            block_name = 'Koilkonda'
-            block_code = '3614007'
-            block_name = 'Hanwada'
-            block_code = '3614008'
-        else:
-            state = 'ap'
-            district_name = 'VISAKHAPATNAM'
-            block_name = 'Gangaraju Madugula'
-            block_id = None
-    
-        #dirname = block_name
-        if False:
-            # filename = 'captcha_ids/Gangaraju Madugula_G.Madugula_030291104271010017-01_ledger_details.html'
-            filename = 'captcha_ids/Gangaraju Madugula_Gaduthuru_030291116195010015-04_ledger_details.html'
-            #csv_buffer = ['S.No,Mandal Name,Gram Panchayat,Village,Job card number/worker ID,Name of the wageseeker,Credited Date,Deposit (INR),Debited Date,Withdrawal (INR),Available Balance (INR),Diff. time credit and debit\n']
-            return 'SUCCESS'
-    
-        if block_code:
-            panchayats = Panchayat.objects.filter(block__code=block_code)
-        else:
-            panchayats = Panchayat.objects.filter(block__name=block_name)
-        logger.info(panchayats)
-        for panchayat in panchayats:
-            panchayat_name = panchayat.name
-            logger.info('Panchayat[%s]' % panchayat_name)
-            if needed and (panchayat_name not in needed):
-                logger.info('Not interested in [%s]' % panchayat_name)
-                continue
-            if skip and (panchayat_name in skip):
-                logger.info('To skip [%s]' % panchayat_name)
-                continue        
-            workers = Worker.objects.filter(captcha_id__panchayat=panchayat)
-            logger.info(workers)
-            for worker in workers:
-                logger.debug('WorkerID[%s]' % worker.id)
-                tcaptcha_id = worker.captcha_id.tcaptcha_id
-                if tcaptcha_id:
-                    captcha_text = (tcaptcha_id + '-0' + str(worker.applicantNo))
-                else:
-                    logger.error('tcaptcha_id is NULL for [%s]' % worker)
-                    continue
-                logger.debug('Parse HTML for captcha_text[%s]' % captcha_text)
-                
-                filename = '%s/%s_%s_%s_ledger_details.html' % (dirname, block_name, panchayat_name, captcha_text)
-                village_name = worker.captcha_id.village.name
-                try:
-                    data = parse_appi_report(logger, filename=filename, panchayat_name=panchayat_name, village_name=village_name, captcha_text=captcha_text)
-                except Exception as e:
-                    logger.error('Caught Exception[%s]' % e) 
-                    csv_filename = filename.replace('.html','.XXX')
-                    open(csv_filename, 'a').close()
-                    logger.info('Marking the file [%s]' % csv_filename)
-                    continue # break 
-                    
-                csv_filename = filename.replace('.html','.csv')
-                logger.info('Writing to CSV [%s]' % csv_filename)
-                data.to_csv(csv_filename)
-                '''
-                with open(csv_filename, 'w') as csv_file:
-                    logger.info('Writing to CSV [%s]' % csv_filename)
-                    csv_file.write(data.to_csv())
-                '''
-                # break
-            # break
+        if not sample:
+            sample = 'AP_ITDA_10_SAMPLE'
+
+        if not status_file:
+            status_file = self.status_file
+            
+        aggregate_file = f'{self.dir}/{sample}_aggregate.csv'
+        logger.info(f'Generate Gram1 B Report for Sample[{sample}] over status_file[{status_file}] into aggregate_file[{aggregate_file}]')
         
+        statusDF=pd.read_csv(status_file,index_col=0)
+        filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
+        if len(filteredDF) > 0:
+            curIndex=filteredDF.index[0]
+        else:
+            curIndex=None
+            logger.info('No more requests to process')
+            return 'SUCCESS'
+        statusDF.loc[curIndex,'inProgress'] = 1
+        statusDF.to_csv(status_file)
+        prev_village = ''
+        villageDFs=[]
+
+        while curIndex is not None:
+            row = filteredDF.loc[curIndex]
+            district = row['district_name_telugu']
+            district_code = str(row['district_code'])
+            mandal = row['block_name_telugu']
+            mandal_code = str(row['block_code'])
+            village = row['village_name']
+            village_code = str(row['village_code'])
+
+            df = self.fetch_gram1b_report(district=district, mandal=mandal, village=village, district_code=district_code, mandal_code=mandal_code, village_code=village_code)
+            logger.info(f'After appending details: {df}')
+            if not df.empty:
+                villageDFs.append(df)
+                statusDF.loc[curIndex, 'status'] = 'done'
+                logger.info(f'Adding the table for {district} > {mandal} > {village}')
+            else:
+                statusDF.loc[curIndex, 'status'] = 'failed'   # Village not there
+                logger.info(f'Village not found! {district} > {mandal} > {village}')
+            statusDF.loc[curIndex,'inProgress'] = 0
+            statusDF.to_csv(status_file)
+
+            statusDF=pd.read_csv(status_file, index_col=0)
+            filteredDF=statusDF[ (statusDF['status'] == 'pending') & (statusDF['inProgress'] == 0)]
+            if len(filteredDF) > 0:
+                curIndex=filteredDF.index[0]
+                statusDF.loc[curIndex,'inProgress'] = 1
+                statusDF.to_csv(status_file)
+            else:
+                curIndex=None
+
+        if len(villageDFs) > 0:
+            villageDF=pd.concat(villageDFs)
+        else: # FIXME
+            columns = ['SNO', 'FarmerName', 'Fathername', 'Katha Number', 'Nominee Name', 'Nominee Relation', 'district_name_tel', 'district_code', 'mandal_name_tel', 'mandal_code', 'village_name_tel', 'village_code']
+            villageDF=pd.DataFrame(columns = columns)
+
+        filename=f"{self.dir}/{sample}.csv"
+        logger.info('Writing to [%s]' % filename)
+        villageDF.to_csv(filename, index=False)
+
+        return 'SUCCESS'
+
         tarball_filename = '%s_%s.bz2' % (block_name, pd.Timestamp.now())
         tarball_filename = tarball_filename.replace(' ','-').replace(':','-')
         cmd = 'tar cjf %s %s/*.csv' % (tarball_filename, dirname)
@@ -1108,9 +1095,9 @@ class RythuBharosa():
             self.print_current_window_handles(logger)
 
             self.vars["mandal_window"] = self.wait_for_window(5)
-            for mandal_no, mandal_name in enumerate(mandal_list):
+            for mandal_code, mandal_name in enumerate(mandal_list):
                 csv_array = []
-                logger.info(f"processing {dist_no}-{district_name}-{mandal_no}-{mandal_name}")
+                logger.info(f"processing {dist_no}-{district_name}-{mandal_code}-{mandal_name}")
                 logger.info(self.vars)
                 self.driver.switch_to.window(self.vars["mandal_window"])
                 self.vars["window_handles"] = self.driver.window_handles
@@ -1685,13 +1672,23 @@ class TestSuite(unittest.TestCase):
         self.logger.info('TestCase: Single Gram 1B report')
         mb = MeeBhoomi(logger=self.logger, directory='ITDA/Gram1B', status_file='status.csv')
         result = mb.fetch_gram1b_report(
-            district_no = '3',
-            mandal_no = '06',
-            village_no = '306101'
+            district_code = '3',
+            mandal_code = '06',
+            village_code = '306101'
         )
         self.assertEqual(result, 'SUCCESS')
         del mb
 
+    def test_sample_gram1b_report(self):
+        self.logger.info('TestCase: Single Gram 1B report')
+        mb = MeeBhoomi(logger=self.logger, directory='ITDA/Gram1B', status_file='status.csv')
+        self.logger.info("Running test for Death Abstract Report for {sample}")
+        # Start a RythuBharosa Crawl
+        result = mb.sample_gram1b_report(sample_name='AP_ITDA_10_SAMPLE', status_file='status.csv')
+        self.assertEqual(result, 'SUCCESS')
+        del mb
+
+        
     @unittest.skip('Need to implement the the name to no logic')
     def test_fetch_gram1b_report_for(self):
         self.logger.info('Test Suite for a single Gram 1B report')
