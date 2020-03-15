@@ -21,7 +21,9 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                       get_muster_list,
                       get_jobcard_transactions,
                       get_block_rejected_transactions,
-                      get_muster_transactions
+                      get_muster_transactions,
+                      get_fto_status_urls,
+                      get_block_rejected_stats
                      )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions
@@ -39,6 +41,9 @@ class Location():
         dataframe = api_get_report_dataframe(logger, self.id, report_type, finyear=finyear)
         return dataframe
     def get_file_path(self, logger):
+        filepath = f"data/samples/on_demand/{self.scheme}/reportType"
+        if self.location_type == "country":
+            return filepath
         filepath = f"data/samples/on_demand/{self.scheme}/reportType/{self.state_code}"
         if self.location_type == "state":
             return filepath
@@ -62,6 +67,19 @@ class Location():
         logger.info(f"file name is {filename}")
         create_update_report(logger, self.id, report_type,
                              data, filename, finyear=finyear)
+    def fto_status_urls(self, logger):
+        """This function will get and save FTO Stat"""
+        dataframe = get_fto_status_urls(self, logger)
+        report_type = "fto_status_urls"
+        self.save_report(logger, dataframe, report_type)
+    def block_rejected_stats(self, logger):
+        """This function will get block Rejected Statistics"""
+        report_type = "fto_status_urls"
+        fto_status_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = get_block_rejected_stats(self, logger, fto_status_df) 
+        report_type = "block_rejected_stats"
+        self.save_report(logger, dataframe, report_type)
+
 class APPanchayat(Location):
     """This is the AP Panchayat subclass for Location Class"""
     def __init__(self, logger, location_code):

@@ -37,6 +37,7 @@ def main():
         func_name = args.get('func_name', None)
         location_type = args.get('locationType', 'panchayat')
         location_codes = []
+        LOCATION_CLASS = "Location"
         if args['notnic']:
             BLOCK_CLASS = "APBlock"
             PANCHAYAT_CLASS = "APPanchayat"
@@ -46,19 +47,23 @@ def main():
 
         if location_type == 'block':
             location_codes.append(location_code)
-        else:
+        elif location_type == 'panchayat':
             if len(location_code) == 7:
                 block_location = getattr(models, BLOCK_CLASS)(logger=logger,
                                             location_code=location_code)
                 location_codes = block_location.get_all_panchayats(logger)
             else:
                 location_codes = [location_code]
+        else:
+            location_codes.append(location_code)
 
         for location_code in location_codes:
             if location_type == 'block':
                 my_location = getattr(models, BLOCK_CLASS)(logger=logger, location_code=location_code)
-            else:
+            elif location_type == 'panchayat':
                 my_location = getattr(models, PANCHAYAT_CLASS)(logger=logger, location_code=location_code)
+            else:
+                my_location = getattr(models, LOCATION_CLASS)(logger=logger, location_code=location_code)
             logger.info(my_location.__dict__)
            # my_location.muster_list(logger)
             method_to_call = getattr(my_location, func_name)
