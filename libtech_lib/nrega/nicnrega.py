@@ -4,6 +4,7 @@
 #pylint: disable-msg = too-many-statements
 
 import re
+from pathlib import Path
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
 import json
@@ -15,6 +16,7 @@ from libtech_lib.generic.commons import  (get_current_finyear,
                       standardize_dates_in_dataframe,
                       get_default_start_fin_year,
                       insert_location_details,
+                      get_percentage,
                       get_finyear_from_muster_url,
                       get_fto_finyear
                      )
@@ -22,6 +24,11 @@ from libtech_lib.generic.api_interface import api_get_report_url, api_get_report
 from libtech_lib.generic.html_functions import get_dataframe_from_html, get_dataframe_from_url
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 
+HOMEDIR = str(Path.home())
+JSONCONFIGFILE = f"{HOMEDIR}/.libtech/crawlerConfig.json"
+with open(JSONCONFIGFILE) as CONFIG_file:
+    CONFIG = json.load(CONFIG_file)
+NREGA_DATA_DIR = CONFIG['nrega_data_dir']
 def get_jobcard_register(lobj, logger):
     """Download Jobcard Register for a given panchayat
     return the pandas dataframe of jobcard Register"""
@@ -382,4 +389,101 @@ def get_block_rejected_transactions(lobj, logger):
                 'utr_no', 'primary_account_holder', 'bank_code', 'ifsc_code']
     dataframe = dataframe[col_list]
     logger.info(f"dataframe shape is {dataframe.shape}")
+    return dataframe
+def get_block_rejected_stats(lobj, logger, fto_status_df):
+    """This function will get block Rejected Stats"""
+    job_list = []
+    column_headers = ["srno", "block", "total_fto_generated", "fs_fto_signed",
+                      "fs_fto_pending", "ss_fto_signed",
+                      "second_singnatory_fto_url", "ss_fto_pending",
+                      "sent_to_bank", "sent_to_bank_transactions",
+                      "processed_by_bank", "process_by_bank_transactions",
+                      "partial_processed", "partial_processed_transactions",
+                      "partial_processed_pending", "pending_for_processing",
+                      "pending_from_processing_transactions",
+                      "processed", "invalid", "invalid_url",
+                      "rejected", "rejected_url",
+                      "total"]
+    url_prefix = "http://mnregaweb4.nic.in/netnrega/FTO/"
+    extract_dict = {}
+    extract_dict['pattern'] = f"Second Signatory"
+    extract_dict['column_headers'] = column_headers
+    extract_dict['data_start_row'] = 4
+    extract_dict['extract_url_array'] = [5,17,18]
+    extract_dict['url_prefix'] = url_prefix
+    func_name = "fetch_rejected_stats" 
+    for index, row in fto_status_df.iterrows():
+        func_args = []
+        url = row.get("dist_url", None)
+        finyear = row.get("finyear", None)
+        logger.info(f"finyear {finyear} url {url}")
+        if url is not None:
+            func_args = [lobj, url, finyear, extract_dict]
+            job_dict = {
+                'func_name' : func_name,
+                'func_args' : func_args
+            }
+            job_list.append(job_dict)
+    dataframe = libtech_queue_manager(logger, job_list, num_threads=1)
+    dataframe.to_csv("~/thrash//a.csv", index=False)
+    return dataframe
+
+
+def get_fto_status_urls(lobj, logger):
+    """This function will download the block level Rejection Stats"""
+    logger.info("Block Level Rejection Stats")
+    csv_array = []
+    column_headers = ["state_code", "district_code", "state_name",
+                      "district_name", "finyear", "dist_url"]
+    start_finyear = get_default_start_fin_year()
+    end_finyear  = get_current_finyear()
+    url_prefix = "http://mnregaweb4.nic.in/netnrega/FTO/"
+    for finyear in range(int(start_finyear), int(end_finyear)+1):
+        logger.info(f"Downloading for FinYear {finyear}")
+        filename = f"{NREGA_DATA_DIR}/misReport_{finyear}.html"
+        logger.info(filename)
+        with open(filename, "rb") as fr:
+            myhtml = fr.read()
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        elem = mysoup.find("a", href=re.compile("FTOReport.aspx"))
+        if elem is not None:
+            base_href = elem["href"]
+        logger.info(base_href)
+        res = requests.get(base_href)
+        myhtml = None
+        if res.status_code == 200:
+            myhtml = res.content
+        if myhtml is not None:
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            elems = mysoup.find_all("a", href=re.compile("FTOReport.aspx"))
+            for elem in elems:
+                logger.info(elem)
+                state_href = elem["href"]
+                logger.info(state_href)
+                url = url_prefix + state_href
+                response = requests.get(url)
+                logger.info(url)
+                dist_html = None
+                if response.status_code == 200:
+                    dist_html = response.content
+                if dist_html is not None:
+                    dist_soup = BeautifulSoup(dist_html, "lxml")
+                    elems = dist_soup.find_all("a", href=re.compile("FTOReport.aspx"))
+                    for elem in elems:
+                        dist_url = url_prefix + elem["href"]
+                        #logger.info(dist_url)
+                        parsed = urlparse.urlparse(dist_url)
+                        params_dict = parse_qs(parsed.query)
+                        #logger.info(params_dict)
+                        state_name = params_dict.get("state_name", [''])[0]
+                        state_code = params_dict.get("state_code", [""])[0]
+                        district_name = params_dict.get("district_name",
+                                                        [""])[0]
+                        district_code = params_dict.get("district_code",
+                                                        [""])[0]
+                        row = [state_code, district_code, state_name,
+                               district_name, finyear, dist_url]
+                        csv_array.append(row)
+
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
     return dataframe

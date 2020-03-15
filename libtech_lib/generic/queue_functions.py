@@ -1,5 +1,7 @@
 """This has all the functions that need tobe executed in the queue"""
 import requests
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
 import pandas as pd
 import json
 from bs4 import BeautifulSoup
@@ -11,6 +13,8 @@ from libtech_lib.generic.html_functions import (get_dataframe_from_html,
 from libtech_lib.generic.commons import (standardize_dates_in_dataframe,
                      insert_finyear_in_dataframe,
                      get_default_start_fin_year,
+                     get_params_from_url,
+                     get_percentage,
                      get_fto_finyear
                     )
 
@@ -130,7 +134,130 @@ def fetch_jobcard_details(logger, func_args, thread_name=None):
         dataframe = None
     return dataframe
 
+def fetch_rejected_stats(logger, func_args, thread_name=None):
+    """This function will fetch Rejected statistics"""
+    lobj = func_args[0]
+    url = func_args[1]
+    finyear = func_args[2]
+    extract_dict = func_args[3]
+    response = requests.get(url)
+    logger.info(url)
+    logger.info(response.status_code)
+    dataframe = None
+    fin_agency = "bank"
+    param_name_array = ["state_code", "district_code", "block_code",
+                        "state_name", "district_name", "block_name"]
+    col_list = ['state_code', 'state_name', 'district_code', 'district_name',
+                'block_code', 'block_name', 'finyear', 'fin_agency',
+                'total', 'rejected', 'invalid', 'processed',
+                'rejected_percentage', 'invalid_percentage',
+                'second_singnatory_fto_url', 'invalid_url', 'rejected_url',
+                'total_fto_generated', 'ss_fto_signed'
+                ]
+    headers = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': 'http://mnregaweb4.nic.in',
+        'Connection': 'keep-alive',
+        'Referer': url,
+        'Upgrade-Insecure-Requests': '1',
+    }
 
+    data = {
+      '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$RBtnLstIsEfms$1',
+      '__EVENTARGUMENT': '',
+      '__LASTFOCUS': '',
+      '__VIEWSTATE':'',
+      '__VIEWSTATEENCRYPTED': '',
+      'ctl00$ContentPlaceHolder1$RBtnLst': 'W',
+      'ctl00$ContentPlaceHolder1$RBtnLstIsEfms': 'P',
+      'ctl00$ContentPlaceHolder1$HiddenField1': ''
+    }
+    
+    
+    dataframe_dict = {}
+    dataframe_array = []
+    view_state = None
+    if response.status_code == 200:
+        myhtml = response.content
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        view_state = mysoup.find(id='__VIEWSTATE').get('value')
+        dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+        if dataframe is not None:
+            dataframe_dict['bank'] = dataframe
+    po_view_state = None
+    if view_state is not None:
+        data['__VIEWSTATE'] = view_state
+        response = requests.post(url, headers=headers, data=data)
+        if response.status_code == 200:
+            myhtml = response.content
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            po_view_state = mysoup.find(id='__VIEWSTATE').get('value')
+            dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+            if dataframe is not None:
+                dataframe_dict['postoffice'] = dataframe
+    if po_view_state is not None:
+        data['__VIEWSTATE'] = po_view_state
+        data['ctl00$ContentPlaceHolder1$RBtnLstIsEfms'] = "C"
+        response = requests.post(url, headers=headers, data=data)
+        if response.status_code == 200:
+            myhtml = response.content
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+            if dataframe is not None:
+                dataframe_dict['cobank'] = dataframe
+
+
+    for fin_agency, dataframe in dataframe_dict.items():
+        to_delete_rows = []
+        for index, row in dataframe.iterrows():
+            block = row.get("block", None)
+            if block == "Total":
+                to_delete_rows.append(index)
+            fto_url = row.get("second_singnatory_fto_url", url)
+            param_dict = get_params_from_url(logger, fto_url, param_name_array)
+            for param_name in param_name_array:
+                dataframe.loc[index, param_name] = param_dict.get(param_name,
+                                                                  "")
+            total = int(row.get("total", 0))
+            rejected = int(row.get("rejected", 0))
+            invalid = int(row.get("invalid", 0))
+            rejected_percentage = get_percentage(rejected, total)
+            invalid_percentage = get_percentage(invalid, total)
+            dataframe.loc[index, "rejected_percentage"] = rejected_percentage
+            dataframe.loc[index, "invalid_percentage"] = invalid_percentage
+
+            dataframe.loc[index, "finyear"] = finyear
+            dataframe.loc[index, "fin_agency"] = fin_agency
+            
+        dataframe = dataframe.drop(to_delete_rows)
+        dataframe = dataframe[col_list]
+        dataframe_array.append(dataframe)
+    dataframe = pd.concat(dataframe_array)
+    return dataframe
+
+def get_block_rejected_transactions(lobj, logger):
+    """This function will fetch all theblock rejected transactions"""
+    #As a first step we need to get all the list of jobcards for that block
+    panchayat_ids = lobj.get_all_panchayat_ids(logger)
+    return dataframe
+
+def fetch_table_from_url(logger, func_args, thread_name=None):
+    """This function will fetch the table from URL based on extract Dict"""
+    lobj = func_args[0]
+    url = func_args[1]
+    extract_dict = func_args[3]
+    response = requests.get(url)
+    logger.info(url)
+    logger.info(response.status_code)
+    dataframe = None
+    if response.status_code == 200:
+        myhtml = response.content
+        dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+        logger.info(dataframe.columns)
+        logger.info(dataframe.head())
+    return dataframe
 def parse_save_insidene(logger, func_args, thread_name=None):
     """Downloads and Saves data from Inside NE Magazine"""
     headers = func_args[0]
