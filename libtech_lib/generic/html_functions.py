@@ -92,8 +92,6 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
         my_table = matched_tables[0]
     else:
         my_table = None
-    if my_table is not None:
-        logger.debug(f"found the table")
     #If table found we will extract the rows and columns
     if my_table is not None:
         dataframe_columns = []

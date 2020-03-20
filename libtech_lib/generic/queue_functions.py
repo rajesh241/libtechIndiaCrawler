@@ -142,7 +142,6 @@ def fetch_rejected_stats(logger, func_args, thread_name=None):
     extract_dict = func_args[3]
     response = requests.get(url)
     logger.info(url)
-    logger.info(response.status_code)
     dataframe = None
     fin_agency = "bank"
     param_name_array = ["state_code", "district_code", "block_code",
@@ -232,8 +231,9 @@ def fetch_rejected_stats(logger, func_args, thread_name=None):
             dataframe.loc[index, "fin_agency"] = fin_agency
             
         dataframe = dataframe.drop(to_delete_rows)
-        dataframe = dataframe[col_list]
-        dataframe_array.append(dataframe)
+        if len(dataframe) > 0:
+            dataframe = dataframe[col_list]
+            dataframe_array.append(dataframe)
     dataframe = pd.concat(dataframe_array)
     return dataframe
 
