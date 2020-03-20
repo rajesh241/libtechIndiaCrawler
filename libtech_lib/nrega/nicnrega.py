@@ -424,8 +424,7 @@ def get_block_rejected_stats(lobj, logger, fto_status_df):
                 'func_args' : func_args
             }
             job_list.append(job_dict)
-    dataframe = libtech_queue_manager(logger, job_list, num_threads=1)
-    dataframe.to_csv("~/thrash//a.csv", index=False)
+    dataframe = libtech_queue_manager(logger, job_list, num_threads=50)
     return dataframe
 
 

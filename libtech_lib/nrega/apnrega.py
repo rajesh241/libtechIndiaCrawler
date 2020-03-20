@@ -36,6 +36,14 @@ def get_ap_muster_transactions(lobj, logger):
     url = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=R1Display&page=Newreportcenter_ajax_eng#'
     url='http://www.nrega.telangana.gov.in/Nregs/FrontServlet?requestType=Common_engRH&actionVal=musterinfo&page=MusterRolls_eng'
     url2='http://www.nrega.telangana.gov.in/Nregs/FrontServlet?'
+    if lobj.state_code == "36":
+        state_code = "02"
+        base_url = 'http://www.nrega.telangana.gov.in/Nregs/FrontServlet?requestType=Common_engRH&actionVal=musterinfo&page=MusterRolls_eng'
+        url2='http://www.nrega.telangana.gov.in/Nregs/FrontServlet?'
+    else:
+        state_code = "01"
+        base_url = "http://www.nrega.ap.gov.in/Nregs/"
+        url2 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=Common_engRH&actionVal=musterinfo&page=MusterRolls_eng'
     logger.info('Fetching URL[%s] for cookies' % url)
     for finyear in range(int(start_fin_year), int(end_fin_year) + 1):
         startYear=int(finyear)-1+2000
@@ -102,6 +110,7 @@ def get_ap_muster_transactions(lobj, logger):
                   else:
                       to_delete_rows.append(index)
                   dataframe.loc[index, "tjobcard" ] = tjobcard
+                  dataframe.loc[index, "tjobcard_str" ] = "~"+str(tjobcard)
                   dataframe.loc[index, "finyear" ] = finyear
               date_dict = {
                   'From Date' : '%d-%b-%Y',
@@ -116,7 +125,6 @@ def get_ap_muster_transactions(lobj, logger):
               dataframe_array.append(dataframe)
     dataframe = pd.concat(dataframe_array, ignore_index=True)
     dataframe = dataframe.reset_index(drop=True)
-    dataframe.to_csv("/tmp/a.csv")
     return dataframe
 
 
