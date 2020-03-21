@@ -28,6 +28,11 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions
                     )
+from libtech_lib.generic.aws import days_since_modified_s3
+REPORT_THRESHOLD_DICT = {
+    "jobcard_register" : 15,
+    "worker_register" : 15,
+}
 class Location():
     """This is the base Location Class"""
     def __init__(self, logger, location_code, scheme='nrega'):
@@ -54,9 +59,35 @@ class Location():
         if self.location_type == "block":
             return filepath
         filepath = f"{filepath}/{self.panchayat_code}"
+        logger.info("filepath is ")
         return filepath
+    def get_report_filepath(self, logger, report_type, finyear=None):
+        """Standard function to get report_filename"""
+        if finyear is None:
+            report_filename = f"{self.slug}_{self.code}_{report_type}.csv"
+        else:
+            report_filename = f"{self.slug}_{self.code}_{report_type}_{finyear}.csv"
+        filepath = self.get_file_path(logger)
+        filepath = filepath.replace("reportType", report_type)
+        filename = f"{filepath}/{report_filename}"
+        logger.info(f"file name is {filename}")
+        return filename
+    def is_report_updated(self, logger, report_type, finyear=None):
+        """Checks if report is updated"""
+        filename = self.get_report_filepath(logger, report_type, finyear=finyear)
+        logger.info(f"report name is {filename}")
+        days_diff = days_since_modified_s3(logger, filename)
+        if days_diff is None:
+            return False
+        threshold = REPORT_THRESHOLD_DICT.get(report_type, 7)
+        if days_diff > threshold:
+            return False
+        return False
+
     def save_report(self, logger, data, report_type, finyear=None):
         """Standard function to save report to the location"""
+        if data is None:
+            return
         if finyear is None:
             report_filename = f"{self.slug}_{self.code}_{report_type}.csv"
         else:
@@ -123,18 +154,28 @@ class NREGAPanchayat(Location):
     def jobcard_register(self, logger):
         """Will Fetch the Jobcard Register"""
         logger.info(f"Going to fetch Jobcard register for {self.code}")
-        dataframe = get_jobcard_register(self, logger)
         report_type = "jobcard_register"
-        self.save_report(logger, dataframe, report_type)
+        is_updated = self.is_report_updated(logger, report_type)
+        if not is_updated:
+            dataframe = get_jobcard_register(self, logger)
+            self.save_report(logger, dataframe, report_type)
     def worker_register(self, logger):
         """Will Fetch the Jobcard Register"""
         logger.info(f"Going to fetch Jobcard register for {self.code}")
-        dataframe = get_worker_register(self, logger)
         report_type = "worker_register"
-        self.save_report(logger, dataframe, report_type)
+        is_updated = self.is_report_updated(logger, report_type)
+        if not is_updated:
+            dataframe = get_worker_register(self, logger)
+            self.save_report(logger, dataframe, report_type)
     def jobcard_transactions(self, logger):
         """This will fetch all jobcard transactions for the panchayat"""
-        logger.info(f"Going to fetch Muster list for {self.code}")
+        report_type = "jobcard_transactions"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
+        logger.info(f"Going to fetch Jobcard Transactions for {self.code}")
+        self.jobcard_register(logger)
+        self.worker_register(logger)
         report_type = "jobcard_register"
         jobcard_register_df = self.fetch_report_dataframe(logger, report_type)
         dataframe = get_jobcard_transactions(self, logger, jobcard_register_df)
@@ -143,6 +184,11 @@ class NREGAPanchayat(Location):
     def muster_list(self, logger):
         """This will fetch all jobcard transactions for the panchayat"""
         logger.info(f"Going to fetch Muster list for {self.code}")
+        report_type = "muster_list"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
+        self.jobcard_transactions(logger)
         report_type = "jobcard_transactions"
         jobcard_transaction_df = self.fetch_report_dataframe(logger, report_type)
         dataframe = get_muster_list(self, logger, jobcard_transaction_df)
@@ -151,6 +197,11 @@ class NREGAPanchayat(Location):
     def muster_transactions(self, logger):
         """This will fetch all muster transactions for the panchayat"""
         logger.info(f"Going to fetch Muster transactions for {self.code}")
+        report_type = "muster_transactions"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
+        self.muster_list(logger)
         report_type = "muster_list"
         muster_list_df = self.fetch_report_dataframe(logger, report_type)
         dataframe = get_muster_transactions(self, logger, muster_list_df)
