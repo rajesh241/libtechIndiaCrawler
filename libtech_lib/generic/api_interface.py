@@ -22,7 +22,7 @@ LOCATIONURL = '%s/api/public/location/' % (BASEURL)
 TAGURL = '%s/api/public/tag/' % (BASEURL)
 REPORTURL = '%s/api/public/report/' % (BASEURL)
 GETREPORTURL = "%s/api/getReport/" % (BASEURL)
-TASKQUEUEURL = '%s/api/queue/' % (BASEURL)
+TASKQUEUEURL = '%s/api/public/queue/' % (BASEURL)
 
 def get_authentication_token():
     """This function will get the authentication token based on the username
@@ -51,7 +51,36 @@ def get_authentication_header(token=None):
         }
     return headers
 
-
+def update_task(logger,  patch_data):
+    headers = get_authentication_header()
+    res = requests.patch(TASKQUEUEURL, headers=headers,
+                         data=json.dumps(patch_data))
+    logger.debug(f"Patch status {res.status_code} and response {res.content}")
+ 
+def get_task(logger, task_id=None):
+    """This function will get the first task from the queue to execute"""
+    headers = get_authentication_header()
+    if task_id is not None:
+      url="%s?id=%s" % (TASKQUEUEURL, str(task_id))
+    else:
+      url="%s?is_done=0&ordering=-priority,updated&limit=1" % (TASKQUEUEURL)
+    logger.info(url)
+    res = requests.get(url, headers=headers)
+    logger.info
+    response = res.json()
+    count = response.get("count", None)
+    if task_id is not None:
+      return_id = response.get("id", None)
+      if return_id is None:
+        task_dict = None
+      else:
+        task_dict = response
+    elif ((count is None) or (count == 0)):
+      task_dict= None
+    else:
+      task_dict = response['results'][0]
+    return task_dict
+ 
 def fetch_data(logger, url, return_type='json', params=None):
     """This implements requests get functionality and by default will return
     the json, if content is required, return_type has to be set to content"""
