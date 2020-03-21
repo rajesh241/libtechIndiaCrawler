@@ -48,18 +48,17 @@ def execute_task(logger, task_id=None, process_name=None):
     scheme = task_dict.get("scheme", None)
     task_id = task_dict.get("id", None)
     my_location = getattr(models, location_class)(logger=logger, location_code=location_code)
+    status = "inProgress"
+    patch_data = {
+        'id' : task_id,
+        'status' : status,
+        'process_name': process_name,
+        'start_time' : start_time,
+        }
+    update_task(logger,  patch_data)
     is_server_running = nic_server_status(logger, location_code)
     logger.info(is_server_running)
-    if (is_server_running):
-        status = "inProgress"
-        patch_data = {
-            'id' : task_id,
-            'status' : status,
-            'process_name': process_name,
-            'start_time' : start_time,
-            }
-        update_task(logger,  patch_data)
-    else:
+    if not is_server_running:
         status = 'parked'
         patch_data = {
             'id' : task_id,

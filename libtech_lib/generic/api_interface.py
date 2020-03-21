@@ -51,7 +51,14 @@ def get_authentication_header(token=None):
         }
     return headers
 
+def create_task(logger,  data):
+    """This would create a task"""
+    headers = get_authentication_header()
+    res = requests.post(TASKQUEUEURL, headers=headers,
+                         data=json.dumps(data))
+    logger.debug(f"Patch status {res.status_code} and response {res.content}")
 def update_task(logger,  patch_data):
+    """function to update the task"""
     headers = get_authentication_header()
     res = requests.patch(TASKQUEUEURL, headers=headers,
                          data=json.dumps(patch_data))
