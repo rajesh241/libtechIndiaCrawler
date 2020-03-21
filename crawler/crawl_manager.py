@@ -77,11 +77,13 @@ def execute_task(logger, task_id=None, process_name=None):
         patch_data['is_done'] = True
         patch_data['status'] = 'completed'
     except Exception as e:
-        remarks = e
+        remarks = str(e)
+        logger.info(f"error {remarks}")
         patch_data['is_error'] = True
         patch_data['is_done'] = False
         patch_data['status'] = 'error'
         patch_data['priority'] = 20
+        patch_data['remarks'] = remarks
          
     end_time_obj, end_time = get_current_datetime()
     duration = int(((end_time_obj-state_time_obj).total_seconds())/60)
