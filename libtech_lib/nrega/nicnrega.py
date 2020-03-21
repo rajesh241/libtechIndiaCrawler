@@ -20,7 +20,10 @@ from libtech_lib.generic.commons import  (get_current_finyear,
                       get_finyear_from_muster_url,
                       get_fto_finyear
                      )
-from libtech_lib.generic.api_interface import api_get_report_url, api_get_report_dataframe
+from libtech_lib.generic.api_interface import  (api_get_report_url,
+                                                api_get_report_dataframe,
+                                                get_location_dict
+                                               )
 from libtech_lib.generic.html_functions import get_dataframe_from_html, get_dataframe_from_url
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 
@@ -29,6 +32,24 @@ JSONCONFIGFILE = f"{HOMEDIR}/.libtech/crawlerConfig.json"
 with open(JSONCONFIGFILE) as CONFIG_file:
     CONFIG = json.load(CONFIG_file)
 NREGA_DATA_DIR = CONFIG['nrega_data_dir']
+
+def nic_server_status(logger, location_code, scheme='nrega'):
+    if scheme != "nrega":
+      return True
+    ldict = get_location_dict(logger, location_code=location_code)
+    state_name = ldict.get("state_name", None)
+    state_code = ldict.get("state_code", None)
+    crawl_ip = ldict.get("crawl_ip", None)
+    url = f"http://{crawl_ip}/netnrega/homestciti.aspx?state_code={state_code}&state_name={state_name}"
+    logger.info(url)
+    r=requests.get(url)
+    logger.info(r.status_code)
+    if r.status_code == 200:
+      return True
+    else:
+      return False
+
+
 def get_jobcard_register(lobj, logger):
     """Download Jobcard Register for a given panchayat
     return the pandas dataframe of jobcard Register"""
@@ -64,7 +85,7 @@ def get_jobcard_register(lobj, logger):
         if res.status_code == 200:
             myhtml = res.content
             dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
-    dataframe = insert_location_details(logger, lobj, dataframe)
+            dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
 
 def get_worker_register(lobj, logger):
