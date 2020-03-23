@@ -5,6 +5,11 @@ from libtech_lib.generic.commons import logger_fetch
 from libtech_lib.nrega.models import NREGAPanchayat, NREGABlock, APPanchayat
 from libtech_lib.nrega import models
 from libtech_lib.generic.api_interface import create_task
+from libtech_lib.generic.html_functions import (get_dataframe_from_html,
+                            get_dataframe_from_url,
+                            get_urldataframe_from_url,
+                            delete_divs_by_classes
+                           )
 def args_fetch():
     '''
     Paser for the argument list that returns the args list
@@ -13,6 +18,8 @@ def args_fetch():
     parser = argparse.ArgumentParser(description=('This is blank script',
                                                   'you can copy this base script '))
     parser.add_argument('-l', '--log-level', help='Log level defining verbosity', required=False)
+    parser.add_argument('-d', '--debug', help='Debug Loop',
+                        required=False, action='store_const', const=1)
     parser.add_argument('-t', '--test', help='Test Loop',
                         required=False, action='store_const', const=1)
     parser.add_argument('-i', '--insert', help='Insert in Queue',
@@ -73,9 +80,20 @@ def main():
                 location_class = LOCATION_CLASS
             data['location_class'] = location_class
             create_task(logger, data)
-     
     if args['test']:
-        logger.info("Testing phase")
+        url ="http://mnregaweb2.nic.in/Netnrega/placeHolder1/placeHolder2/../../citizen_html/musternew.aspx?lflag=&id=1&state_name=CHHATTISGARH&district_name=JASHPUR&block_name=Manora&panchayat_name=Alori&block_code=3307016&msrno=5603&finyear=2016-2017&workcode=3307016001%2fWC%2f81094155&dtfrm=27%2f02%2f2017&dtto=05%2f03%2f2017&wn=Laghu+Sichai+Talab+Nirman+Pushani+%2fRengashu+(1.60+Lakhs)&Digest=nTMkfSq3BkT80yXpUwcuFw"
+        extract_dict = {}
+        extract_dict['pattern'] = f"CH-"
+        extract_dict['table_id_array'] = ["ctl00_ContentPlaceHolder1_grdShowRecords",
+                                      "ContentPlaceHolder1_grdShowRecords"]
+        extract_dict['split_cell_array'] = [1]
+        cookies = None
+
+        dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict,
+                                       cookies=cookies)
+        logger.info(dataframe.head())
+    if args['debug']:
+        logger.info("Debug phase")
         location_code = args.get('locationCode', None)
         func_name = args.get('func_name', None)
         location_type = args.get('locationType', 'panchayat')

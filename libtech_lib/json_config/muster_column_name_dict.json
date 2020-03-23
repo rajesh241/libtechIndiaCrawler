@@ -16,5 +16,20 @@
     "यात्रा और खान पान का व्यय" : "m_travel_cost",
     "Implements / Sharpening Charge":"m_tools_cost",
     "Caste":"caste",
-    "Sign./Thumb Impression":"thumb_impression"
+    "जाति" : "caste",
+    "कुल हाजिरी":"days_worked",
+    "Name/RegNo": "name_relationship",
+    "Name/RegNo_1": "jobcard",
+    "Sign./Thumb Impression":"thumb_impression",
+    "Wage Per Day (As per measurement)":"day_wage",
+    "Travel and living exp.":"m_travel_cost",
+    "S.No":"muster_index",
+    "Total Attendance":"days_worked",
+    "Amount Due":"m_labour_wage",
+    "Total Cash payment":"total_wage",
+    "कुल नकद भुगतान" : "total_wage",
+    "देय राशि" : "m_labour_wage",
+    "प्रतिदन मजदूर (माप के अनुसार )":"day_wage",
+    "यात्रा और खान पान का व्यय":"m_travel_cost"
+
 }
