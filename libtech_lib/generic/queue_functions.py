@@ -1,22 +1,23 @@
 """This has all the functions that need tobe executed in the queue"""
-import requests
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
-import pandas as pd
+#pylint: disable-msg = too-many-locals
+#pylint: disable-msg = too-many-branches
+#pylint: disable-msg = too-many-statements
+#pylint: disable-msg = line-too-long
 import json
+import requests
+import pandas as pd
 from bs4 import BeautifulSoup
 from libtech_lib.generic.html_functions import (get_dataframe_from_html,
-                            get_dataframe_from_url,
-                            get_urldataframe_from_url,
-                            delete_divs_by_classes
-                           )
-from libtech_lib.generic.commons import (standardize_dates_in_dataframe,
-                     insert_finyear_in_dataframe,
-                     get_default_start_fin_year,
-                     get_params_from_url,
-                     get_percentage,
-                     get_fto_finyear
-                    )
+                                                get_dataframe_from_url,
+                                                get_urldataframe_from_url,
+                                                delete_divs_by_classes
+                                               )
+from libtech_lib.generic.commons import (insert_finyear_in_dataframe,
+                                         get_default_start_fin_year,
+                                         get_params_from_url,
+                                         get_percentage,
+                                         get_fto_finyear
+                                        )
 
 def fetch_muster_details(logger, func_args, thread_name=None):
     """Given a muster URL, this program will fetch muster details"""
@@ -29,11 +30,13 @@ def fetch_muster_details(logger, func_args, thread_name=None):
     muster_column_name_dict = func_args[6]
     extract_dict = {}
     extract_dict['pattern'] = f"{lobj.state_short_code}-"
-    extract_dict['table_id'] = "ctl00_ContentPlaceHolder1_grdShowRecords"
+    extract_dict['table_id_array'] = ["ctl00_ContentPlaceHolder1_grdShowRecords",
+                                      "ContentPlaceHolder1_grdShowRecords"]
     extract_dict['split_cell_array'] = [1]
-    logger.info(f"Currently processing {url}")
+    logger.info(f"Currently processing {url} by {thread_name}")
     dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict,
                                        cookies=cookies)
+    logger.info(f"extracted dataframe columns {dataframe.columns}")
     columns_to_keep = []
     for column_name in dataframe.columns:
         if not column_name.isdigit():
@@ -56,6 +59,7 @@ def fetch_muster_urls(logger, func_args, thread_name=None):
     lobj = func_args[0]
     url = func_args[1]
     cookies = func_args[2]
+    logger.debug(f"fetch muster url {url} in {thread_name}")
     extract_dict = {}
     extract_dict['pattern'] = "musternew.aspx"
     extract_dict['url_prefix'] = f"http://{lobj.crawl_ip}/Netnrega/placeHolder1/placeHolder2/"
@@ -68,6 +72,7 @@ def fetch_rejection_details(logger, func_args, thread_name=None):
     lobj = func_args[0]
     url = func_args[1]
     dataframe = None
+    logger.debug(f"Fetch rejection details for {lobj.code} in {thread_name}")
     column_headers = ["wagelist_no", "jobcard", "applicant_no", "name",
                       "work_code", "work_name", "muster_no", "reference_no",
                       "rejection_status", "rejection_reason", "process_date", "fto_no",
@@ -101,6 +106,7 @@ def fetch_jobcard_details(logger, func_args, thread_name=None):
     url = func_args[1]
     cookies = func_args[2]
     response = requests.get(url, cookies=cookies)
+    logger.debug(f"Fetch data for {lobj.code} with {thread_name}")
     dataframe = None
     if response.status_code == 200:
         myhtml = response.content
@@ -139,6 +145,7 @@ def fetch_rejected_stats(logger, func_args, thread_name=None):
     lobj = func_args[0]
     url = func_args[1]
     finyear = func_args[2]
+    logger.debug(f"Fetch data for {lobj.code} with {thread_name}")
     extract_dict = func_args[3]
     response = requests.get(url)
     logger.info(url)
@@ -164,17 +171,15 @@ def fetch_rejected_stats(logger, func_args, thread_name=None):
     }
 
     data = {
-      '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$RBtnLstIsEfms$1',
-      '__EVENTARGUMENT': '',
-      '__LASTFOCUS': '',
-      '__VIEWSTATE':'',
-      '__VIEWSTATEENCRYPTED': '',
-      'ctl00$ContentPlaceHolder1$RBtnLst': 'W',
-      'ctl00$ContentPlaceHolder1$RBtnLstIsEfms': 'P',
-      'ctl00$ContentPlaceHolder1$HiddenField1': ''
+        '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$RBtnLstIsEfms$1',
+        '__EVENTARGUMENT': '',
+        '__LASTFOCUS': '',
+        '__VIEWSTATE':'',
+        '__VIEWSTATEENCRYPTED': '',
+        'ctl00$ContentPlaceHolder1$RBtnLst': 'W',
+        'ctl00$ContentPlaceHolder1$RBtnLstIsEfms': 'P',
+        'ctl00$ContentPlaceHolder1$HiddenField1': ''
     }
-    
-    
     dataframe_dict = {}
     dataframe_array = []
     view_state = None
@@ -229,7 +234,6 @@ def fetch_rejected_stats(logger, func_args, thread_name=None):
 
             dataframe.loc[index, "finyear"] = finyear
             dataframe.loc[index, "fin_agency"] = fin_agency
-            
         dataframe = dataframe.drop(to_delete_rows)
         if len(dataframe) > 0:
             dataframe = dataframe[col_list]
@@ -240,13 +244,16 @@ def fetch_rejected_stats(logger, func_args, thread_name=None):
 def get_block_rejected_transactions(lobj, logger):
     """This function will fetch all theblock rejected transactions"""
     #As a first step we need to get all the list of jobcards for that block
-    panchayat_ids = lobj.get_all_panchayat_ids(logger)
+    logger.info(f"Processing {lobj.code}")
+    dataframe = None
+   # panchayat_ids = lobj.get_all_panchayat_ids(logger)
     return dataframe
 
 def fetch_table_from_url(logger, func_args, thread_name=None):
     """This function will fetch the table from URL based on extract Dict"""
     lobj = func_args[0]
     url = func_args[1]
+    logger.debug(f"running {lobj.code} in {thread_name}")
     extract_dict = func_args[3]
     response = requests.get(url)
     logger.info(url)
@@ -260,6 +267,7 @@ def fetch_table_from_url(logger, func_args, thread_name=None):
     return dataframe
 def parse_save_insidene(logger, func_args, thread_name=None):
     """Downloads and Saves data from Inside NE Magazine"""
+    logger.info(f"Executing in {thread_name}")
     headers = func_args[0]
     outfile = func_args[1]
     post_dict = func_args[2]
@@ -279,7 +287,7 @@ def parse_save_insidene(logger, func_args, thread_name=None):
                            "addtoany_share_save_container",
                            "jp-relatedposts"]
             post_div = delete_divs_by_classes(logger, post_div, class_array)
-            code_div = post_div.find("div", attrs={"class" : "code-block"})
+            #code_div = post_div.find("div", attrs={"class" : "code-block"})
             strong_p = post_div.findAll("strong")
             for strong in strong_p:
                 strong_text = strong.text.lstrip().rstrip()
@@ -290,7 +298,7 @@ def parse_save_insidene(logger, func_args, thread_name=None):
             em_p = post_div.findAll("em")
             for strong in em_p:
                 strong_text = strong.text.lstrip().rstrip()
-                if ("Support Inside Northeast" in strong_text):
+                if "Support Inside Northeast" in strong_text:
                     parent_p = strong.parent
                     parent_p.decompose()
 
@@ -306,5 +314,3 @@ def parse_save_insidene(logger, func_args, thread_name=None):
         post_data['post_content'] = post_content
         with open(outfile, 'w', encoding='utf8') as json_file:
             json.dump(post_data, json_file, indent=4, ensure_ascii=False)
-    return None
- 

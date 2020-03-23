@@ -6,29 +6,29 @@ there is a class for each location type, and associated methods related to that
 #File Path for on Demand
 #data/samples/on_demand/<scheme>/<report_type>/district/block/panchayat/
 ##Archive data
-AP_STATE_CODE = "02"
 from libtech_lib.generic.commons import (get_full_finyear,
-                     get_current_finyear
-                    )
+                                         get_current_finyear
+                                         )
 from libtech_lib.generic.api_interface import (get_location_dict,
-                           create_update_report,
-                           api_get_report_dataframe,
-                           api_get_child_locations,
-                           api_get_child_location_ids
-                          )
+                                               create_update_report,
+                                               api_get_report_dataframe,
+                                               api_get_child_locations,
+                                               api_get_child_location_ids
+                                              )
 from libtech_lib.nrega.nicnrega import (get_jobcard_register,
-                      get_worker_register,
-                      get_muster_list,
-                      get_jobcard_transactions,
-                      get_block_rejected_transactions,
-                      get_muster_transactions,
-                      get_fto_status_urls,
-                      get_block_rejected_stats
-                     )
+                                        get_worker_register,
+                                        get_muster_list,
+                                        get_jobcard_transactions,
+                                        get_block_rejected_transactions,
+                                        get_muster_transactions,
+                                        get_fto_status_urls,
+                                        get_block_rejected_stats
+                                       )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions
-                    )
+                                      )
 from libtech_lib.generic.aws import days_since_modified_s3
+AP_STATE_CODE = "02"
 REPORT_THRESHOLD_DICT = {
     "jobcard_register" : 15,
     "worker_register" : 15,
@@ -43,9 +43,11 @@ class Location():
             setattr(self, key, value)
     def fetch_report_dataframe(self, logger, report_type, finyear=None):
         """Fetches the report dataframe from amazon S3"""
-        dataframe = api_get_report_dataframe(logger, self.id, report_type, finyear=finyear)
+        dataframe = api_get_report_dataframe(logger, self.id, report_type,
+                                             index_col=None, finyear=finyear)
         return dataframe
     def get_file_path(self, logger):
+        """Will get file path directory for the given location"""
         filepath = f"data/samples/on_demand/{self.scheme}/reportType"
         if self.location_type == "country":
             return filepath
@@ -70,19 +72,19 @@ class Location():
         filepath = self.get_file_path(logger)
         filepath = filepath.replace("reportType", report_type)
         filename = f"{filepath}/{report_filename}"
-        logger.info(f"file name is {filename}")
         return filename
     def is_report_updated(self, logger, report_type, finyear=None):
         """Checks if report is updated"""
         filename = self.get_report_filepath(logger, report_type, finyear=finyear)
         logger.info(f"report name is {filename}")
         days_diff = days_since_modified_s3(logger, filename)
+        logger.info(f"days diff is {days_diff}")
         if days_diff is None:
             return False
         threshold = REPORT_THRESHOLD_DICT.get(report_type, 7)
         if days_diff > threshold:
             return False
-        return False
+        return True
 
     def save_report(self, logger, data, report_type, finyear=None):
         """Standard function to save report to the location"""
@@ -107,7 +109,7 @@ class Location():
         """This function will get block Rejected Statistics"""
         report_type = "fto_status_urls"
         fto_status_df = self.fetch_report_dataframe(logger, report_type)
-        dataframe = get_block_rejected_stats(self, logger, fto_status_df) 
+        dataframe = get_block_rejected_stats(self, logger, fto_status_df)
         report_type = "block_rejected_stats"
         self.save_report(logger, dataframe, report_type)
 
@@ -117,7 +119,6 @@ class APPanchayat(Location):
         self.scheme = 'nrega'
         self.code = location_code
         Location.__init__(self, logger, self.code, self.scheme)
-        full_finyear = get_full_finyear(get_current_finyear())
         if self.state_code == AP_STATE_CODE:
             self.home_url = "http://www.nrega.ap.gov.in/Nregs/FrontServlet"
         else:
@@ -248,3 +249,11 @@ class NREGABlock(Location):
     def block_rejected_transactions(self, logger):
         """This will fetch all the rejected transactions of the block"""
         get_block_rejected_transactions(self, logger)
+    def block_reference_document(self, logger):
+        """This will crawl data for the entire block"""
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        for each_panchayat_code in panchayat_array:
+            logger.info(f"Currently Processing panchayat code {each_panchayat_code}")
+            my_location = NREGAPanchayat(logger, each_panchayat_code)
+            my_location.muster_transactions(logger)
