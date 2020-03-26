@@ -23,6 +23,7 @@ from libtech_lib.generic.api_interface import  (api_get_report_url,
                                                )
 from libtech_lib.generic.html_functions import get_dataframe_from_html, get_dataframe_from_url
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
+from libtech_lib.generic.libtech_exception import NICCrawlException
 
 HOMEDIR = str(Path.home())
 JSONCONFIGFILE = f"{HOMEDIR}/.libtech/crawlerConfig.json"
@@ -515,3 +516,122 @@ def get_fto_status_urls(lobj, logger):
 
     dataframe = pd.DataFrame(csv_array, columns=column_headers)
     return dataframe
+
+
+def get_nic_stat_urls(lobj, logger, panchayat_code_array):
+    dataframe = None
+    csv_array = []
+    column_headers = ["state_code", "district_code", "block_code",
+                      "panchayat_code", "location_code", "location_type", "stats_url"]
+    urlPrefix = "http://mnregaweb4.nic.in/netnrega/"
+    url = "http://mnregaweb4.nic.in/netnrega/all_lvl_details_dashboard_new.aspx"
+    headers  =  {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q = 0.9,*/*;q = 0.8',
+    'Accept-Encoding': 'gzip, deflate',
+    'Accept-Language': 'en-GB,en;q = 0.5',
+    'Connection': 'keep-alive',
+    'Host': 'mnregaweb4.nic.in',
+    'Referer': url,
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:45.0) Gecko/20100101 Firefox/45.0',
+    'Content-Type': 'application/x-www-form-urlencoded',
+    }
+    r = requests.get(url)
+    if r.status_code  ==  200:
+        myhtml = r.content
+        htmlsoup = BeautifulSoup(myhtml,"lxml")
+        validation  =  htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+        view_state  =  htmlsoup.find(id = '__VIEWSTATE').get('value')
+        data  =  {
+            '__EVENTARGUMENT': '',
+            '__LASTFOCUS': '',
+            '__VIEWSTATE': view_state,
+            '__VIEWSTATEENCRYPTED': '',
+            '__EVENTVALIDATION': validation,
+            'ddl_state': lobj.state_code,
+            '__EVENTTARGET': 'ddl_state',
+        }
+    
+        response  =  requests.post(url, headers=headers, data=data)
+        if response.status_code == 200:
+            myhtml = response.content
+        else:
+            myhtml = None
+        if myhtml is not None:
+            htmlsoup = BeautifulSoup(myhtml,"lxml")
+            validation  =  htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+            view_state  =  htmlsoup.find(id = '__VIEWSTATE').get('value')
+            data['ddl_dist'] = lobj.district_code
+            data['__EVENTTARGET'] = 'ddl_dist'
+            data['__VIEWSTATE'] =  view_state
+            data['__EVENTVALIDATION'] =  validation
+
+            response  =  requests.post(url, headers=headers, data=data)
+            if response.status_code == 200:
+                myhtml = response.content
+            else:
+                myhtml = None
+            if myhtml is not None:
+                htmlsoup = BeautifulSoup(myhtml,"lxml")
+                validation = htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+                view_state = htmlsoup.find(id = '__VIEWSTATE').get('value')
+                data['ddl_blk'] = lobj.block_code
+                data['__EVENTTARGET'] = 'ddl_blk'
+                data['__VIEWSTATE'] =  view_state
+                data['__EVENTVALIDATION'] =  validation
+                response  =  requests.post(url,headers=headers, data=data)
+                if response.status_code == 200:
+                    myhtml = response.content
+                else:
+                    myhtml = None
+                if myhtml is not None:
+                    htmlsoup = BeautifulSoup(myhtml,"lxml")
+                    validation = htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+                    view_state = htmlsoup.find(id = '__VIEWSTATE').get('value')
+                    panchayat_code_array.append(lobj.block_code)
+                    for location_code in panchayat_code_array:
+                        stats_url = None
+                        if location_code  ==  lobj.block_code:
+                            location_code_string = 'ALL'
+                            panchayat_code = ''
+                            location_type = 'block'
+                        else:
+                            location_code_string = location_code
+                            panchayat_code = location_code
+                            location_type = 'panchayat'
+                        data  =  {
+                          '__EVENTTARGET': '',
+                          '__EVENTARGUMENT': '',
+                          '__LASTFOCUS': '',
+                          '__VIEWSTATE': view_state,
+                          '__VIEWSTATEENCRYPTED': '',
+                          '__EVENTVALIDATION': validation,
+                          'ddl_state': lobj.state_code,
+                          'ddl_dist' : lobj.district_code,
+                          'ddl_blk' : lobj.block_code,
+                          'ddl_pan' : location_code_string,
+                          'btproceed' : 'View Detail'
+                        }
+                        response  =  requests.post(url, headers=headers, data=data)
+                        if response.status_code == 200:
+                            myhtml = response.content
+                        else:
+                            myhtml = None
+                        if myhtml is not None:
+                            htmlsoup = BeautifulSoup(myhtml,"lxml")
+                            myi_frame = htmlsoup.find("iframe")
+                            if myi_frame is not None:
+                                stats_url = urlPrefix+myi_frame['src']
+                                #logger.info(stats_url)
+                                row = [lobj.state_code, lobj.district_code,
+                                       lobj.block_code, panchayat_code,
+                                       location_code, location_type, stats_url] 
+                                csv_array.append(row)
+                        if stats_url is None:
+                            exception_message = f"Unable to get stats for {location_code_string} and block_code {lobj.block_code}"
+                            raise Exception('x should not exceed 5. The value of xwas:')
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    dataframe.to_csv("/tmp/a.csv")
+    return dataframe
+
+
+

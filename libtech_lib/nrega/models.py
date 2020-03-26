@@ -6,6 +6,7 @@ there is a class for each location type, and associated methods related to that
 #File Path for on Demand
 #data/samples/on_demand/<scheme>/<report_type>/district/block/panchayat/
 ##Archive data
+import pandas as pd
 from libtech_lib.generic.commons import (get_full_finyear,
                                          get_current_finyear
                                          )
@@ -22,7 +23,8 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_block_rejected_transactions,
                                         get_muster_transactions,
                                         get_fto_status_urls,
-                                        get_block_rejected_stats
+                                        get_block_rejected_stats,
+                                        get_nic_stat_urls
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions
@@ -208,7 +210,9 @@ class NREGAPanchayat(Location):
         dataframe = get_muster_transactions(self, logger, muster_list_df)
         report_type = "muster_transactions"
         self.save_report(logger, dataframe, report_type)
-
+    def nic_stats(self, logger):
+        """This function will fetch NIC Stats"""
+        report_type = "nic_stats"
 class APBlock(Location):
     """This is the AP Block subclass for Location Class"""
     def __init__(self, logger, location_code):
@@ -227,6 +231,36 @@ class APBlock(Location):
         panchayat_array = api_get_child_location_ids(logger, self.code,
                                                      scheme='nrega')
         return panchayat_array
+
+class NREGADistrict(Location):
+    """This is the District class for NREGA"""
+    def __init__(self, logger, location_code):
+        self.scheme = 'nrega'
+        self.code = location_code
+        Location.__init__(self, logger, self.code, self.scheme)
+    def get_all_blocks(self, logger):
+        """Getting all child Locations, in this case getting all panchayat
+        locations"""
+        block_array = api_get_child_locations(logger, self.code,
+                                                  scheme='nrega')
+        return block_array
+    def nic_stat_urls(self, logger):
+        """This function will get the nic stat URLs for all the panchayats and
+        blocks"""
+        dataframe_array = []
+        block_array = self.get_all_blocks(logger)
+        logger.info(block_array)
+        for block_code in block_array:
+            my_location = NREGABlock(logger, block_code)
+            dataframe = my_location.nic_stat_urls(logger)
+            logger.info(f"data frame is {dataframe.head()}")
+            if dataframe is not None:
+                dataframe_array.append(dataframe)
+        dataframe = pd.concat(dataframe_array)
+        report_type = "nic_stat_urls"
+        self.save_report(logger, dataframe, report_type)
+        
+
 
 class NREGABlock(Location):
     """This is the Panchayat subclass for Location Class"""
@@ -257,3 +291,11 @@ class NREGABlock(Location):
             logger.info(f"Currently Processing panchayat code {each_panchayat_code}")
             my_location = NREGAPanchayat(logger, each_panchayat_code)
             my_location.muster_transactions(logger)
+    def nic_stat_urls(self, logger):
+        """This function will get the nic stat URLs for all the panchayats and
+        blocks"""
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        dataframe = get_nic_stat_urls(self, logger, panchayat_array)
+        return dataframe
+
