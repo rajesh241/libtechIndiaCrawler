@@ -70,7 +70,7 @@ def get_task(logger, task_id=None):
     if task_id is not None:
       url="%s?id=%s" % (TASKQUEUEURL, str(task_id))
     else:
-      url="%s?is_done=0&ordering=-priority,updated&limit=1" % (TASKQUEUEURL)
+      url="%s?is_done=0&status=inQueue&ordering=-priority,updated&limit=1" % (TASKQUEUEURL)
     logger.info(url)
     res = requests.get(url, headers=headers)
     logger.info

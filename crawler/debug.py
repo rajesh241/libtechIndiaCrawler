@@ -4,7 +4,7 @@ import argparse
 from libtech_lib.generic.commons import logger_fetch
 from libtech_lib.nrega.models import NREGAPanchayat, NREGABlock, APPanchayat
 from libtech_lib.nrega import models
-from libtech_lib.generic.api_interface import create_task
+from libtech_lib.generic.api_interface import create_task, api_get_child_locations
 from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                             get_dataframe_from_url,
                             get_urldataframe_from_url,
@@ -81,10 +81,21 @@ def main():
         }
         for location_code in location_codes:
             data['location_code'] = location_code
-            data['location_class'] = location_class
+            data['location_class'] = LOCATION_CLASS
             create_task(logger, data)
 
     if args['test']:
+        state_codes = api_get_child_locations(logger, 0)
+        for state_code in state_codes:
+            district_codes = api_get_child_locations(logger, state_code)
+            for district_code in district_codes:
+                logger.info(f"Current Processing {state_code}-{district_code}")
+                data={}
+                data['location_code'] = district_code
+                data['location_class'] = "NREGADistrict"
+                data['report_type'] = "nic_stat_urls"
+                create_task(logger, data)
+        exit(0)
         url ="http://mnregaweb2.nic.in/Netnrega/placeHolder1/placeHolder2/../../citizen_html/musternew.aspx?lflag=&id=1&state_name=CHHATTISGARH&district_name=JASHPUR&block_name=Manora&panchayat_name=Alori&block_code=3307016&msrno=5603&finyear=2016-2017&workcode=3307016001%2fWC%2f81094155&dtfrm=27%2f02%2f2017&dtto=05%2f03%2f2017&wn=Laghu+Sichai+Talab+Nirman+Pushani+%2fRengashu+(1.60+Lakhs)&Digest=nTMkfSq3BkT80yXpUwcuFw"
         extract_dict = {}
         extract_dict['pattern'] = f"CH-"
