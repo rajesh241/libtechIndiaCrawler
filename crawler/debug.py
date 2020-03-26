@@ -43,16 +43,26 @@ def main():
     if args['insert']:
         logger.info("Inserting in Crawl Queue")
         location_code = args.get('locationCode', None)
+        is_not_nic = args.get('notnic', None)
         func_name = args.get('func_name', None)
         location_type = args.get('locationType', 'panchayat')
         location_codes = []
         LOCATION_CLASS = "Location"
-        if args['notnic']:
-            BLOCK_CLASS = "APBlock"
-            PANCHAYAT_CLASS = "APPanchayat"
-        else:
-            BLOCK_CLASS = "NREGABlock"
-            PANCHAYAT_CLASS = "NREGAPanchayat"
+        if location_type == "panchayat":
+            if is_not_nic:
+                LOCATION_CLASS = "APPanchayat"
+            else:
+                LOCATION_CLASS = "NREGAPanchayat"
+        if location_type == "block":
+            if is_not_nic:
+                LOCATION_CLASS = "APBlock"
+            else:
+                LOCATION_CLASS = "NREGABlock"
+        if location_type == "district":
+            if is_not_nic:
+                LOCATION_CLASS = "APDistrict"
+            else:
+                LOCATION_CLASS = "NREGADistrict"
 
         if location_type == 'block':
             location_codes.append(location_code)
@@ -65,21 +75,15 @@ def main():
                 location_codes = [location_code]
         else:
             location_codes.append(location_code)
+
         data = {
                 'report_type' : func_name,
         }
         for location_code in location_codes:
             data['location_code'] = location_code
-            if location_type == 'block':
-                location_class = BLOCK_CLASS
-            elif location_type == 'panchayat':
-                location_class = PANCHAYAT_CLASS
-                logger.info("I am here")
-                logger.info(PANCHAYAT_CLASS)
-            else:
-                location_class = LOCATION_CLASS
             data['location_class'] = location_class
             create_task(logger, data)
+
     if args['test']:
         url ="http://mnregaweb2.nic.in/Netnrega/placeHolder1/placeHolder2/../../citizen_html/musternew.aspx?lflag=&id=1&state_name=CHHATTISGARH&district_name=JASHPUR&block_name=Manora&panchayat_name=Alori&block_code=3307016&msrno=5603&finyear=2016-2017&workcode=3307016001%2fWC%2f81094155&dtfrm=27%2f02%2f2017&dtto=05%2f03%2f2017&wn=Laghu+Sichai+Talab+Nirman+Pushani+%2fRengashu+(1.60+Lakhs)&Digest=nTMkfSq3BkT80yXpUwcuFw"
         extract_dict = {}
@@ -100,9 +104,11 @@ def main():
         location_codes = []
         LOCATION_CLASS = "Location"
         if args['notnic']:
+            DISTRICT_CLASS = "APDistrict"
             BLOCK_CLASS = "APBlock"
             PANCHAYAT_CLASS = "APPanchayat"
         else:
+            DISTRICT_CLASS = "NREGADistrict"
             BLOCK_CLASS = "NREGABlock"
             PANCHAYAT_CLASS = "NREGAPanchayat"
 
@@ -123,6 +129,8 @@ def main():
                 my_location = getattr(models, BLOCK_CLASS)(logger=logger, location_code=location_code)
             elif location_type == 'panchayat':
                 my_location = getattr(models, PANCHAYAT_CLASS)(logger=logger, location_code=location_code)
+            elif location_type == 'district':
+                my_location = getattr(models, DISTRICT_CLASS)(logger=logger, location_code=location_code)
             else:
                 my_location = getattr(models, LOCATION_CLASS)(logger=logger, location_code=location_code)
             logger.info(my_location.__dict__)
