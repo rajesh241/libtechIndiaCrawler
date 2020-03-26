@@ -253,12 +253,12 @@ class NREGADistrict(Location):
         for block_code in block_array:
             my_location = NREGABlock(logger, block_code)
             dataframe = my_location.nic_stat_urls(logger)
-            logger.info(f"data frame is {dataframe.head()}")
             if dataframe is not None:
                 dataframe_array.append(dataframe)
-        dataframe = pd.concat(dataframe_array)
-        report_type = "nic_stat_urls"
-        self.save_report(logger, dataframe, report_type)
+        if len(dataframe_array) > 0:
+            dataframe = pd.concat(dataframe_array)
+            report_type = "nic_stat_urls"
+            self.save_report(logger, dataframe, report_type)
         
 
 

@@ -23,7 +23,6 @@ from libtech_lib.generic.api_interface import  (api_get_report_url,
                                                )
 from libtech_lib.generic.html_functions import get_dataframe_from_html, get_dataframe_from_url
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
-from libtech_lib.generic.libtech_exception import NICCrawlException
 
 HOMEDIR = str(Path.home())
 JSONCONFIGFILE = f"{HOMEDIR}/.libtech/crawlerConfig.json"
