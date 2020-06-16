@@ -15,6 +15,8 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from libtech_lib.generic.commons import  (get_current_finyear,
                                           get_default_start_fin_year,
+                                          get_percentage,
+                                          get_previous_date,
                                           insert_location_details
                                           )
 from libtech_lib.generic.api_interface import  (api_get_report_url,
@@ -136,7 +138,7 @@ def get_worker_register(lobj, logger):
         name = row.get('name', None)
         if name is not None:
             if '*' in name:
-                name = name.replace('*', '')
+                name = name.replace('*', '').lstrip().rstrip()
                 dataframe.loc[index, 'name'] = name
         head_of_household = row.get('head_of_household', '')
         if head_of_household == '':
@@ -246,9 +248,89 @@ def get_muster_list(lobj, logger, jobcard_transactions_df):
     dataframe = dataframe.reset_index(drop=True)
     return dataframe
 
-def get_muster_transactions(lobj, logger, muster_list_df):
+def get_muster_transactions(lobj, logger):
+    """This function will download Muster Transactions"""
+    """First it will take existing muster transactions, find out incomplete
+    musters. Second it will take muster list and find out musters which have
+    never been downloaded"""
+    #First lets download worker df which we will later merge with muster
+    #transactions to 
+    worker_df = lobj.fetch_report_dataframe(logger, "worker_register")
+    jt_df = lobj.fetch_report_dataframe(logger, "jobcard_transactions")
+    mt_df = lobj.fetch_report_dataframe(logger, "muster_transactions")
+    ml_df = lobj.fetch_report_dataframe(logger, "muster_list")
+def get_musters_to_be_downloaded(lobj, logger, muster_list_df,
+                            muster_transactions_df):
+    """Download the pending musters from the muster list"""
+    musters_to_download_df = None
+    csv_array = []
+    column_headers = ["block_code", "finyear", "muster_no", "muster_url"]
+    logger.info(muster_transactions_df.shape)
+    logger.info(muster_transactions_df.columns)
+    logger.info(muster_list_df.columns)
+    logger.info(f"Length of muster list is {len(muster_list_df)}")
+    jt_df = lobj.fetch_report_dataframe(logger, "jobcard_transactions")
+    grouped_jt = jt_df.groupby(['finyear','muster_no']).agg({'noOfDays':'sum'}).reset_index()
+    ml_merged = muster_list_df.merge(grouped_jt, on=['finyear','muster_no'], how='left',
+                         indicator=True)
+    muster_list_df = ml_merged[ml_merged["_merge"]=="both"]
+    drop_columns = ['_merge']
+    muster_list_df = muster_list_df.drop(columns=drop_columns)
+    logger.info(f"Length of muster list is {len(muster_list_df)}")
+    input()
+
+    grouped_muster_transactions = muster_transactions_df.groupby(["muster_url"]).agg(
+                                             { 'days_worked':"sum"}
+                                     ).reset_index()
+    
+    logger.info(f"unique musters is {len(grouped_muster_transactions)}")
+    df_all = muster_list_df.merge(grouped_muster_transactions,
+                                  on=["muster_url"], how='left', indicator=True)
+    logger.info(f"length of df_all is {len(df_all)}")
+    left_only = df_all[df_all["_merge"]=="left_only"]
+    not_downloaded = left_only[column_headers]
+    logger.info(f"length of not downloaded is {len(not_downloaded)}")
+    ### We are only going to re download musters which are not complete and
+    ### And have not been updated in last 7 days
+    date_thresold = get_previous_date(logger, delta_days=7)
+    logger.info(f"date threshold is {date_thresold}")
+    muster_transactions_df['lastUpdateDate'] = pd.to_datetime(muster_transactions_df['lastUpdateDate'])
+    mt_filtered = muster_transactions_df[muster_transactions_df['lastUpdateDate'] < date_thresold]
+    logger.info(f"Length of mt_filtered is {len(mt_filtered)}")
+    grouped_muster_transactions = mt_filtered.groupby(["muster_url"]).agg(
+                                             { 'days_worked':"sum"}
+                                     ).reset_index()
+
+    ###Now we will iterate to see which musters are not complete
+    for index, row in grouped_muster_transactions.iterrows():
+        muster_url = row.get("muster_url")
+        filtered_df = muster_transactions_df[(muster_transactions_df['muster_url']==muster_url)]
+        filtered_df = filtered_df[filtered_df['muster_status'] != 'Credited']
+        if len(filtered_df) > 0:
+            row = [muster_url]
+            csv_array.append(row)
+    not_complete_df = pd.DataFrame(csv_array, columns=["muster_url"])
+    not_complete = not_complete_df.merge(muster_list_df, on=["muster_url"],
+                                         how='left')
+    not_complete = not_complete[column_headers]
+    logger.info(f"Lenght incomplete Musters is {len(not_complete)}")
+    logger.info(f"Lenght not download Musters is {len(not_downloaded)}")
+    musters_to_download_df = pd.concat([not_complete, not_downloaded])
+    return musters_to_download_df
+
+def get_muster_transactions1(lobj, logger, muster_list_df,
+                            muster_transactions_df):
     """form the muster list dataframe this will get all the muster
     transactions"""
+    if muster_transactions_df is not None:
+        musters_to_download_df = get_musters_to_be_downloaded(lobj, logger,
+                                                              muster_list_df,
+                                                              muster_transactions_df)
+    else:
+        musters_to_download_df = muster_list_df
+    logger.info(musters_to_download_df.head())
+    musters_to_download_df.to_csv("/tmp/to_download.csv")
+    logger.info(f"to be downloaded is {len(musters_to_download_df)}")
     logger.info(muster_list_df.columns)
     col_list = ['state_code', 'state_name', 'district_code', 'district_name',
                 'block_code', 'block_name', 'panchayat_name', 'panchayat_code',
@@ -277,52 +359,75 @@ def get_muster_transactions(lobj, logger, muster_list_df):
     with open(muster_column_config_file) as config_file:
         muster_column_dict = json.load(config_file)
     logger.info(muster_column_dict)
-    for index, row in muster_list_df.iterrows():
+    for index, row in musters_to_download_df.iterrows():
         url = row['muster_url']
+        logger.info(url)
         muster_no = row['muster_no']
         finyear = row['finyear']
         block_code = row['block_code']
+        muster_transactions_df = muster_transactions_df[(muster_transactions_df['finyear']!= finyear) |
+                                             (muster_transactions_df['block_code']!=block_code) |
+                                             (muster_transactions_df['muster_no']!=muster_no)]
         func_args = [lobj, url, cookies, muster_no, finyear, block_code, muster_column_dict]
         job_dict = {
             'func_name' : func_name,
             'func_args' : func_args
         }
         job_list.append(job_dict)
-    dataframe = libtech_queue_manager(logger, job_list)
-    if dataframe is None:
-        dataframe = pd.DataFrame(columns=col_list)
-        return dataframe
-    logger.info(dataframe.columns)
-    ## In Muster HTML name and relationship appear in the same column.
-    ## Separating them here below.
-    rows_to_delete = []
-    for index, row in dataframe.iterrows():
-        sr_no = row.get("muster_index", None)
-        if (sr_no is None) or (not sr_no.isdigit()):
-            rows_to_delete.append(index)
-        name_relationship = row['name_relationship']
-        try:
-            relationship = re.search(r'\((.*?)\)', name_relationship).group(1)
-        except:
-            relationship = ''
-        name = name_relationship.replace(f"({relationship})", "")
-        dataframe.loc[index, 'name'] = name
-        dataframe.loc[index, 'relationship'] = relationship
-    dataframe = dataframe.drop(rows_to_delete)
-    logger.info(f"dataframe shape is {dataframe.shape}")
-    logger.info(dataframe.columns)
+    muster_col_list = ['muster_index', 'jobcard', 'caste', 'days_worked', 'day_wage',
+                       'm_labour_wage',
+                              'm_travel_cost', 'm_tools_cost', 'total_wage',
+                       'm_postoffice_bank_name',
+                              'm_pocode_bankbranch', 'm_poadd_bankbranchcode',
+                       'm_wagelist_no',
+                              'muster_status', 'credited_date',
+                              'muster_no', 'finyear', 'block_code', 'name',
+                       'relationship']
+    muster_transactions_df = muster_transactions_df[muster_col_list]
+    dataframe = libtech_queue_manager(logger, job_list, num_threads=500)
+    if dataframe is not None:
+        logger.info(dataframe.columns)
+        ## In Muster HTML name and relationship appear in the same column.
+        ## Separating them here below.
+        rows_to_delete = []
+        for index, row in dataframe.iterrows():
+            sr_no = row.get("muster_index", None)
+            if (sr_no is None) or (not sr_no.isdigit()):
+                rows_to_delete.append(index)
+            name_relationship = row['name_relationship']
+            try:
+                relationship = re.search(r'\((.*?)\)', name_relationship).group(1)
+            except:
+                relationship = ''
+            name = name_relationship.replace(f"({relationship})", "")
+            dataframe.loc[index, 'name'] = name
+            dataframe.loc[index, 'relationship'] = relationship
+        dataframe = dataframe.drop(rows_to_delete)
+        logger.info(f"dataframe shape is {dataframe.shape}")
+        logger.info(dataframe.columns)
+        dataframe = pd.concat([dataframe, muster_transactions_df]) 
+    else:
+        logger.info("I am here since no musters to download")
+        dataframe = muster_transactions_df
+    logger.info(dataframe.shape)
+    input()
     logger.info(muster_list_df.columns)
     dataframe = pd.merge(dataframe, muster_list_df, how='left',
                          on=['block_code', 'finyear', 'muster_no'])
     logger.info(f"dataframe shape is {dataframe.shape}")
-    logger.info(f"dataframe columns are {dataframe.columns}")
+    #logger.info(f"dataframe columns are {dataframe.columns}")
     drop_columns = ['caste', 'block_code']
     dataframe = dataframe.drop(columns=drop_columns)
-    dataframe = pd.merge(dataframe, worker_df, how='left',
+    worker_df = worker_df.drop_duplicates(subset=['jobcard', 'name'],
+                                          keep='last')
+    dataframe = dataframe.merge(worker_df, how='left',
                          on=['jobcard', 'name'])
-    logger.info(dataframe.columns)
     logger.info(f"dataframe shape is {dataframe.shape}")
+    input()
     dataframe = dataframe[col_list]
+    logger.info(f"Length of data frame is {len(dataframe)}")
+    dataframe1 = dataframe[dataframe['panchayat_code'] == int(lobj.code)]
+    logger.info(f"Length of data frame is {len(dataframe1)}")
     return dataframe
 
 def get_block_rejected_transactions(lobj, logger):
@@ -629,8 +734,55 @@ def get_nic_stat_urls(lobj, logger, panchayat_code_array):
                             exception_message = f"Unable to get stats for {location_code_string} and block_code {lobj.block_code}"
                             raise Exception('x should not exceed 5. The value of xwas:')
     dataframe = pd.DataFrame(csv_array, columns=column_headers)
-    dataframe.to_csv("/tmp/a.csv")
     return dataframe
 
 
+def get_nic_stats(lobj, logger, nic_stat_urls_df):
+    """This function will fetch nic Stats"""
+    logger.info("Going to fetch nic Stats")
+    logger.info(nic_stat_urls_df.columns)
+    filtered_df = nic_stat_urls_df[nic_stat_urls_df['location_code'] ==
+                                   int(lobj.code)].reset_index()
+    logger.info(f"length of filtered_df is {len(filtered_df)}")
+    if len(filtered_df) != 1:
+        return None
+    stats_url = filtered_df.loc[0, "stats_url"]
+    logger.info(stats_url)
+    res = requests.get(stats_url)
+    if res.status_code != 200:
+        return None
+    myhtml = res.content
+    extract_dict = {}
+    extract_dict['table_id'] = 'GridView1'
+    finyear = int(get_current_finyear())
+    fin_array = [finyear, finyear-1, finyear-2, finyear-3, finyear-4]
+    column_headers = ['name'] + fin_array + ['graphs']
+    extract_dict['column_headers'] = column_headers
+    dataframe = get_dataframe_from_html(logger, myhtml,
+                                        mydict=extract_dict)
+    return dataframe
 
+def get_data_accuracy(lobj, logger, muster_transactions_df, nic_stats_df):
+    """This function will calculate data accuracy for last 3 financial years"""
+    accuracy = None
+    start_finyear = get_default_start_fin_year()
+    end_finyear = get_current_finyear()
+    work_days_df = nic_stats_df[nic_stats_df['name'] == 'Persondays Generated so far'].reset_index()
+    if len(work_days_df) != 1:
+        return accuracy 
+    nic_stat_row = work_days_df.loc[0]
+    logger.info(muster_transactions_df.columns)
+    libtech_total_workdays = 0
+    nic_total_workdays = 0
+    for finyear in range(int(start_finyear), int(end_finyear)+1):
+        filtered_transactions_df = muster_transactions_df[muster_transactions_df['finyear'] == finyear]
+        #filtered_transactions_df = filtered_transactions_df[filtered_transactions_df['panchayat_code'] == int(lobj.code)]
+        libtech_workdays = filtered_transactions_df.days_worked.sum()
+        nic_workdays = int(nic_stat_row.get(str(finyear)).replace(",",""))
+        logger.info(f"Libtech {libtech_workdays} - NIC {nic_workdays}")
+        libtech_total_workdays = libtech_total_workdays + libtech_workdays
+        nic_total_workdays = nic_total_workdays + nic_workdays
+    accuracy = get_percentage(nic_total_workdays, libtech_total_workdays,
+                              round_digits=2)
+    logger.info(f"Accuracy is {accuracy}")
+    return accuracy 

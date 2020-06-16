@@ -14,7 +14,8 @@ from libtech_lib.generic.api_interface import (get_location_dict,
                                                create_update_report,
                                                api_get_report_dataframe,
                                                api_get_child_locations,
-                                               api_get_child_location_ids
+                                               api_get_child_location_ids,
+                                               api_update_crawl_accuracy
                                               )
 from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_worker_register,
@@ -24,6 +25,8 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_muster_transactions,
                                         get_fto_status_urls,
                                         get_block_rejected_stats,
+                                        get_nic_stats,
+                                        get_data_accuracy,
                                         get_nic_stat_urls
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
@@ -34,10 +37,12 @@ AP_STATE_CODE = "02"
 REPORT_THRESHOLD_DICT = {
     "jobcard_register" : 15,
     "worker_register" : 15,
+    "nic_stat_urls" : 365
 }
+DEFAULT_REPORT_THRESHOLD = 20
 class Location():
     """This is the base Location Class"""
-    def __init__(self, logger, location_code, scheme='nrega'):
+    def __init__(self, logger, location_code, force_download='false', scheme='nrega'):
         self.code = location_code
         self.scheme = scheme
         location_dict = get_location_dict(logger, self.code, scheme=self.scheme)
@@ -48,6 +53,10 @@ class Location():
         dataframe = api_get_report_dataframe(logger, self.id, report_type,
                                              index_col=None, finyear=finyear)
         return dataframe
+    def update_accuracy(self, logger, accuracy):
+        """This will update the data accuracy in the Location database"""
+        api_update_crawl_accuracy(logger, self.id, accuracy)
+        
     def get_file_path(self, logger):
         """Will get file path directory for the given location"""
         filepath = f"data/samples/on_demand/{self.scheme}/reportType"
@@ -83,7 +92,8 @@ class Location():
         logger.info(f"days diff is {days_diff}")
         if days_diff is None:
             return False
-        threshold = REPORT_THRESHOLD_DICT.get(report_type, 7)
+        threshold = REPORT_THRESHOLD_DICT.get(report_type,
+                                              DEFAULT_REPORT_THRESHOLD)
         if days_diff > threshold:
             return False
         return True
@@ -140,8 +150,9 @@ class APPanchayat(Location):
 
 class NREGAPanchayat(Location):
     """This is the Panchayat subclass for Location Class"""
-    def __init__(self, logger, location_code):
+    def __init__(self, logger, location_code, force_download=False):
         self.scheme = 'nrega'
+        self.force_download = force_download
         self.code = location_code
         Location.__init__(self, logger, self.code, self.scheme)
         full_finyear = get_full_finyear(get_current_finyear())
@@ -167,14 +178,17 @@ class NREGAPanchayat(Location):
         logger.info(f"Going to fetch Jobcard register for {self.code}")
         report_type = "worker_register"
         is_updated = self.is_report_updated(logger, report_type)
-        if not is_updated:
-            dataframe = get_worker_register(self, logger)
-            self.save_report(logger, dataframe, report_type)
+        #if (is_updated) and (not self.force_download):
+        if (is_updated):
+            return
+        dataframe = get_worker_register(self, logger)
+        self.save_report(logger, dataframe, report_type)
     def jobcard_transactions(self, logger):
         """This will fetch all jobcard transactions for the panchayat"""
         report_type = "jobcard_transactions"
         is_updated = self.is_report_updated(logger, report_type)
-        if is_updated:
+        #if (is_updated) and (not self.force_download):
+        if (is_updated):
             return
         logger.info(f"Going to fetch Jobcard Transactions for {self.code}")
         self.jobcard_register(logger)
@@ -189,7 +203,8 @@ class NREGAPanchayat(Location):
         logger.info(f"Going to fetch Muster list for {self.code}")
         report_type = "muster_list"
         is_updated = self.is_report_updated(logger, report_type)
-        if is_updated:
+        #if (is_updated) and (not self.force_download):
+        if (is_updated):
             return
         self.jobcard_transactions(logger)
         report_type = "jobcard_transactions"
@@ -197,22 +212,59 @@ class NREGAPanchayat(Location):
         dataframe = get_muster_list(self, logger, jobcard_transaction_df)
         report_type = "muster_list"
         self.save_report(logger, dataframe, report_type)
+    def correct(self, logger):
+        report_type = "muster_transactions"
+        filtered_transactions_df = self.fetch_report_dataframe(logger, report_type)
+        filtered_transactions_df = filtered_transactions_df[filtered_transactions_df['panchayat_code'] == int(self.code)]
+        report_type = "muster_transactions"
+        self.save_report(logger, filtered_transactions_df, report_type)
+
     def muster_transactions(self, logger):
         """This will fetch all muster transactions for the panchayat"""
         logger.info(f"Going to fetch Muster transactions for {self.code}")
         report_type = "muster_transactions"
         is_updated = self.is_report_updated(logger, report_type)
-        if is_updated:
+        if (is_updated) and (not self.force_download):
             return
         self.muster_list(logger)
         report_type = "muster_list"
         muster_list_df = self.fetch_report_dataframe(logger, report_type)
-        dataframe = get_muster_transactions(self, logger, muster_list_df)
         report_type = "muster_transactions"
-        self.save_report(logger, dataframe, report_type)
+        muster_transactions_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = get_muster_transactions(self, logger, muster_list_df,
+                                            muster_transactions_df)
+        report_type = "muster_transactions"
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+    def validate_data(self, logger):
+        """This function will validate downloaded data with nic stats"""
+        self.muster_transactions(logger)
+        self.nic_stats(logger)
+        report_type="muster_transactions"
+        muster_transactions_df = self.fetch_report_dataframe(logger, report_type)
+        report_type="nic_stats"
+        nic_stats_df = self.fetch_report_dataframe(logger, report_type)
+        accuracy = get_data_accuracy(self, logger, muster_transactions_df, nic_stats_df)
+        self.update_accuracy(logger, accuracy)
+        
+
+
     def nic_stats(self, logger):
         """This function will fetch NIC Stats"""
         report_type = "nic_stats"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
+        logger.info(f"District code is {self.district_code}")
+        my_location = NREGADistrict(logger, self.district_code)
+        my_location.nic_stat_urls(logger)
+        report_type = "nic_stat_urls"
+        nic_stat_urls_df = my_location.fetch_report_dataframe(logger, report_type)
+        dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
+        report_type = "nic_stats"
+        self.save_report(logger, dataframe, report_type)
+
+
 class APBlock(Location):
     """This is the AP Block subclass for Location Class"""
     def __init__(self, logger, location_code):
@@ -247,6 +299,10 @@ class NREGADistrict(Location):
     def nic_stat_urls(self, logger):
         """This function will get the nic stat URLs for all the panchayats and
         blocks"""
+        report_type = "nic_stat_urls"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
         dataframe_array = []
         block_array = self.get_all_blocks(logger)
         logger.info(block_array)
@@ -264,8 +320,9 @@ class NREGADistrict(Location):
 
 class NREGABlock(Location):
     """This is the Panchayat subclass for Location Class"""
-    def __init__(self, logger, location_code):
+    def __init__(self, logger, location_code, force_download=False):
         self.scheme = 'nrega'
+        self.force_download = force_download
         self.code = location_code
         Location.__init__(self, logger, self.code, self.scheme)
     def get_all_panchayats(self, logger):
@@ -280,6 +337,20 @@ class NREGABlock(Location):
         panchayat_array = api_get_child_location_ids(logger, self.code,
                                                      scheme='nrega')
         return panchayat_array
+    def nic_stats(self, logger):
+        """This function will fetch NIC Stats"""
+        report_type = "nic_stats"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
+        logger.info(f"District code is {self.district_code}")
+        my_location = NREGADistrict(logger, self.district_code)
+        my_location.nic_stat_urls(logger)
+        report_type = "nic_stat_urls"
+        nic_stat_urls_df = my_location.fetch_report_dataframe(logger, report_type)
+        dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
+        report_type = "nic_stats"
+        self.save_report(logger, dataframe, report_type)
     def block_rejected_transactions(self, logger):
         """This will fetch all the rejected transactions of the block"""
         get_block_rejected_transactions(self, logger)
@@ -287,10 +358,23 @@ class NREGABlock(Location):
         """This will crawl data for the entire block"""
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
+        transactions_df_array = []
         for each_panchayat_code in panchayat_array:
             logger.info(f"Currently Processing panchayat code {each_panchayat_code}")
             my_location = NREGAPanchayat(logger, each_panchayat_code)
-            my_location.muster_transactions(logger)
+            my_location.correct(logger)
+            my_location.validate_data(logger)
+            report_type="muster_transactions"
+            muster_transactions_df = my_location.fetch_report_dataframe(logger, report_type)
+            transactions_df_array.append(muster_transactions_df)
+        muster_transactions_df = pd.concat(transactions_df_array)
+        report_type="nic_stats"
+        nic_stats_df = self.fetch_report_dataframe(logger, report_type)
+        accuracy = get_data_accuracy(self, logger, muster_transactions_df, nic_stats_df)
+        self.update_accuracy(logger, accuracy)
+        logger.info(f"Shape of  is {muster_transactions_df.shape}")
+        
+        #self.block_rejected_transactions(logger)
     def nic_stat_urls(self, logger):
         """This function will get the nic stat URLs for all the panchayats and
         blocks"""

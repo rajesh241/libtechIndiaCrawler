@@ -198,3 +198,11 @@ def get_params_from_url(logger, url, param_name_array):
         param_dict[param_name] = param_value
     return param_dict
 
+def get_previous_date(logger, delta_days=7, date_format=None):
+    """Will fetch the previoius date as defined by delta_days"""
+    if date_format is None:
+        date_format = "%Y-%m-%d"
+    my_date = datetime.datetime.strftime(datetime.datetime.now() -
+                                         datetime.timedelta(delta_days), '%Y-%m-%d')
+    return my_date
+
