@@ -87,7 +87,7 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
     if table_id_array is None:
         if table_id is not None:
             table_id_array = [table_id]
-    logger.info(f"table id array is {table_id_array}")
+    #logger.info(f"table id array is {table_id_array}")
     if table_id_array is not None:
         for table_id in table_id_array:
             matched_tables = mysoup.findAll('table', id=table_id)
@@ -163,7 +163,11 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
                             col_url = ""
                         row_data.append(col_url)
                 dataframe_array.append(row_data)
-
+        if len(dataframe_array[1]) > len(dataframe_columns):
+            #logger.info("Length Mismatch")
+            diff = len(dataframe_array[0]) - len(dataframe_columns)
+            for i in range(1,diff+1):
+                dataframe_columns.append("")
         dataframe = pd.DataFrame(dataframe_array, columns=dataframe_columns)
     return dataframe
 
