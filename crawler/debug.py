@@ -20,6 +20,8 @@ def args_fetch():
     parser.add_argument('-l', '--log-level', help='Log level defining verbosity', required=False)
     parser.add_argument('-d', '--debug', help='Debug Loop',
                         required=False, action='store_const', const=1)
+    parser.add_argument('-fd', '--forceDownload', help='Force Download',
+                        required=False, action='store_const', const=1)
     parser.add_argument('-t', '--test', help='Test Loop',
                         required=False, action='store_const', const=1)
     parser.add_argument('-i', '--insert', help='Insert in Queue',
@@ -35,6 +37,25 @@ def args_fetch():
     args = vars(parser.parse_args())
     return args
 
+def get_location_class(logger, location_type, is_not_nic):
+     LOCATION_CLASS = "Location"
+     if location_type == "panchayat":
+         if is_not_nic:
+             LOCATION_CLASS = "APPanchayat"
+         else:
+             LOCATION_CLASS = "NREGAPanchayat"
+     if location_type == "block":
+         if is_not_nic:
+             LOCATION_CLASS = "APBlock"
+         else:
+             LOCATION_CLASS = "NREGABlock"
+     if location_type == "district":
+         if is_not_nic:
+             LOCATION_CLASS = "APDistrict"
+         else:
+             LOCATION_CLASS = "NREGADistrict"
+     return LOCATION_CLASS
+
 
 def main():
     """Main Module of this program"""
@@ -47,23 +68,6 @@ def main():
         func_name = args.get('func_name', None)
         location_type = args.get('locationType', 'panchayat')
         location_codes = []
-        LOCATION_CLASS = "Location"
-        if location_type == "panchayat":
-            if is_not_nic:
-                LOCATION_CLASS = "APPanchayat"
-            else:
-                LOCATION_CLASS = "NREGAPanchayat"
-        if location_type == "block":
-            if is_not_nic:
-                LOCATION_CLASS = "APBlock"
-            else:
-                LOCATION_CLASS = "NREGABlock"
-        if location_type == "district":
-            if is_not_nic:
-                LOCATION_CLASS = "APDistrict"
-            else:
-                LOCATION_CLASS = "NREGADistrict"
-
         if location_type == 'block':
             location_codes.append(location_code)
         elif location_type == 'panchayat':
@@ -109,20 +113,20 @@ def main():
         logger.info(dataframe.head())
     if args['debug']:
         logger.info("Debug phase")
+        if args['forceDownload']:
+            force_download = True
+        else:
+            force_download = False
         location_code = args.get('locationCode', None)
         func_name = args.get('func_name', None)
         location_type = args.get('locationType', 'panchayat')
         location_codes = []
-        LOCATION_CLASS = "Location"
+        location_class = get_location_class(logger, location_type,
+                                            args['notnic'])
         if args['notnic']:
-            DISTRICT_CLASS = "APDistrict"
             BLOCK_CLASS = "APBlock"
-            PANCHAYAT_CLASS = "APPanchayat"
         else:
-            DISTRICT_CLASS = "NREGADistrict"
             BLOCK_CLASS = "NREGABlock"
-            PANCHAYAT_CLASS = "NREGAPanchayat"
-
         if location_type == 'block':
             location_codes.append(location_code)
         elif location_type == 'panchayat':
@@ -136,15 +140,9 @@ def main():
             location_codes.append(location_code)
 
         for location_code in location_codes:
-            if location_type == 'block':
-                my_location = getattr(models, BLOCK_CLASS)(logger=logger, location_code=location_code)
-            elif location_type == 'panchayat':
-                my_location = getattr(models, PANCHAYAT_CLASS)(logger=logger, location_code=location_code)
-            elif location_type == 'district':
-                my_location = getattr(models, DISTRICT_CLASS)(logger=logger, location_code=location_code)
-            else:
-                my_location = getattr(models, LOCATION_CLASS)(logger=logger, location_code=location_code)
-            logger.info(my_location.__dict__)
+            my_location = getattr(models, location_class)(logger=logger,
+                                                          location_code=location_code,
+                                                          force_download=force_download)
            # my_location.muster_list(logger)
             method_to_call = getattr(my_location, func_name)
             method_to_call(logger)

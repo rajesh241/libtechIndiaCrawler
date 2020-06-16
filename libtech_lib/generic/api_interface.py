@@ -1,9 +1,11 @@
 """This module has all the functions required to access REST API
 for the Django interface"""
+import datetime
 from pathlib import Path
 import json
 import requests
 import pandas as pd
+import pytz
 
 from libtech_lib.generic.aws import upload_s3
 
@@ -105,6 +107,21 @@ def fetch_data(logger, url, return_type='json', params=None):
         response = None
     return response
 
+def api_update_crawl_accuracy(logger, location_id, accuracy, scheme="nrega"):
+    """Given location ID, this function will update the crawl accuracy"""
+    utc_now = pytz.utc.localize(datetime.datetime.utcnow())
+    india_now = utc_now.astimezone(pytz.timezone("Asia/Calcutta"))
+    india_now_isoformat = india_now.isoformat()
+    headers = get_authentication_header()
+    data = {
+        "id" : location_id,
+        "accuracy" : accuracy,
+        "last_crawl_date" : india_now_isoformat,
+        "is_data_available" : 1
+    }
+    res = requests.patch(LOCATIONURL, headers=headers, data=json.dumps(data))
+    logger.info(f"Patch status for data accuracy is {res.status_code}")
+    
 def get_location_dict(logger, location_code=None, location_id=None, scheme=None):
     """Given a location Code for a database Location ID, this function will
     return a dict containing all the meta data avilable by querying the API"""
