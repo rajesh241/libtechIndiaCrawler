@@ -123,10 +123,6 @@ def main():
         location_codes = []
         location_class = get_location_class(logger, location_type,
                                             args['notnic'])
-        if args['notnic']:
-            BLOCK_CLASS = "APBlock"
-        else:
-            BLOCK_CLASS = "NREGABlock"
         if location_type == 'block':
             location_codes.append(location_code)
         elif location_type == 'panchayat':
