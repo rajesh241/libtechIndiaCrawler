@@ -92,7 +92,6 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
         for table_id in table_id_array:
             matched_tables = mysoup.findAll('table', id=table_id)
             if len(matched_tables) > 0:
-                logger.info(f"found tables for {table_id}")
                 break
     elif text_pattern is None:
         matched_tables = tables
@@ -138,32 +137,33 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
             ##Extracting the table data
             if i >= data_start_row:
                 row_data = []
-                cols = row.findAll('td')
-                for j, col in enumerate(cols):
-                    if j in split_cell_array:
-                        col_contents = col.get_text(strip=True, separator=',')
-                        col_array = col_contents.split(",")
-                        row_data.append(col_array[0])
-                        if len(col_array) == 1:
-                            row_data.append('')
+                cols = row.findAll(['th', 'td'])
+                if len(cols) > 0:
+                    for j, col in enumerate(cols):
+                        if j in split_cell_array:
+                            col_contents = col.get_text(strip=True, separator=',')
+                            col_array = col_contents.split(",")
+                            row_data.append(col_array[0])
+                            if len(col_array) == 1:
+                                row_data.append('')
+                            else:
+                                row_data.append(col_array[1])
                         else:
-                            row_data.append(col_array[1])
-                    else:
-                        col_text = col.text.lstrip().rstrip()
-                        row_data.append(col_text)
-                    if j in extract_url_array:
-                        elem = col.find("a")
-                        if elem is not None:
-                            col_url = elem['href']
-                            if url_prefix is not None:
-                                col_url = url_prefix + col_url
-                            elif base_url is not None:
-                                col_url = urljoin(base_url, col_url)
-                        else:
-                            col_url = ""
-                        row_data.append(col_url)
-                dataframe_array.append(row_data)
-        if len(dataframe_array[1]) > len(dataframe_columns):
+                            col_text = col.text.lstrip().rstrip()
+                            row_data.append(col_text)
+                        if j in extract_url_array:
+                            elem = col.find("a")
+                            if elem is not None:
+                                col_url = elem['href']
+                                if url_prefix is not None:
+                                    col_url = url_prefix + col_url
+                                elif base_url is not None:
+                                    col_url = urljoin(base_url, col_url)
+                            else:
+                                col_url = ""
+                            row_data.append(col_url)
+                    dataframe_array.append(row_data)
+        if len(dataframe_array[0]) > len(dataframe_columns):
             #logger.info("Length Mismatch")
             diff = len(dataframe_array[0]) - len(dataframe_columns)
             for i in range(1,diff+1):

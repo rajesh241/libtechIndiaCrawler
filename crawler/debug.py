@@ -32,6 +32,7 @@ def args_fetch():
     parser.add_argument('-lt', '--locationType',
                         help='Location type that needs tobe instantiated', required=False)
     parser.add_argument('-fn', '--func_name', help='Name of the function', required=False)
+    parser.add_argument('-sn', '--sample_name', help='Name of the function', required=False)
     parser.add_argument('-ti1', '--testInput1', help='Test Input 1', required=False)
     parser.add_argument('-ti2', '--testInput2', help='Test Input 2', required=False)
     args = vars(parser.parse_args())
@@ -119,6 +120,7 @@ def main():
             force_download = False
         location_code = args.get('locationCode', None)
         func_name = args.get('func_name', None)
+        sample_name = args.get('sample_name', 'on_demand')
         location_type = args.get('locationType', 'panchayat')
         location_codes = []
         location_class = get_location_class(logger, location_type,
@@ -138,7 +140,8 @@ def main():
         for location_code in location_codes:
             my_location = getattr(models, location_class)(logger=logger,
                                                           location_code=location_code,
-                                                          force_download=force_download)
+                                                          force_download=force_download,
+                                                          sample_name=sample_name)
            # my_location.muster_list(logger)
             method_to_call = getattr(my_location, func_name)
             method_to_call(logger)
