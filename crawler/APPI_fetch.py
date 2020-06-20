@@ -119,8 +119,8 @@ class MeeBhoomi():
         if logger:
             self.logger = logger
         else:
-            self.logger = logger_fetch('info')
-        self.logger.info(f'Constructor({type(self).__name__})')
+            logger = self.logger = logger_fetch('info')
+        logger.info(f'Constructor({type(self).__name__})')
 
         self.dir = 'ITDA/Gram1B/'
         #self.dir = 'data/csv'

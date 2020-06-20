@@ -1,3 +1,9 @@
+# Data folder for any downloads
+Data/
+
+# Patched files for backup
+*.patched
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
