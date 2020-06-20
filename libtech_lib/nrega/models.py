@@ -45,6 +45,7 @@ class Location():
     def __init__(self, logger, location_code, force_download='false', scheme='nrega'):
         self.code = location_code
         self.scheme = scheme
+        self.force_download = force_download
         location_dict = get_location_dict(logger, self.code, scheme=self.scheme)
         for key, value in location_dict.items():
             setattr(self, key, value)
@@ -86,6 +87,8 @@ class Location():
         return filename
     def is_report_updated(self, logger, report_type, finyear=None):
         """Checks if report is updated"""
+        if self.force_download:
+            return False
         filename = self.get_report_filepath(logger, report_type, finyear=finyear)
         logger.info(f"report name is {filename}")
         days_diff = days_since_modified_s3(logger, filename)
@@ -127,10 +130,12 @@ class Location():
 
 class APPanchayat(Location):
     """This is the AP Panchayat subclass for Location Class"""
-    def __init__(self, logger, location_code):
+    def __init__(self, logger, location_code, force_download=False):
         self.scheme = 'nrega'
         self.code = location_code
-        Location.__init__(self, logger, self.code, self.scheme)
+        self.force_download = force_download
+        Location.__init__(self, logger, self.code, scheme=self.scheme,
+                          force_download=self.force_download)
         if self.state_code == AP_STATE_CODE:
             self.home_url = "http://www.nrega.ap.gov.in/Nregs/FrontServlet"
         else:
@@ -152,9 +157,10 @@ class NREGAPanchayat(Location):
     """This is the Panchayat subclass for Location Class"""
     def __init__(self, logger, location_code, force_download=False):
         self.scheme = 'nrega'
-        self.force_download = force_download
         self.code = location_code
-        Location.__init__(self, logger, self.code, self.scheme)
+        self.force_download = force_download
+        Location.__init__(self, logger, self.code, scheme=self.scheme,
+                          force_download=self.force_download)
         full_finyear = get_full_finyear(get_current_finyear())
         self.panchayat_page_url = (f"http://{self.crawl_ip}/netnrega/IndexFrame.aspx?"
                                    f"lflag=eng&District_Code={self.state_code}&"
@@ -256,7 +262,8 @@ class NREGAPanchayat(Location):
         if is_updated:
             return
         logger.info(f"District code is {self.district_code}")
-        my_location = NREGADistrict(logger, self.district_code)
+        my_location = NREGADistrict(logger, self.district_code,
+                                    force_download=False)
         my_location.nic_stat_urls(logger)
         report_type = "nic_stat_urls"
         nic_stat_urls_df = my_location.fetch_report_dataframe(logger, report_type)
@@ -270,7 +277,9 @@ class APBlock(Location):
     def __init__(self, logger, location_code):
         self.scheme = 'nrega'
         self.code = location_code
-        Location.__init__(self, logger, self.code, self.scheme)
+        self.force_download = force_download
+        Location.__init__(self, logger, self.code, scheme=self.scheme,
+                          force_download=self.force_download)
     def get_all_panchayats(self, logger):
         """Getting all child Locations, in this case getting all panchayat
         locations"""
@@ -286,10 +295,12 @@ class APBlock(Location):
 
 class NREGADistrict(Location):
     """This is the District class for NREGA"""
-    def __init__(self, logger, location_code):
+    def __init__(self, logger, location_code, force_download=False):
         self.scheme = 'nrega'
+        self.force_download = force_download
         self.code = location_code
-        Location.__init__(self, logger, self.code, self.scheme)
+        Location.__init__(self, logger, self.code, scheme=self.scheme,
+                          force_download=self.force_download)
     def get_all_blocks(self, logger):
         """Getting all child Locations, in this case getting all panchayat
         locations"""
@@ -300,9 +311,12 @@ class NREGADistrict(Location):
         """This function will get the nic stat URLs for all the panchayats and
         blocks"""
         report_type = "nic_stat_urls"
+        logger.info(f"force download is {self.force_download}")
         is_updated = self.is_report_updated(logger, report_type)
+        logger.info(f"CHecking if nic stat urls is updated{is_updated}")
         if is_updated:
             return
+        exit(0)
         dataframe_array = []
         block_array = self.get_all_blocks(logger)
         logger.info(block_array)
@@ -324,7 +338,8 @@ class NREGABlock(Location):
         self.scheme = 'nrega'
         self.force_download = force_download
         self.code = location_code
-        Location.__init__(self, logger, self.code, self.scheme)
+        Location.__init__(self, logger, self.code, scheme=self.scheme,
+                          force_download=self.force_download)
     def get_all_panchayats(self, logger):
         """Getting all child Locations, in this case getting all panchayat
         locations"""
@@ -344,7 +359,8 @@ class NREGABlock(Location):
         if is_updated:
             return
         logger.info(f"District code is {self.district_code}")
-        my_location = NREGADistrict(logger, self.district_code)
+        my_location = NREGADistrict(logger, self.district_code,
+                                    force_download=False)
         my_location.nic_stat_urls(logger)
         report_type = "nic_stat_urls"
         nic_stat_urls_df = my_location.fetch_report_dataframe(logger, report_type)
