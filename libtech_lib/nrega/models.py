@@ -32,6 +32,8 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions,
+                                       get_ap_not_enrolled_r14_21A,
+                                       get_ap_labour_report_r3_17,
                                        get_ap_suspended_payments_r14_5
                                       )
 from libtech_lib.generic.aws import days_since_modified_s3
@@ -326,10 +328,43 @@ class APBlock(Location):
             dataframe = get_ap_suspended_payments_r14_5(my_location, logger)
             if dataframe is not None:
                 df_array.append(dataframe)
-        dataframe = pd.concat(df_array)
-        report_type = "ap_suspended_payments_r14_5"
-        if dataframe is not None:
-            self.save_report(logger, dataframe, report_type)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            report_type = "ap_suspended_payments_r14_5"
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+    def ap_not_enrolled_r14_21A(self, logger):
+        "Will fetch R15.5 suspended payment reprot"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            logger.info(f"Currently Processing panchayat code {each_panchayat_code}")
+            my_location = APPanchayat(logger, each_panchayat_code)
+            dataframe = get_ap_not_enrolled_r14_21A(my_location, logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            report_type = "ap_not_enrolled_r14_21A"
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+    def ap_labour_report_r3_17(self, logger):
+        "Will fetch R3_17"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            logger.info(f"Currently Processing panchayat code {each_panchayat_code}")
+            my_location = APPanchayat(logger, each_panchayat_code)
+            dataframe = get_ap_labour_report_r3_17(my_location, logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            report_type = "ap_labour_report_r3_17"
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
 
 class NREGADistrict(Location):
     """This is the District class for NREGA"""

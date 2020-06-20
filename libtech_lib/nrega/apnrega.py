@@ -294,4 +294,13 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
     cols = location_cols + ["tjobcard"] + column_headers
     dataframe = dataframe[cols]
     return dataframe
- 
+
+def get_ap_not_enrolled_r14_21A(lobj, logger):
+    """Will download report not enrolled R 14_21A"""
+    dataframe = None
+    return dataframe
+
+def get_ap_labour_report_r3_17(lobj, logger):
+    """Will download Labour Report R 3_17"""
+    dataframe = None
+    return dataframe
