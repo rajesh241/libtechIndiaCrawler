@@ -36,6 +36,14 @@ def get_ap_muster_transactions(lobj, logger):
     url = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=R1Display&page=Newreportcenter_ajax_eng#'
     url='http://www.nrega.telangana.gov.in/Nregs/FrontServlet?requestType=Common_engRH&actionVal=musterinfo&page=MusterRolls_eng'
     url2='http://www.nrega.telangana.gov.in/Nregs/FrontServlet?'
+    if lobj.state_code == "36":
+        state_code = "02"
+        base_url = 'http://www.nrega.telangana.gov.in/Nregs/FrontServlet?requestType=Common_engRH&actionVal=musterinfo&page=MusterRolls_eng'
+        url2='http://www.nrega.telangana.gov.in/Nregs/FrontServlet?'
+    else:
+        state_code = "01"
+        base_url = "http://www.nrega.ap.gov.in/Nregs/"
+        url2 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=Common_engRH&actionVal=musterinfo&page=MusterRolls_eng'
     logger.info('Fetching URL[%s] for cookies' % url)
     for finyear in range(int(start_fin_year), int(end_fin_year) + 1):
         startYear=int(finyear)-1+2000
@@ -102,6 +110,7 @@ def get_ap_muster_transactions(lobj, logger):
                   else:
                       to_delete_rows.append(index)
                   dataframe.loc[index, "tjobcard" ] = tjobcard
+                  dataframe.loc[index, "tjobcard_str" ] = "~"+str(tjobcard)
                   dataframe.loc[index, "finyear" ] = finyear
               date_dict = {
                   'From Date' : '%d-%b-%Y',
@@ -116,7 +125,6 @@ def get_ap_muster_transactions(lobj, logger):
               dataframe_array.append(dataframe)
     dataframe = pd.concat(dataframe_array, ignore_index=True)
     dataframe = dataframe.reset_index(drop=True)
-    dataframe.to_csv("/tmp/a.csv")
     return dataframe
 
 
@@ -193,5 +201,66 @@ def get_ap_jobcard_register(lobj, logger):
     if dataframe is not None:
         dataframe = insert_location_details(logger, lobj, dataframe)
         logger.info(dataframe.head())
+    return dataframe
+
+def get_ap_suspended_payments_r14_5(lobj, logger):
+    """ Will download Suspended Payment information per panchayat"""
+
+    dataframe = None
+    logger.info(f"Fetching Suspended Payment Report {lobj.code}")
+    logger.info(f"state url = {lobj.home_url}")
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+    panchayat_code = lobj.panchayat_code[8:10]
+    lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
+    column_headers = ['srno', 'tjobcard', 'jobcard', 'head_of_household',
+                      'registraction_date', 'caste', 'no_of_disabled',
+                      'no_of_shg_members', 'no_of_males', 'no_of_females']
+    logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s " % (district_code,block_code,panchayat_code))
+    res = requests.get(lobj.home_url)
+    input()
+    if res.status_code != 200:
+        return None #If the state URL is not reachable return None
+    cookies = res.cookies
+    logger.info(f"cookies are {res.cookies}")
+    headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+        } 
+    params = (
+            ('requestType', 'SmartCardreport_engRH'),
+            ('actionVal', 'DelayPay'),
+            ('id', id),
+            ('type', '-1'),
+            ('Date', '-1'),
+            ('File', ''),
+            ('Agency', ''),
+            ('listType', ''),
+            ('yearMonth', '-1'),
+            ('ReportType', 'Program : ALL'),
+            ('flag', '-1'),
+            ('Rtype', ''),
+            ('Date1', '-1'),
+            ('wtype', ''),
+            ('ytype', ''),
+            ('Date2', '-1'),
+            ('ltype', ''),
+            ('year', '2020-2021'),
+            ('program', 'ALL'),
+            ('fileName', id),
+            ('stype', ''),
+            ('ptype', ''),
+            ('lltype', ''),
+        )
+    res = requests.get(lobj.home_url, cookies=cookies, headers=headers, params=params, verify=False)
+    if res.status_code != 200:
+        return None
+    myhtml = res.content
+    with open("/tmp/a.html", "wb") as f:
+        f.write(myhtml)
     return dataframe
  

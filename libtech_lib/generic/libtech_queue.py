@@ -57,5 +57,6 @@ def libtech_queue_worker(logger, job_queue, result_queue):
             if result is not None:
                 result_queue.put(result)
         except Exception as e_text:
+            logger.error(f"Error in thread {name} with func arguments {func_args}")
             logger.error(e_text, exc_info=True)
         job_queue.task_done()
