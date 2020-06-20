@@ -6,6 +6,7 @@ there is a class for each location type, and associated methods related to that
 #File Path for on Demand
 #data/samples/on_demand/<scheme>/<report_type>/district/block/panchayat/
 ##Archive data
+import datetime
 import pandas as pd
 from libtech_lib.generic.commons import (get_full_finyear,
                                          get_current_finyear
@@ -31,6 +32,8 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions,
+                                       get_ap_not_enrolled_r14_21A,
+                                       get_ap_labour_report_r3_17,
                                        get_ap_suspended_payments_r14_5
                                       )
 from libtech_lib.generic.aws import days_since_modified_s3
@@ -43,10 +46,12 @@ REPORT_THRESHOLD_DICT = {
 DEFAULT_REPORT_THRESHOLD = 20
 class Location():
     """This is the base Location Class"""
-    def __init__(self, logger, location_code, force_download='false', scheme='nrega'):
+    def __init__(self, logger, location_code, force_download='false',
+                 scheme='nrega', sample_name="on_demand"):
         self.code = location_code
         self.scheme = scheme
         self.force_download = force_download
+        self.sample_name = sample_name
         location_dict = get_location_dict(logger, self.code, scheme=self.scheme)
         for key, value in location_dict.items():
             setattr(self, key, value)
@@ -61,10 +66,14 @@ class Location():
         
     def get_file_path(self, logger):
         """Will get file path directory for the given location"""
-        filepath = f"data/samples/on_demand/{self.scheme}/reportType"
+        if self.sample_name == "on_demand":
+            filepath = f"data/samples/on_demand/{self.scheme}/reportType"
+        else:
+            today_date = datetime.date.today().strftime("%d_%m_%Y")
+            filepath = f"data/samples/{self.sample_name}/{self.scheme}/reportType/{today_date}"
         if self.location_type == "country":
             return filepath
-        filepath = f"data/samples/on_demand/{self.scheme}/reportType/{self.state_code}"
+        filepath = f"{filepath}/{self.state_code}"
         if self.location_type == "state":
             return filepath
         filepath = f"{filepath}/{self.district_code}"
@@ -76,6 +85,7 @@ class Location():
         filepath = f"{filepath}/{self.panchayat_code}"
         logger.info("filepath is ")
         return filepath
+
     def get_report_filepath(self, logger, report_type, finyear=None):
         """Standard function to get report_filename"""
         if finyear is None:
@@ -131,12 +141,14 @@ class Location():
 
 class APPanchayat(Location):
     """This is the AP Panchayat subclass for Location Class"""
-    def __init__(self, logger, location_code, force_download=False):
+    def __init__(self, logger, location_code, force_download=False, sample_name="on_demand"):
         self.scheme = 'nrega'
         self.code = location_code
         self.force_download = force_download
+        self.sample_name = sample_name
         Location.__init__(self, logger, self.code, scheme=self.scheme,
-                          force_download=self.force_download)
+                          force_download=self.force_download,
+                          sample_name=self.sample_name)
         if self.state_code == AP_STATE_CODE:
             self.home_url = "http://www.nrega.ap.gov.in/Nregs/FrontServlet"
         else:
@@ -156,15 +168,20 @@ class APPanchayat(Location):
     def ap_suspended_payments_r14_5(self, logger):
         "Will fetch R15.5 suspended payment reprot"
         dataframe = get_ap_suspended_payments_r14_5(self, logger)
+        report_type = "ap_suspended_payments_r14_5"
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
 
 class NREGAPanchayat(Location):
     """This is the Panchayat subclass for Location Class"""
-    def __init__(self, logger, location_code, force_download=False):
+    def __init__(self, logger, location_code, force_download=False, sample_name="on_demand"):
         self.scheme = 'nrega'
         self.code = location_code
         self.force_download = force_download
+        self.sample_name = sample_name
         Location.__init__(self, logger, self.code, scheme=self.scheme,
-                          force_download=self.force_download)
+                          force_download=self.force_download,
+                          sample_name=self.sample_name)
         full_finyear = get_full_finyear(get_current_finyear())
         self.panchayat_page_url = (f"http://{self.crawl_ip}/netnrega/IndexFrame.aspx?"
                                    f"lflag=eng&District_Code={self.state_code}&"
@@ -278,12 +295,15 @@ class NREGAPanchayat(Location):
 
 class APBlock(Location):
     """This is the AP Block subclass for Location Class"""
-    def __init__(self, logger, location_code):
+    def __init__(self, logger, location_code, sample_name="on_demand",
+                 force_download=False):
         self.scheme = 'nrega'
         self.code = location_code
         self.force_download = force_download
+        self.sample_name = sample_name
         Location.__init__(self, logger, self.code, scheme=self.scheme,
-                          force_download=self.force_download)
+                          force_download=self.force_download,
+                          sample_name=self.sample_name)
     def get_all_panchayats(self, logger):
         """Getting all child Locations, in this case getting all panchayat
         locations"""
@@ -296,15 +316,66 @@ class APBlock(Location):
         panchayat_array = api_get_child_location_ids(logger, self.code,
                                                      scheme='nrega')
         return panchayat_array
+    def ap_suspended_payments_r14_5(self, logger):
+        "Will fetch R15.5 suspended payment reprot"
+
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            logger.info(f"Currently Processing panchayat code {each_panchayat_code}")
+            my_location = APPanchayat(logger, each_panchayat_code)
+            dataframe = get_ap_suspended_payments_r14_5(my_location, logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            report_type = "ap_suspended_payments_r14_5"
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+    def ap_not_enrolled_r14_21A(self, logger):
+        "Will fetch R15.5 suspended payment reprot"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            logger.info(f"Currently Processing panchayat code {each_panchayat_code}")
+            my_location = APPanchayat(logger, each_panchayat_code)
+            dataframe = get_ap_not_enrolled_r14_21A(my_location, logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            report_type = "ap_not_enrolled_r14_21A"
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+    def ap_labour_report_r3_17(self, logger):
+        "Will fetch R3_17"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            logger.info(f"Currently Processing panchayat code {each_panchayat_code}")
+            my_location = APPanchayat(logger, each_panchayat_code)
+            dataframe = get_ap_labour_report_r3_17(my_location, logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            report_type = "ap_labour_report_r3_17"
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
 
 class NREGADistrict(Location):
     """This is the District class for NREGA"""
-    def __init__(self, logger, location_code, force_download=False):
+    def __init__(self, logger, location_code, force_download=False, sample_name="on_demand"):
         self.scheme = 'nrega'
         self.force_download = force_download
         self.code = location_code
+        self.sample_name = sample_name
         Location.__init__(self, logger, self.code, scheme=self.scheme,
-                          force_download=self.force_download)
+                          force_download=self.force_download,
+                          sample_name=self.sample_name)
     def get_all_blocks(self, logger):
         """Getting all child Locations, in this case getting all panchayat
         locations"""
@@ -338,12 +409,14 @@ class NREGADistrict(Location):
 
 class NREGABlock(Location):
     """This is the Panchayat subclass for Location Class"""
-    def __init__(self, logger, location_code, force_download=False):
+    def __init__(self, logger, location_code, force_download=False, sample_name="on_demand"):
         self.scheme = 'nrega'
         self.force_download = force_download
         self.code = location_code
+        self.sample_name = sample_name
         Location.__init__(self, logger, self.code, scheme=self.scheme,
-                          force_download=self.force_download)
+                          force_download=self.force_download,
+                          sample_name=self.sample_name)
     def get_all_panchayats(self, logger):
         """Getting all child Locations, in this case getting all panchayat
         locations"""
