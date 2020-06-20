@@ -34,7 +34,8 @@ from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions,
                                        get_ap_not_enrolled_r14_21A,
                                        get_ap_labour_report_r3_17,
-                                       get_ap_suspended_payments_r14_5
+                                       get_ap_suspended_payments_r14_5,
+                                       get_ap_nefms_report_r14_37
                                       )
 from libtech_lib.generic.aws import days_since_modified_s3
 AP_STATE_CODE = "02"
@@ -166,7 +167,7 @@ class APPanchayat(Location):
         report_type = "ap_muster_transactions"
         self.save_report(logger, dataframe, report_type)
     def ap_suspended_payments_r14_5(self, logger):
-        "Will fetch R15.5 suspended payment reprot"
+        "Will fetch R14.5 suspended payment reprot"
         dataframe = get_ap_suspended_payments_r14_5(self, logger)
         report_type = "ap_suspended_payments_r14_5"
         if dataframe is not None:
@@ -317,7 +318,7 @@ class APBlock(Location):
                                                      scheme='nrega')
         return panchayat_array
     def ap_suspended_payments_r14_5(self, logger):
-        "Will fetch R15.5 suspended payment reprot"
+        "Will fetch R14.5 suspended payment reprot"
 
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
@@ -334,7 +335,7 @@ class APBlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type)
     def ap_not_enrolled_r14_21A(self, logger):
-        "Will fetch R15.5 suspended payment reprot"
+        "Will fetch R14.21A not enrolled reprot"
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
         df_array = []
@@ -349,8 +350,27 @@ class APBlock(Location):
             report_type = "ap_not_enrolled_r14_21A"
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type)
+
+    def ap_nefms_report_r14_37(self, logger):
+        "Will fetch R14.37 NEFMS reprot"
+
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            logger.info(f"Currently Processing panchayat code {each_panchayat_code}")
+            my_location = APPanchayat(logger, each_panchayat_code)
+            dataframe = get_ap_nefms_report_r14_37(my_location, logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            report_type = "ap_nefms_report_r14_37"
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+
     def ap_labour_report_r3_17(self, logger):
-        "Will fetch R3_17"
+        "Will fetch R3.17"
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
         df_array = []

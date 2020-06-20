@@ -7,6 +7,7 @@ import re
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
 import json
+import time
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -207,13 +208,17 @@ def ap_nrega_download_page(logger, url, cookies=None, params=None, headers=None)
     max_retry = 5
     retry = 0
     res = None
+    timeout = 0
     while (retry < max_retry):
         try:
             res = requests.get(url, cookies=cookies, params=params,
                                headers=headers, verify=False)
             retry = max_retry
-        except:
+            time.sleep(timeout)
+        except Exception as e:
             retry = retry + 1
+            timeout += 5
+            logger.warning(f'Need to retry. Failed {retry} time(s). Exception[{e}]')
     return res
 
 def get_ap_suspended_payments_r14_5(lobj, logger):
@@ -263,13 +268,13 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
             ('ltype', ''),
             ('year', '2020-2021'),
             ('program', 'ALL'),
-            ('fileName', id),
+            ('fileName', location_id),
             ('stype', ''),
             ('ptype', ''),
             ('lltype', ''),
         )
     url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
-   # response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
+    # response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
     response = ap_nrega_download_page(logger, url1, headers=headers,
                                       params=params, cookies=cookies)
     if (not response) or (response.status_code != 200):
@@ -298,9 +303,270 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
 def get_ap_not_enrolled_r14_21A(lobj, logger):
     """Will download report not enrolled R 14_21A"""
     dataframe = None
+    logger.info(f"Fetching Suspended Payment Report {lobj.code}")
+    logger.info(f"state url = {lobj.home_url}")
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+    panchayat_code = lobj.panchayat_code[8:10]
+    location_id = district_code + block_code
+    lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
+    column_headers = [
+        'S No',
+        'Panchayat Name',
+        'Wage Seekers Identified as NOT ENROLLED Opening Balance of 19-Jun-2020',
+        'Wage Seekers Identified as NOT ENROLLED On 19-Jun-2020',
+        'Wage Seekers Identified as NOT ENROLLED EOD of 19-Jun-2020',
+        'Wage Seekers seeded on 19-Jun-2020 Seeded with UID',
+        'Wage Seekers seeded on 19-Jun-2020 Seeded with existing EID *',
+        'Wage Seekers seeded on 19-Jun-2020 Seeded with newly enrolled EID **',
+        'Wage Seekers seeded on 19-Jun-2020 Total',
+        'Wage Seekers Identified as NOT ENROLLED - Closing Balance of 19-Jun-2020'
+    ]
+    logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s location %s" % (district_code,block_code,panchayat_code, location_id))
+    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    res = ap_nrega_download_page(logger, url)
+    if (not res) or (res.status_code != 200):
+        return None
+    cookies = res.cookies
+    logger.debug(f"cookies are {cookies}")
+    headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+        } 
+    params = (
+            ('requestType', 'SmartCardreport_engRH'),
+            ('actionVal', 'UIDSeedingLink'),
+            ('id', location_id),
+            ('type', ''),
+            ('Date', '-1'),
+            ('File', ''),
+            ('Agency', ''),
+            ('listType', ''),
+            ('yearMonth', '-1'),
+            ('ReportType', ''),
+            ('flag', 'UIDLink'),
+            ('Rtype', ''),
+            ('Date1', '-1'),
+            ('wtype', ''),
+            ('ytype', ''),
+            ('Date2', '-1'),
+            ('ltype', ''),
+            ('year', ''),
+            ('program', ''),
+            ('fileName', location_id),
+            ('stype', ''),
+            ('ptype', ''),
+            ('lltype', ''),
+        )
+
+    url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
+    # response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
+    response = ap_nrega_download_page(logger, url1, headers=headers,
+                                      params=params, cookies=cookies)
+    if (not response) or (response.status_code != 200):
+        return None
+
+    if response.status_code != 200:
+        return None
+    myhtml = response.content
+    extract_dict = {}
+    extract_dict['column_headers'] = column_headers
+    extract_dict['table_id'] = 'sortable'
+    extract_dict['data_start_row'] = 3
+    dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    logger.info(f"the shape of dataframe is {dataframe.shape}")
+    if dataframe is None:
+        return None
+    # dataframe['tjobcard'] = "~" + dataframe['HouseHold Code']
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    #cols = location_cols + ["tjobcard"] + column_headers
+    cols = location_cols + column_headers
+    dataframe = dataframe[cols]
+    return dataframe
+
+def get_ap_nefms_report_r14_37(lobj, logger):
+    """Will download NEFMS report"""
+    dataframe = None
+    logger.info(f"Fetching Suspended Payment Report {lobj.code}")
+    logger.info(f"state url = {lobj.home_url}")
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+    panchayat_code = lobj.panchayat_code[8:10]
+    location_id = f'{district_code}~{block_code}~{panchayat_code}'
+    lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
+    column_headers = [
+        'S.No.',
+        'File Name',
+        'File Sent Date',
+        'No. of Transactions',
+        'No. of Wage Seekers',
+        'Total Amount',
+        'Success Transactions',
+        'Success Amount',
+        'Rejected Transactions',
+        'Rejected Amount',
+        'Response Pending Transactions',
+        'Response Pending Amount',
+        'Release Pending Transactions',
+        'Release Pending Amount'
+    ]
+    logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s location %s" % (district_code,block_code,panchayat_code, location_id))
+    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    res = ap_nrega_download_page(logger, url)
+    if (not res) or (res.status_code != 200):
+        return None
+    cookies = res.cookies
+    logger.debug(f"cookies are {cookies}")
+    headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+        } 
+    params = (
+            ('requestType', 'SmartCardreport_engRH'),
+            ('actionVal', 'NEFMS'),
+            ('id', location_id),
+            ('type', ''),
+            ('Date', '-1'),
+            ('File', ''),
+            ('Agency', ''),
+            ('listType', ''),
+            ('yearMonth', '-1'),
+            ('ReportType', ''),
+            ('flag', '-1'),
+            ('Rtype', '-1'),
+            ('Date1', '-1'),
+            ('wtype', '-1'),
+            ('ytype', '-1'),
+            ('Date2', '-1'),
+            ('ltype', '-1'),
+            ('year', ''),
+            ('program', ''),
+            ('fileName', location_id),
+            ('stype', '-1'),
+            ('ptype', '-1'),
+            ('lltype', 'ITDA'),
+        )
+    url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
+    # response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
+    response = ap_nrega_download_page(logger, url1, headers=headers,
+                                      params=params, cookies=cookies)
+    if (not response) or (response.status_code != 200):
+        return None
+
+    if response.status_code != 200:
+        return None
+    myhtml = response.content
+    extract_dict = {}
+    extract_dict['column_headers'] = column_headers
+    extract_dict['table_id'] = 'sortable'
+    extract_dict['data_start_row'] = 3
+    dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    logger.info(f"the shape of dataframe is {dataframe.shape}")
+    if dataframe is None:
+        return None
+    #dataframe['tjobcard'] = "~" + dataframe['HouseHold Code']
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    #cols = location_cols + ["tjobcard"] + column_headers
+    cols = location_cols + column_headers
+    dataframe = dataframe[cols]
     return dataframe
 
 def get_ap_labour_report_r3_17(lobj, logger):
     """Will download Labour Report R 3_17"""
     dataframe = None
+    logger.info(f"Fetching Suspended Payment Report {lobj.code}")
+    logger.info(f"state url = {lobj.home_url}")
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+    panchayat_code = lobj.panchayat_code[8:10]
+    location_id = district_code + block_code
+    lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
+    date = '20/06/2020'
+    column_headers = [
+        'S.No',
+        'Panchayat Name',
+        'No of Groups Registred',
+        'No of groups Demanded',
+        'Tagetted labour per day',
+        'Targetted persondays for the month',
+        'No of groups working',
+        'No. of labour reported',
+        'No of GPs where work not happened',
+        'No of Persondays generated',
+        '% of groups working over demanded',
+        '% of labour reported over Target'
+    ]
+    logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s location %s" % (district_code,block_code,panchayat_code, location_id))
+    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    res = ap_nrega_download_page(logger, url)
+    if (not res) or (res.status_code != 200):
+        return None
+    cookies = res.cookies
+    logger.debug(f"cookies are {cookies}")
+    headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+        } 
+    params = (
+            ('requestType', 'PRReportsRH'),
+            ('actionVal', 'DailyLabour'),
+            ('id', location_id),
+            ('type', '-1'),
+            ('type1', ''),
+            ('dept', ''),
+            ('fromDate', ''),
+            ('toDate', ''),
+            ('Rtype', ''),
+            ('reportGroup', ''),
+            ('fto', ''),
+            ('LinkType', '-1'),
+            ('rtype', ''),
+            ('reptype', ''),
+            ('date', date),
+            ('program', ''),
+            ('type2', ''),
+            ('type3', ''),
+        )
+    url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
+    # response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
+    response = ap_nrega_download_page(logger, url1, headers=headers,
+                                      params=params, cookies=cookies)
+    if (not response) or (response.status_code != 200):
+        return None
+
+    if response.status_code != 200:
+        return None
+    myhtml = response.content
+    extract_dict = {}
+    extract_dict['column_headers'] = column_headers
+    extract_dict['table_id'] = 'sortable'
+    extract_dict['data_start_row'] = 3
+    dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    logger.info(f"the shape of dataframe is {dataframe.shape}")
+    if dataframe is None:
+        return None
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    cols = location_cols + column_headers
+    dataframe = dataframe[cols]
     return dataframe
