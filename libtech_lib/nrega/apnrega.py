@@ -203,26 +203,38 @@ def get_ap_jobcard_register(lobj, logger):
         logger.info(dataframe.head())
     return dataframe
 
+def ap_nrega_download_page(logger, url, cookies=None, params=None, headers=None):
+    max_retry = 5
+    retry = 0
+    res = None
+    while (retry < max_retry):
+        try:
+            res = requests.get(url, cookies=cookies, params=params,
+                               headers=headers, verify=False)
+            retry = max_retry
+        except:
+            retry = retry + 1
+    return res
+
 def get_ap_suspended_payments_r14_5(lobj, logger):
     """ Will download Suspended Payment information per panchayat"""
-
     dataframe = None
     logger.info(f"Fetching Suspended Payment Report {lobj.code}")
     logger.info(f"state url = {lobj.home_url}")
     district_code = lobj.district_code[-2:]
     block_code = lobj.block_code[-2:]
     panchayat_code = lobj.panchayat_code[8:10]
+    location_id = district_code + block_code + panchayat_code
     lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
-    column_headers = ['srno', 'tjobcard', 'jobcard', 'head_of_household',
-                      'registraction_date', 'caste', 'no_of_disabled',
-                      'no_of_shg_members', 'no_of_males', 'no_of_females']
-    logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s " % (district_code,block_code,panchayat_code))
-    res = requests.get(lobj.home_url)
-    input()
-    if res.status_code != 200:
-        return None #If the state URL is not reachable return None
+    column_headers = ['S.No.', 'HouseHold Code', 'Worker Code', 'Name',
+                      'Amount', 'From Date', 'To Date']
+    logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s location %s" % (district_code,block_code,panchayat_code, location_id))
+    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    res = ap_nrega_download_page(logger, url)
+    if (not res) or (res.status_code != 200):
+        return None
     cookies = res.cookies
-    logger.info(f"cookies are {res.cookies}")
+    logger.debug(f"cookies are {cookies}")
     headers = {
             'Connection': 'keep-alive',
             'Cache-Control': 'max-age=0',
@@ -234,7 +246,7 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
     params = (
             ('requestType', 'SmartCardreport_engRH'),
             ('actionVal', 'DelayPay'),
-            ('id', id),
+            ('id', location_id),
             ('type', '-1'),
             ('Date', '-1'),
             ('File', ''),
@@ -256,11 +268,39 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
             ('ptype', ''),
             ('lltype', ''),
         )
-    res = requests.get(lobj.home_url, cookies=cookies, headers=headers, params=params, verify=False)
-    if res.status_code != 200:
+    url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
+   # response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
+    response = ap_nrega_download_page(logger, url1, headers=headers,
+                                      params=params, cookies=cookies)
+    if (not response) or (response.status_code != 200):
         return None
-    myhtml = res.content
-    with open("/tmp/a.html", "wb") as f:
-        f.write(myhtml)
+
+    if response.status_code != 200:
+        return None
+    myhtml = response.content
+    extract_dict = {}
+    extract_dict['column_headers'] = column_headers
+    extract_dict['table_id'] = 'sortable'
+    extract_dict['data_start_row'] = 3
+    dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    logger.info(f"the shape of dataframe is {dataframe.shape}")
+    if dataframe is None:
+        return None
+    dataframe['tjobcard'] = "~" + dataframe['HouseHold Code']
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    cols = location_cols + ["tjobcard"] + column_headers
+    dataframe = dataframe[cols]
     return dataframe
- 
+
+def get_ap_not_enrolled_r14_21A(lobj, logger):
+    """Will download report not enrolled R 14_21A"""
+    dataframe = None
+    return dataframe
+
+def get_ap_labour_report_r3_17(lobj, logger):
+    """Will download Labour Report R 3_17"""
+    dataframe = None
+    return dataframe
