@@ -2,25 +2,54 @@
 #pylint: disable-msg = too-many-locals
 #pylint: disable-msg = too-many-branches
 #pylint: disable-msg = too-many-statements
+#pylint: disable-msg = line-too-long
+#pylint: disable-msg = bare-except
 
 import re
+from pathlib import Path
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
+from slugify import slugify
 import json
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 from libtech_lib.generic.commons import  (get_current_finyear,
-                      get_full_finyear,
-                      standardize_dates_in_dataframe,
-                      get_default_start_fin_year,
-                      insert_location_details,
-                      get_finyear_from_muster_url,
-                      get_fto_finyear
-                     )
-from libtech_lib.generic.api_interface import api_get_report_url, api_get_report_dataframe
+                                          get_default_start_fin_year,
+                                          get_percentage,
+                                          get_previous_date,
+                                          insert_location_details
+                                          )
+from libtech_lib.generic.api_interface import  (api_get_report_url,
+                                                api_get_report_dataframe,
+                                                get_location_dict
+                                               )
 from libtech_lib.generic.html_functions import get_dataframe_from_html, get_dataframe_from_url
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
+
+HOMEDIR = str(Path.home())
+JSONCONFIGFILE = f"{HOMEDIR}/.libtech/crawlerConfig.json"
+with open(JSONCONFIGFILE) as CONFIG_file:
+    CONFIG = json.load(CONFIG_file)
+NREGA_DATA_DIR = CONFIG['nrega_data_dir']
+JSON_CONFIG_DIR = CONFIG['json_config_dir']
+
+def nic_server_status(logger, location_code, scheme='nrega'):
+    """Different States have different servers. This function will fetch the
+    status of server for the corresponding location before the crawling
+    starts"""
+    if scheme != "nrega":
+        return True
+    ldict = get_location_dict(logger, location_code=location_code)
+    state_name = ldict.get("state_name", None)
+    state_code = ldict.get("state_code", None)
+    crawl_ip = ldict.get("crawl_ip", None)
+    url = f"http://{crawl_ip}/netnrega/homestciti.aspx?state_code={state_code}&state_name={state_name}"
+    logger.info(url)
+    res = requests.get(url)
+    logger.info(res.status_code)
+    return bool(res.status_code == 200)
+
 
 def get_jobcard_register(lobj, logger):
     """Download Jobcard Register for a given panchayat
@@ -57,7 +86,7 @@ def get_jobcard_register(lobj, logger):
         if res.status_code == 200:
             myhtml = res.content
             dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
-    dataframe = insert_location_details(logger, lobj, dataframe)
+            dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
 
 def get_worker_register(lobj, logger):
@@ -110,7 +139,7 @@ def get_worker_register(lobj, logger):
         name = row.get('name', None)
         if name is not None:
             if '*' in name:
-                name = name.replace('*', '')
+                name = name.replace('*', '').lstrip().rstrip()
                 dataframe.loc[index, 'name'] = name
         head_of_household = row.get('head_of_household', '')
         if head_of_household == '':
@@ -171,6 +200,7 @@ def get_muster_list(lobj, logger, jobcard_transactions_df):
     """From the jobcard transactions df this function will first get unique
     work urls and from work urls it will get all unique muster urls"""
     logger.info(f"lenth of dataframe is  {len(jobcard_transactions_df)}")
+    col_list = ['muster_no', 'muster_url', 'finyear', 'date_from', 'date_to', 'work_name', 'work_code', 'block_code', 'lastUpdateDate']
     work_url_array = jobcard_transactions_df.work_name_url.unique()
     logger.info(f"Number of unique work urls is {len(work_url_array)}")
     response = requests.get(lobj.panchayat_page_url)
@@ -185,7 +215,10 @@ def get_muster_list(lobj, logger, jobcard_transactions_df):
         }
         job_list.append(job_dict)
     dataframe = libtech_queue_manager(logger, job_list)
-    finyear_regex = re.compile(r'finyear=\d{4}-\d{4}')
+    if dataframe is None:
+        dataframe = pd.DataFrame(columns=col_list)
+        return dataframe
+    #finyear_regex = re.compile(r'finyear=\d{4}-\d{4}')
     for index, row in dataframe.iterrows():
         url = row['muster_url']
         parsed = urlparse.urlparse(url)
@@ -216,63 +249,90 @@ def get_muster_list(lobj, logger, jobcard_transactions_df):
     dataframe = dataframe.reset_index(drop=True)
     return dataframe
 
-def get_muster_transactions(lobj, logger, muster_list_df):
+def get_muster_transactions(lobj, logger):
+    """This function will download Muster Transactions"""
+    """First it will take existing muster transactions, find out incomplete
+    musters. Second it will take muster list and find out musters which have
+    never been downloaded"""
+    #First lets download worker df which we will later merge with muster
+    #transactions to 
+    worker_df = lobj.fetch_report_dataframe(logger, "worker_register")
+    jt_df = lobj.fetch_report_dataframe(logger, "jobcard_transactions")
+    mt_df = lobj.fetch_report_dataframe(logger, "muster_transactions")
+    ml_df = lobj.fetch_report_dataframe(logger, "muster_list")
+def get_musters_to_be_downloaded(lobj, logger, muster_list_df,
+                            muster_transactions_df):
+    """Download the pending musters from the muster list"""
+    musters_to_download_df = None
+    csv_array = []
+    column_headers = ["block_code", "finyear", "muster_no", "muster_url"]
+    logger.info(muster_transactions_df.shape)
+    logger.info(muster_transactions_df.columns)
+    logger.info(muster_list_df.columns)
+    logger.info(f"Length of muster list is {len(muster_list_df)}")
+    jt_df = lobj.fetch_report_dataframe(logger, "jobcard_transactions")
+    grouped_jt = jt_df.groupby(['finyear','muster_no']).agg({'noOfDays':'sum'}).reset_index()
+    ml_merged = muster_list_df.merge(grouped_jt, on=['finyear','muster_no'], how='left',
+                         indicator=True)
+    muster_list_df = ml_merged[ml_merged["_merge"]=="both"]
+    drop_columns = ['_merge']
+    muster_list_df = muster_list_df.drop(columns=drop_columns)
+    logger.info(f"Length of muster list is {len(muster_list_df)}")
+    input()
+
+    grouped_muster_transactions = muster_transactions_df.groupby(["muster_url"]).agg(
+                                             { 'days_worked':"sum"}
+                                     ).reset_index()
+    
+    logger.info(f"unique musters is {len(grouped_muster_transactions)}")
+    df_all = muster_list_df.merge(grouped_muster_transactions,
+                                  on=["muster_url"], how='left', indicator=True)
+    logger.info(f"length of df_all is {len(df_all)}")
+    left_only = df_all[df_all["_merge"]=="left_only"]
+    not_downloaded = left_only[column_headers]
+    logger.info(f"length of not downloaded is {len(not_downloaded)}")
+    ### We are only going to re download musters which are not complete and
+    ### And have not been updated in last 7 days
+    date_thresold = get_previous_date(logger, delta_days=7)
+    logger.info(f"date threshold is {date_thresold}")
+    muster_transactions_df['lastUpdateDate'] = pd.to_datetime(muster_transactions_df['lastUpdateDate'])
+    mt_filtered = muster_transactions_df[muster_transactions_df['lastUpdateDate'] < date_thresold]
+    logger.info(f"Length of mt_filtered is {len(mt_filtered)}")
+    grouped_muster_transactions = mt_filtered.groupby(["muster_url"]).agg(
+                                             { 'days_worked':"sum"}
+                                     ).reset_index()
+
+    ###Now we will iterate to see which musters are not complete
+    for index, row in grouped_muster_transactions.iterrows():
+        muster_url = row.get("muster_url")
+        filtered_df = muster_transactions_df[(muster_transactions_df['muster_url']==muster_url)]
+        filtered_df = filtered_df[filtered_df['muster_status'] != 'Credited']
+        if len(filtered_df) > 0:
+            row = [muster_url]
+            csv_array.append(row)
+    not_complete_df = pd.DataFrame(csv_array, columns=["muster_url"])
+    not_complete = not_complete_df.merge(muster_list_df, on=["muster_url"],
+                                         how='left')
+    not_complete = not_complete[column_headers]
+    logger.info(f"Lenght incomplete Musters is {len(not_complete)}")
+    logger.info(f"Lenght not download Musters is {len(not_downloaded)}")
+    musters_to_download_df = pd.concat([not_complete, not_downloaded])
+    return musters_to_download_df
+
+def get_muster_transactions1(lobj, logger, muster_list_df,
+                            muster_transactions_df):
     """form the muster list dataframe this will get all the muster
     transactions"""
-    worker_df = lobj.fetch_report_dataframe(logger, "worker_register")
-    logger.info(f"shape of worker df is {worker_df.shape}")
-    try:
-        response = requests.get(lobj.panchayat_page_url, timeout = 5)
-    except requests.exceptions.Timeout as e: 
-        logger.error(e)
-    cookies = response.cookies
-    job_list = []
-    func_name = "fetch_muster_details"
-    MUSTER_COLUMN_CONFIG_FILE = f"json_config/muster_column_name_dict.json"
-    with open(MUSTER_COLUMN_CONFIG_FILE) as config_file:
-        muster_column_dict = json.load(config_file)
-    logger.info(muster_column_dict)
-    for index, row in muster_list_df.iterrows():
-        url = row['muster_url']
-        muster_no = row['muster_no']
-        finyear = row['finyear']
-        block_code = row['block_code']
-        func_args = [lobj, url, cookies, muster_no, finyear, block_code, muster_column_dict]
-        job_dict = {
-            'func_name' : func_name,
-            'func_args' : func_args
-        }
-        job_list.append(job_dict)
-    dataframe = libtech_queue_manager(logger, job_list)
-    ## In Muster HTML name and relationship appear in the same column.
-    ## Separating them here below. 
-    rows_to_delete = []
-    for index, row in dataframe.iterrows():
-        sr_no = row.get("muster_index", None)
-        if (sr_no is None) or (not sr_no.isdigit()):
-            rows_to_delete.append(index)
-        name_relationship = row['name_relationship']
-        try:
-            relationship = re.search(r'\((.*?)\)', name_relationship).group(1)
-        except:
-            relationship = ''
-        name = name_relationship.replace(f"({relationship})","")
-        dataframe.loc[index, 'name'] = name
-        dataframe.loc[index, 'relationship'] = relationship
-    
-    dataframe = dataframe.drop(rows_to_delete)
-    logger.info(f"dataframe shape is {dataframe.shape}")
-    logger.info(dataframe.columns)
+    if muster_transactions_df is not None:
+        musters_to_download_df = get_musters_to_be_downloaded(lobj, logger,
+                                                              muster_list_df,
+                                                              muster_transactions_df)
+    else:
+        musters_to_download_df = muster_list_df
+    logger.info(musters_to_download_df.head())
+    musters_to_download_df.to_csv("/tmp/to_download.csv")
+    logger.info(f"to be downloaded is {len(musters_to_download_df)}")
     logger.info(muster_list_df.columns)
-    dataframe = pd.merge(dataframe, muster_list_df, how='left',
-                         on=['block_code', 'finyear', 'muster_no'])
-    logger.info(f"dataframe shape is {dataframe.shape}")
-    drop_columns = ['caste', 'block_code']
-    dataframe = dataframe.drop(columns=drop_columns)
-    dataframe = pd.merge(dataframe, worker_df, how='left',
-                         on=['jobcard', 'name'])
-    logger.info(dataframe.columns)
-    logger.info(f"dataframe shape is {dataframe.shape}")
     col_list = ['state_code', 'state_name', 'district_code', 'district_name',
                 'block_code', 'block_name', 'panchayat_name', 'panchayat_code',
                 'village_name', 'jobcard', 'name', 'relationship',
@@ -286,7 +346,89 @@ def get_muster_transactions(lobj, logger, muster_list_df):
                 'm_pocode_bankbranch', 'm_poadd_bankbranchcode',
                 'm_wagelist_no', 'muster_status', 'credited_date',
                 ]
+    worker_df = lobj.fetch_report_dataframe(logger, "worker_register")
+    logger.info(f"shape of worker df is {worker_df.shape}")
+    try:
+        response = requests.get(lobj.panchayat_page_url, timeout=10)
+    except requests.exceptions.Timeout as exp:
+        logger.error(exp)
+    cookies = response.cookies
+    job_list = []
+    func_name = "fetch_muster_details"
+    muster_column_config_file = f"{JSON_CONFIG_DIR}/muster_column_name_dict.json"
+    logger.info(muster_column_config_file)
+    with open(muster_column_config_file) as config_file:
+        muster_column_dict = json.load(config_file)
+    logger.info(muster_column_dict)
+    for index, row in musters_to_download_df.iterrows():
+        url = row['muster_url']
+        logger.info(url)
+        muster_no = row['muster_no']
+        finyear = row['finyear']
+        block_code = row['block_code']
+        muster_transactions_df = muster_transactions_df[(muster_transactions_df['finyear']!= finyear) |
+                                             (muster_transactions_df['block_code']!=block_code) |
+                                             (muster_transactions_df['muster_no']!=muster_no)]
+        func_args = [lobj, url, cookies, muster_no, finyear, block_code, muster_column_dict]
+        job_dict = {
+            'func_name' : func_name,
+            'func_args' : func_args
+        }
+        job_list.append(job_dict)
+    muster_col_list = ['muster_index', 'jobcard', 'caste', 'days_worked', 'day_wage',
+                       'm_labour_wage',
+                              'm_travel_cost', 'm_tools_cost', 'total_wage',
+                       'm_postoffice_bank_name',
+                              'm_pocode_bankbranch', 'm_poadd_bankbranchcode',
+                       'm_wagelist_no',
+                              'muster_status', 'credited_date',
+                              'muster_no', 'finyear', 'block_code', 'name',
+                       'relationship']
+    muster_transactions_df = muster_transactions_df[muster_col_list]
+    dataframe = libtech_queue_manager(logger, job_list, num_threads=500)
+    if dataframe is not None:
+        logger.info(dataframe.columns)
+        ## In Muster HTML name and relationship appear in the same column.
+        ## Separating them here below.
+        rows_to_delete = []
+        for index, row in dataframe.iterrows():
+            sr_no = row.get("muster_index", None)
+            if (sr_no is None) or (not sr_no.isdigit()):
+                rows_to_delete.append(index)
+            name_relationship = row['name_relationship']
+            try:
+                relationship = re.search(r'\((.*?)\)', name_relationship).group(1)
+            except:
+                relationship = ''
+            name = name_relationship.replace(f"({relationship})", "")
+            dataframe.loc[index, 'name'] = name
+            dataframe.loc[index, 'relationship'] = relationship
+        dataframe = dataframe.drop(rows_to_delete)
+        logger.info(f"dataframe shape is {dataframe.shape}")
+        logger.info(dataframe.columns)
+        dataframe = pd.concat([dataframe, muster_transactions_df]) 
+    else:
+        logger.info("I am here since no musters to download")
+        dataframe = muster_transactions_df
+    logger.info(dataframe.shape)
+    input()
+    logger.info(muster_list_df.columns)
+    dataframe = pd.merge(dataframe, muster_list_df, how='left',
+                         on=['block_code', 'finyear', 'muster_no'])
+    logger.info(f"dataframe shape is {dataframe.shape}")
+    #logger.info(f"dataframe columns are {dataframe.columns}")
+    drop_columns = ['caste', 'block_code']
+    dataframe = dataframe.drop(columns=drop_columns)
+    worker_df = worker_df.drop_duplicates(subset=['jobcard', 'name'],
+                                          keep='last')
+    dataframe = dataframe.merge(worker_df, how='left',
+                         on=['jobcard', 'name'])
+    logger.info(f"dataframe shape is {dataframe.shape}")
+    input()
     dataframe = dataframe[col_list]
+    logger.info(f"Length of data frame is {len(dataframe)}")
+    dataframe1 = dataframe[dataframe['panchayat_code'] == int(lobj.code)]
+    logger.info(f"Length of data frame is {len(dataframe1)}")
     return dataframe
 
 def get_block_rejected_transactions(lobj, logger):
@@ -383,3 +525,286 @@ def get_block_rejected_transactions(lobj, logger):
     dataframe = dataframe[col_list]
     logger.info(f"dataframe shape is {dataframe.shape}")
     return dataframe
+def get_block_rejected_stats(lobj, logger, fto_status_df):
+    """This function will get block Rejected Stats"""
+    job_list = []
+    column_headers = ["srno", "block", "total_fto_generated", "fs_fto_signed",
+                      "fs_fto_pending", "ss_fto_signed",
+                      "second_singnatory_fto_url", "ss_fto_pending",
+                      "sent_to_bank", "sent_to_bank_transactions",
+                      "processed_by_bank", "process_by_bank_transactions",
+                      "partial_processed", "partial_processed_transactions",
+                      "partial_processed_pending", "pending_for_processing",
+                      "pending_from_processing_transactions",
+                      "processed", "invalid", "invalid_url",
+                      "rejected", "rejected_url",
+                      "total"]
+    url_prefix = "http://mnregaweb4.nic.in/netnrega/FTO/"
+    extract_dict = {}
+    extract_dict['pattern'] = f"Second Signatory"
+    extract_dict['column_headers'] = column_headers
+    extract_dict['data_start_row'] = 4
+    extract_dict['extract_url_array'] = [5, 17, 18]
+    extract_dict['url_prefix'] = url_prefix
+    func_name = "fetch_rejected_stats"
+    for index, row in fto_status_df.iterrows():
+        func_args = []
+        url = row.get("dist_url", None)
+        finyear = row.get("finyear", None)
+        logger.info(f"finyear {finyear} url {url}")
+        if url is not None:
+            func_args = [lobj, url, finyear, extract_dict]
+            job_dict = {
+                'func_name' : func_name,
+                'func_args' : func_args
+            }
+            job_list.append(job_dict)
+    dataframe = libtech_queue_manager(logger, job_list, num_threads=50)
+    return dataframe
+
+
+def get_fto_status_urls(lobj, logger):
+    """This function will download the block level Rejection Stats"""
+    logger.info(f"Block Level Rejection Stats for {lobj.code}")
+    csv_array = []
+    column_headers = ["state_code", "district_code", "state_name",
+                      "district_name", "finyear", "dist_url"]
+    start_finyear = get_default_start_fin_year()
+    end_finyear = get_current_finyear()
+    url_prefix = "http://mnregaweb4.nic.in/netnrega/FTO/"
+    for finyear in range(int(start_finyear), int(end_finyear)+1):
+        logger.info(f"Downloading for FinYear {finyear}")
+        filename = f"{NREGA_DATA_DIR}/misReport_{finyear}.html"
+        logger.info(filename)
+        with open(filename, "rb") as infile:
+            myhtml = infile.read()
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        elem = mysoup.find("a", href=re.compile("FTOReport.aspx"))
+        if elem is not None:
+            base_href = elem["href"]
+        logger.info(base_href)
+        res = requests.get(base_href)
+        myhtml = None
+        if res.status_code == 200:
+            myhtml = res.content
+        if myhtml is not None:
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            elems = mysoup.find_all("a", href=re.compile("FTOReport.aspx"))
+            for elem in elems:
+                logger.info(elem)
+                state_href = elem["href"]
+                logger.info(state_href)
+                url = url_prefix + state_href
+                response = requests.get(url)
+                logger.info(url)
+                dist_html = None
+                if response.status_code == 200:
+                    dist_html = response.content
+                if dist_html is not None:
+                    dist_soup = BeautifulSoup(dist_html, "lxml")
+                    elems = dist_soup.find_all("a", href=re.compile("FTOReport.aspx"))
+                    for elem1 in elems:
+                        dist_url = url_prefix + elem1["href"]
+                        #logger.info(dist_url)
+                        parsed = urlparse.urlparse(dist_url)
+                        params_dict = parse_qs(parsed.query)
+                        #logger.info(params_dict)
+                        state_name = params_dict.get("state_name", [''])[0]
+                        state_code = params_dict.get("state_code", [""])[0]
+                        district_name = params_dict.get("district_name",
+                                                        [""])[0]
+                        district_code = params_dict.get("district_code",
+                                                        [""])[0]
+                        row = [state_code, district_code, state_name,
+                               district_name, finyear, dist_url]
+                        csv_array.append(row)
+
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    return dataframe
+
+
+def get_nic_stat_urls(lobj, logger, panchayat_code_array):
+    dataframe = None
+    csv_array = []
+    column_headers = ["state_code", "district_code", "block_code",
+                      "panchayat_code", "location_code", "location_type", "stats_url"]
+    urlPrefix = "http://mnregaweb4.nic.in/netnrega/"
+    url = "http://mnregaweb4.nic.in/netnrega/all_lvl_details_dashboard_new.aspx"
+    headers  =  {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q = 0.9,*/*;q = 0.8',
+    'Accept-Encoding': 'gzip, deflate',
+    'Accept-Language': 'en-GB,en;q = 0.5',
+    'Connection': 'keep-alive',
+    'Host': 'mnregaweb4.nic.in',
+    'Referer': url,
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:45.0) Gecko/20100101 Firefox/45.0',
+    'Content-Type': 'application/x-www-form-urlencoded',
+    }
+    r = requests.get(url)
+    if r.status_code  ==  200:
+        myhtml = r.content
+        htmlsoup = BeautifulSoup(myhtml,"lxml")
+        validation  =  htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+        view_state  =  htmlsoup.find(id = '__VIEWSTATE').get('value')
+        data  =  {
+            '__EVENTARGUMENT': '',
+            '__LASTFOCUS': '',
+            '__VIEWSTATE': view_state,
+            '__VIEWSTATEENCRYPTED': '',
+            '__EVENTVALIDATION': validation,
+            'ddl_state': lobj.state_code,
+            '__EVENTTARGET': 'ddl_state',
+        }
+    
+        response  =  requests.post(url, headers=headers, data=data)
+        if response.status_code == 200:
+            myhtml = response.content
+        else:
+            myhtml = None
+        if myhtml is not None:
+            htmlsoup = BeautifulSoup(myhtml,"lxml")
+            validation  =  htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+            view_state  =  htmlsoup.find(id = '__VIEWSTATE').get('value')
+            data['ddl_dist'] = lobj.district_code
+            data['__EVENTTARGET'] = 'ddl_dist'
+            data['__VIEWSTATE'] =  view_state
+            data['__EVENTVALIDATION'] =  validation
+
+            response  =  requests.post(url, headers=headers, data=data)
+            if response.status_code == 200:
+                myhtml = response.content
+            else:
+                myhtml = None
+            if myhtml is not None:
+                htmlsoup = BeautifulSoup(myhtml,"lxml")
+                validation = htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+                view_state = htmlsoup.find(id = '__VIEWSTATE').get('value')
+                data['ddl_blk'] = lobj.block_code
+                data['__EVENTTARGET'] = 'ddl_blk'
+                data['__VIEWSTATE'] =  view_state
+                data['__EVENTVALIDATION'] =  validation
+                response  =  requests.post(url,headers=headers, data=data)
+                if response.status_code == 200:
+                    myhtml = response.content
+                else:
+                    myhtml = None
+                if myhtml is not None:
+                    htmlsoup = BeautifulSoup(myhtml,"lxml")
+                    validation = htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+                    view_state = htmlsoup.find(id = '__VIEWSTATE').get('value')
+                    panchayat_code_array.append(lobj.block_code)
+                    for location_code in panchayat_code_array:
+                        stats_url = None
+                        if location_code  ==  lobj.block_code:
+                            location_code_string = 'ALL'
+                            panchayat_code = ''
+                            location_type = 'block'
+                        else:
+                            location_code_string = location_code
+                            panchayat_code = location_code
+                            location_type = 'panchayat'
+                        data  =  {
+                          '__EVENTTARGET': '',
+                          '__EVENTARGUMENT': '',
+                          '__LASTFOCUS': '',
+                          '__VIEWSTATE': view_state,
+                          '__VIEWSTATEENCRYPTED': '',
+                          '__EVENTVALIDATION': validation,
+                          'ddl_state': lobj.state_code,
+                          'ddl_dist' : lobj.district_code,
+                          'ddl_blk' : lobj.block_code,
+                          'ddl_pan' : location_code_string,
+                          'btproceed' : 'View Detail'
+                        }
+                        response  =  requests.post(url, headers=headers, data=data)
+                        if response.status_code == 200:
+                            myhtml = response.content
+                        else:
+                            myhtml = None
+                        if myhtml is not None:
+                            htmlsoup = BeautifulSoup(myhtml,"lxml")
+                            myi_frame = htmlsoup.find("iframe")
+                            if myi_frame is not None:
+                                stats_url = urlPrefix+myi_frame['src']
+                                #logger.info(stats_url)
+                                row = [lobj.state_code, lobj.district_code,
+                                       lobj.block_code, panchayat_code,
+                                       location_code, location_type, stats_url] 
+                                csv_array.append(row)
+                        if stats_url is None:
+                            exception_message = f"Unable to get stats for {location_code_string} and block_code {lobj.block_code}"
+                            raise Exception('x should not exceed 5. The value of xwas:')
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    return dataframe
+
+
+def get_nic_stats(lobj, logger, nic_stat_urls_df):
+    """This function will fetch nic Stats"""
+    logger.info("Going to fetch nic Stats")
+    logger.info(nic_stat_urls_df.columns)
+    filtered_df = nic_stat_urls_df[nic_stat_urls_df['location_code'] ==
+                                   int(lobj.code)].reset_index()
+    logger.info(f"length of filtered_df is {len(filtered_df)}")
+    if len(filtered_df) != 1:
+        return None
+    stats_url = filtered_df.loc[0, "stats_url"]
+    logger.info(stats_url)
+    res = requests.get(stats_url)
+    if res.status_code != 200:
+        return None
+    myhtml = res.content
+    extract_dict = {}
+    extract_dict['table_id'] = 'GridView1'
+    finyear = int(get_current_finyear())
+    fin_array = [finyear, finyear-1, finyear-2, finyear-3, finyear-4]
+    column_headers = ['name'] + fin_array + ['graphs']
+    extract_dict['column_headers'] = column_headers
+    dataframe = get_dataframe_from_html(logger, myhtml,
+                                        mydict=extract_dict)
+    ##Now we will convert this dataframe to JSON
+    ignored_rows = ["I             Job Card", "II             Progress",
+                    "III             Works",
+                    "IV             Financial Progress"
+                   ]
+    stat_dict = {}
+    finyear_wise = False
+    for index, row in dataframe.iterrows():
+        name = row.get("name", "")
+        if name == "II             Progress":
+            finyear_wise = True
+        if name in ignored_rows:
+            continue
+        if not finyear_wise:
+            stat_dict[slugify(name)] = row.get(finyear, 0)
+        else:
+            fin_stat = {}
+            for each_year in fin_array:
+                fin_stat[each_year] = row.get(each_year, 0)
+            stat_dict[slugify(name)] = fin_stat
+    logger.info(stat_dict)
+    return dataframe
+
+def get_data_accuracy(lobj, logger, muster_transactions_df, nic_stats_df):
+    """This function will calculate data accuracy for last 3 financial years"""
+    accuracy = None
+    start_finyear = get_default_start_fin_year()
+    end_finyear = get_current_finyear()
+    work_days_df = nic_stats_df[nic_stats_df['name'] == 'Persondays Generated so far'].reset_index()
+    if len(work_days_df) != 1:
+        return accuracy 
+    nic_stat_row = work_days_df.loc[0]
+    logger.info(muster_transactions_df.columns)
+    libtech_total_workdays = 0
+    nic_total_workdays = 0
+    for finyear in range(int(start_finyear), int(end_finyear)+1):
+        filtered_transactions_df = muster_transactions_df[muster_transactions_df['finyear'] == finyear]
+        #filtered_transactions_df = filtered_transactions_df[filtered_transactions_df['panchayat_code'] == int(lobj.code)]
+        libtech_workdays = filtered_transactions_df.days_worked.sum()
+        nic_workdays = int(nic_stat_row.get(str(finyear)).replace(",",""))
+        logger.info(f"Libtech {libtech_workdays} - NIC {nic_workdays}")
+        libtech_total_workdays = libtech_total_workdays + libtech_workdays
+        nic_total_workdays = nic_total_workdays + nic_workdays
+    accuracy = get_percentage(nic_total_workdays, libtech_total_workdays,
+                              round_digits=2)
+    logger.info(f"Accuracy is {accuracy}")
+    return accuracy 

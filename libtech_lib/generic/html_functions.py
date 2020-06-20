@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 def get_urldataframe_from_html(logger, myhtml, mydict=None):
     """this will harvest urls from html based on the prameters specified in
     mydict"""
+    logger.info(f"Will extract urls from html")
     dataframe = None
     csv_array = []
     col_headers = ["muster_no", "muster_url"]
@@ -41,13 +42,17 @@ def get_urldataframe_from_url(logger, url, mydict=None, cookies=None):
     return dataframe
 
 def get_dataframe_from_url(logger, url, mydict=None, cookies=None):
-    """Gets the dataframe from the url based on the parameters specified 
+    """Gets the dataframe from the url based on the parameters specified
     in mydict
     It uses get_dataframe_from_html function
     for details on parameters refer to get_dataframe_from_html docstring
     """
-    response = requests.get(url)
+    if cookies is not None:
+        response = requests.get(url, cookies=cookies)
+    else:
+        response = requests.get(url)
     dataframe = None
+    logger.info(f"REsponse status code is {response.status_code}")
     if response.status_code == 200:
         myhtml = response.content
         dataframe = get_dataframe_from_html(logger, myhtml, mydict=mydict)
@@ -73,13 +78,22 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
     dataframe = None
     text_pattern = mydict.get('pattern', None)
     table_id = mydict.get('table_id', None)
+    table_id_array = mydict.get('table_id_array', None)
     mysoup = BeautifulSoup(myhtml, "lxml")
     mysoup = BeautifulSoup(myhtml, "html5lib")
     tables = mysoup.findAll('table')
     matched_tables = []
     #Match the table agains the specified pattern
-    if table_id is not None:
-        matched_tables = mysoup.findAll('table', id=table_id)
+    if table_id_array is None:
+        if table_id is not None:
+            table_id_array = [table_id]
+    #logger.info(f"table id array is {table_id_array}")
+    if table_id_array is not None:
+        for table_id in table_id_array:
+            matched_tables = mysoup.findAll('table', id=table_id)
+            if len(matched_tables) > 0:
+                logger.info(f"found tables for {table_id}")
+                break
     elif text_pattern is None:
         matched_tables = tables
     else:
@@ -92,8 +106,6 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
         my_table = matched_tables[0]
     else:
         my_table = None
-    if my_table is not None:
-        logger.debug(f"found the table")
     #If table found we will extract the rows and columns
     if my_table is not None:
         dataframe_columns = []
@@ -151,7 +163,11 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
                             col_url = ""
                         row_data.append(col_url)
                 dataframe_array.append(row_data)
-
+        if len(dataframe_array[1]) > len(dataframe_columns):
+            #logger.info("Length Mismatch")
+            diff = len(dataframe_array[0]) - len(dataframe_columns)
+            for i in range(1,diff+1):
+                dataframe_columns.append("")
         dataframe = pd.DataFrame(dataframe_array, columns=dataframe_columns)
     return dataframe
 
@@ -160,6 +176,7 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
 def delete_divs_by_classes(logger, mysoup, class_array):
     '''This function will Delete all the divs which have the class attributes
     as in class_array'''
+    logger.info(f"Will delete unnecessary divs")
     for my_class in class_array:
         my_div = mysoup.find("div", attrs={"class" : my_class})
         if my_div is not None:

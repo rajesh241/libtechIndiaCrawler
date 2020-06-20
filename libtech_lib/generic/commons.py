@@ -5,6 +5,8 @@ throughout the library"""
 #pylint: disable-msg = too-many-branches
 #pylint: disable-msg = too-many-statements
 import logging
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
 import datetime
 import time
 import re
@@ -177,3 +179,30 @@ def get_finyear_from_muster_url(logger, url, finyear_regex):
         pattern = match_object.group()
         finyear = pattern[-2:]
     return finyear
+
+def get_percentage(value, total, round_digits=0):
+    """Returns the percentage"""
+    if total == 0:
+        return None
+    percentage = round(value*100/total, round_digits)
+    return percentage
+
+def get_params_from_url(logger, url, param_name_array):
+    """This function will return the parameters from the url based on the
+    param_name_array"""
+    param_dict = {}
+    parsed = urlparse.urlparse(url)
+    params_dict = parse_qs(parsed.query)
+    for param_name in param_name_array:
+        param_value  = params_dict.get(param_name, [''])[0]
+        param_dict[param_name] = param_value
+    return param_dict
+
+def get_previous_date(logger, delta_days=7, date_format=None):
+    """Will fetch the previoius date as defined by delta_days"""
+    if date_format is None:
+        date_format = "%Y-%m-%d"
+    my_date = datetime.datetime.strftime(datetime.datetime.now() -
+                                         datetime.timedelta(delta_days), '%Y-%m-%d')
+    return my_date
+
