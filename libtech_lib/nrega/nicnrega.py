@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
+from slugify import slugify
 import json
 import requests
 import pandas as pd
@@ -760,6 +761,27 @@ def get_nic_stats(lobj, logger, nic_stat_urls_df):
     extract_dict['column_headers'] = column_headers
     dataframe = get_dataframe_from_html(logger, myhtml,
                                         mydict=extract_dict)
+    ##Now we will convert this dataframe to JSON
+    ignored_rows = ["I             Job Card", "II             Progress",
+                    "III             Works",
+                    "IV             Financial Progress"
+                   ]
+    stat_dict = {}
+    finyear_wise = False
+    for index, row in dataframe.iterrows():
+        name = row.get("name", "")
+        if name == "II             Progress":
+            finyear_wise = True
+        if name in ignored_rows:
+            continue
+        if not finyear_wise:
+            stat_dict[slugify(name)] = row.get(finyear, 0)
+        else:
+            fin_stat = {}
+            for each_year in fin_array:
+                fin_stat[each_year] = row.get(each_year, 0)
+            stat_dict[slugify(name)] = fin_stat
+    logger.info(stat_dict)
     return dataframe
 
 def get_data_accuracy(lobj, logger, muster_transactions_df, nic_stats_df):
