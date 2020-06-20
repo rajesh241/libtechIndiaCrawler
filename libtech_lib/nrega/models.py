@@ -30,7 +30,8 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_nic_stat_urls
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
-                                       get_ap_muster_transactions
+                                       get_ap_muster_transactions,
+                                       get_ap_suspended_payments_r14_5
                                       )
 from libtech_lib.generic.aws import days_since_modified_s3
 AP_STATE_CODE = "02"
@@ -152,6 +153,9 @@ class APPanchayat(Location):
         dataframe = get_ap_muster_transactions(self, logger)
         report_type = "ap_muster_transactions"
         self.save_report(logger, dataframe, report_type)
+    def ap_suspended_payments_r14_5(self, logger):
+        "Will fetch R15.5 suspended payment reprot"
+        dataframe = get_ap_suspended_payments_r14_5(self, logger)
 
 class NREGAPanchayat(Location):
     """This is the Panchayat subclass for Location Class"""
