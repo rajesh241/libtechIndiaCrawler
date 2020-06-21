@@ -354,7 +354,8 @@ class APBlock(Location):
 
     def ap_nefms_report_r14_37(self, logger):
         "Will fetch R14.37 NEFMS reprot"
-
+        report_type = "ap_nefms_report_r14_37"
+        # FIXME df_prev = self.fetch_report_dataframe(logger, report_type) 
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
         df_array = []
@@ -366,8 +367,8 @@ class APBlock(Location):
                 df_array.append(dataframe)
         if len(df_array) > 0:
             dataframe = pd.concat(df_array)
-            report_type = "ap_nefms_report_r14_37"
             if dataframe is not None:
+                #FIXME TBD merge here with Ranu's help
                 self.save_report(logger, dataframe, report_type)
 
     def ap_labour_report_r3_17(self, logger):
