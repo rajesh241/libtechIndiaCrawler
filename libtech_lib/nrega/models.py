@@ -71,7 +71,8 @@ class Location():
             filepath = f"data/samples/on_demand/{self.scheme}/reportType"
         else:
             today_date = datetime.date.today().strftime("%d_%m_%Y")
-            filepath = f"data/samples/{self.sample_name}/{self.scheme}/reportType/{today_date}"
+            filepath = f"data/samples/{self.sample_name}/{self.scheme}/{today_date}/reportType"
+            return filepath
         if self.location_type == "country":
             return filepath
         filepath = f"{filepath}/{self.state_code}"
