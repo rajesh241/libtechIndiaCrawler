@@ -406,6 +406,7 @@ def get_ap_nefms_report_r14_37(lobj, logger):
         'File Name',
         'File Sent Date',
         'No. of Transactions',
+        'Transaction URL',
         'No. of Wage Seekers',
         'Total Amount',
         'Success Transactions',
@@ -471,6 +472,7 @@ def get_ap_nefms_report_r14_37(lobj, logger):
     extract_dict['column_headers'] = column_headers
     extract_dict['table_id'] = 'sortable'
     extract_dict['data_start_row'] = 3
+    extract_dict['extract_url_array'] = [3]
     dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
     logger.info(f"the shape of dataframe is {dataframe.shape}")
     if dataframe is None:
@@ -482,7 +484,8 @@ def get_ap_nefms_report_r14_37(lobj, logger):
                      "panchayat_code", "panchayat_name"]
     #cols = location_cols + ["tjobcard"] + column_headers
     cols = location_cols + column_headers
-    dataframe = dataframe[cols]
+    df = dataframe[cols]
+    dataframe = df[:-1] # TBD df[df.name != 'Total']
     return dataframe
 
 def get_ap_labour_report_r3_17(lobj, logger):
@@ -569,4 +572,6 @@ def get_ap_labour_report_r3_17(lobj, logger):
                      "panchayat_code", "panchayat_name"]
     cols = location_cols + column_headers
     dataframe = dataframe[cols]
+    # dataframe = df[:-1] # TBD df[df.name != 'Total']
+
     return dataframe
