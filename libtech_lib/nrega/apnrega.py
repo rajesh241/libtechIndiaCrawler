@@ -11,6 +11,8 @@ import time
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
+
 from libtech_lib.generic.commons import  (get_current_finyear,
                       get_full_finyear,
                       standardize_dates_in_dataframe,
@@ -211,18 +213,21 @@ def ap_nrega_download_page(logger, url, session=None, cookies=None, params=None,
     timeout = 2
     while (retry < max_retry):
         try:
-            if session is not None:
+            if session:
+                logger.info(f'Attempting using *session* to fetch the URL[{url}] for the {retry+1} time')
                 res = session.get(url, cookies=cookies, params=params,
                                    headers=headers, verify=False)
             else:
+                logger.info(f'Attempting using *requests* to fetch the URL[{url}] for the {retry+1} time')
                 res = requests.get(url, cookies=cookies, params=params,
                                    headers=headers, verify=False)
             retry = max_retry
         except Exception as e:
             retry = retry + 1
-            time.sleep(timeout)
             timeout += 5
+            time.sleep(timeout)
             logger.warning(f'Need to retry. Failed {retry} time(s). Exception[{e}]')
+            logger.warning(f'Waiting for {timeout} seconds...')
     return res
 
 def get_ap_suspended_payments_r14_5(lobj, logger):
@@ -270,7 +275,7 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
             ('ytype', ''),
             ('Date2', '-1'),
             ('ltype', ''),
-            ('year', '2019-2020'),
+            ('year', '2020-2021'),
             ('program', 'ALL'),
             ('fileName', location_id),
             ('stype', ''),
@@ -489,53 +494,21 @@ def get_ap_nefms_report_r14_37(lobj, logger):
                      "panchayat_code", "panchayat_name"]
     #cols = location_cols + ["tjobcard"] + column_headers
     cols = location_cols + column_headers
-    df = dataframe[cols]
-    if len(df) == len(df[~df[df.columns[0]].str.contains('Total')]):
-        print('Hell no!')
-    else:
-        print('how so?')
-    dataframe = df[~df[df.columns[0]].str.contains('Total')]
+    dataframe = dataframe[cols]
+    logger.info(f"Before: the shape of dataframe is {dataframe.shape}")
+    dataframe = dataframe[dataframe['S.No'] != 'Total']
+    logger.info(f"After: the shape of dataframe is {dataframe.shape}")
     return dataframe
 
 def get_ap_labour_report_r3_17(lobj, logger):
     """Will download Labour Report R 3_17"""
     dataframe = None
     logger.info(f"Fetching Suspended Payment Report {lobj.code}")
-    logger.info(f"state url = {lobj.home_url}")
     district_code = lobj.district_code[-2:]
     block_code = lobj.block_code[-2:]
-    panchayat_code = lobj.panchayat_code[8:10]
     location_id = district_code + block_code
     lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
-    date = '22/06/2020'
-    headers = {
-            'Connection': 'keep-alive',
-            'Cache-Control': 'max-age=0',
-            'Upgrade-Insecure-Requests': '1',
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-            'Accept-Language': 'en-US,en;q=0.9',
-        } 
-    params = (
-        ('requestType', 'PRReportsRH'),
-        ('actionVal', 'DailyLabour'),
-        ('id', location_id),
-        ('type', '-1'),
-        ('type1', ''),
-        ('dept', ''),
-        ('fromDate', ''),
-        ('toDate', ''),
-        ('Rtype', ''),
-        ('reportGroup', ''),
-        ('fto', 'Gangaraju Madugula'),
-        ('LinkType', '-1'),
-        ('rtype', ''),
-        ('reptype', ''),
-        ('date', date),
-        ('program', ''),
-        ('type2', ''),
-        ('type3', ''),
-    )
+    date = datetime.strftime(datetime.now() - timedelta(1), '%d/%m/%Y')
     column_headers = [
         'S.No',
         'Panchayat Name',
@@ -550,10 +523,44 @@ def get_ap_labour_report_r3_17(lobj, logger):
         '% of groups working over demanded',
         '% of labour reported over Target'
     ]
-    logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s location %s" % (district_code,block_code,panchayat_code, location_id))
-
-
+    logger.debug("DistrictCode: %s, block_code : %s , location %s" % (district_code, block_code, location_id))
     url = 'http://www.nrega.ap.gov.in/Nregs/'
+    '''
+    Using sesssion below
+    res = ap_nrega_download_page(logger, url)
+    if (not res) or (res.status_code != 200):
+        return None
+    cookies = res.cookies
+    logger.debug(f"cookies are {cookies}")
+    '''
+    headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+        } 
+    params = (
+            ('requestType', 'PRReportsRH'),
+            ('actionVal', 'DailyLabour'),
+            ('id', location_id),
+            ('type', '-1'),
+            ('type1', ''),
+            ('dept', ''),
+            ('fromDate', ''),
+            ('toDate', ''),
+            ('Rtype', ''),
+            ('reportGroup', ''),
+            ('fto', ''),
+            ('LinkType', '-1'),
+            ('rtype', ''),
+            ('reptype', ''),
+            ('date', date),
+            ('program', ''),
+            ('type2', ''),
+            ('type3', ''),
+        )
     url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
     logger.info('Fetching URL[%s] for cookies' % url)
     cookies = ''
@@ -565,26 +572,28 @@ def get_ap_labour_report_r3_17(lobj, logger):
             return None
         logger.debug(f"cookies are {cookies}")
 
-
-        #response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
-        response = ap_nrega_download_page(logger, url1, session=session, headers=headers, params=params, cookies=cookies)
+        response = ap_nrega_download_page(
+            logger, url1, session=session,
+            headers=headers, params=params,
+            cookies=cookies)
         if (not response) or (response.status_code != 200):
             return None
+    myhtml = response.content
+    extract_dict = {}
+    extract_dict['column_headers'] = column_headers
+    extract_dict['table_id'] = 'sortable'
+    extract_dict['data_start_row'] = 3
+    dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    logger.info(f"the shape of dataframe is {dataframe.shape}")
+    if dataframe is None:
+        return None
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name"]
+    cols = location_cols + column_headers
+    dataframe = dataframe[cols]
+    logger.info(f"Before: the shape of dataframe is {dataframe.shape}")
+    dataframe = dataframe[dataframe['S.No'] != 'Total']
+    logger.info(f"After: the shape of dataframe is {dataframe.shape}")
 
-        myhtml = response.content
-        extract_dict = {}
-        extract_dict['column_headers'] = column_headers
-        extract_dict['table_id'] = 'sortable'
-        extract_dict['data_start_row'] = 3
-        dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
-        if dataframe is None:
-            return None
-        logger.info(f"the shape of dataframe is {dataframe.shape}")
-        dataframe = insert_location_details(logger, lobj, dataframe)
-        dataframe = dataframe[dataframe['S.No'] != 'Total']
-        location_cols = ["state_code", "state_name", "district_code",
-                         "district_name", "block_code", "block_name",
-                         "panchayat_code", "panchayat_name"]
-        cols = location_cols + column_headers
-        dataframe = dataframe[cols]
     return dataframe

@@ -375,18 +375,10 @@ class APBlock(Location):
         "Will fetch R3.17"
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
-        df_array = []
-        for each_panchayat_code in panchayat_array:
-            logger.info(f"Currently Processing panchayat code {each_panchayat_code}")
-            my_location = APPanchayat(logger, each_panchayat_code)
-            dataframe = get_ap_labour_report_r3_17(my_location, logger)
-            if dataframe is not None:
-                df_array.append(dataframe)
-        if len(df_array) > 0:
-            dataframe = pd.concat(df_array)
-            report_type = "ap_labour_report_r3_17"
-            if dataframe is not None:
-                self.save_report(logger, dataframe, report_type)
+        dataframe = get_ap_labour_report_r3_17(self, logger)
+        report_type = "ap_labour_report_r3_17"
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
 
 class NREGADistrict(Location):
     """This is the District class for NREGA"""
