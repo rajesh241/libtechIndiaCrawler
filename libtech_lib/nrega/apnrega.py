@@ -297,9 +297,9 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
     extract_dict['table_id'] = 'sortable'
     extract_dict['data_start_row'] = 3
     dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
-    logger.info(f"the shape of dataframe is {dataframe.shape}")
     if dataframe is None:
         return None
+    logger.info(f"the shape of dataframe is {dataframe.shape}")
     dataframe['tjobcard'] = "~" + dataframe['HouseHold Code']
     dataframe = insert_location_details(logger, lobj, dataframe)
     location_cols = ["state_code", "state_name", "district_code",
@@ -496,7 +496,7 @@ def get_ap_nefms_report_r14_37(lobj, logger):
     cols = location_cols + column_headers
     dataframe = dataframe[cols]
     logger.info(f"Before: the shape of dataframe is {dataframe.shape}")
-    dataframe = dataframe[dataframe['S.No'] != 'Total']
+    dataframe = dataframe[dataframe['S.No.'] != 'Total']
     logger.info(f"After: the shape of dataframe is {dataframe.shape}")
     return dataframe
 
