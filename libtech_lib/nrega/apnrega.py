@@ -11,6 +11,8 @@ import time
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
+
 from libtech_lib.generic.commons import  (get_current_finyear,
                       get_full_finyear,
                       standardize_dates_in_dataframe,
@@ -211,14 +213,16 @@ def ap_nrega_download_page(logger, url, cookies=None, params=None, headers=None)
     timeout = 0
     while (retry < max_retry):
         try:
+            logger.info(f'Attempting to fetch the URL[{url}] for the {retry+1} time')
             res = requests.get(url, cookies=cookies, params=params,
                                headers=headers, verify=False)
             retry = max_retry
-            time.sleep(timeout)
         except Exception as e:
             retry = retry + 1
             timeout += 5
+            time.sleep(timeout)
             logger.warning(f'Need to retry. Failed {retry} time(s). Exception[{e}]')
+            logger.warning(f'Waiting for {timeout} seconds...')
     return res
 
 def get_ap_suspended_payments_r14_5(lobj, logger):
@@ -484,8 +488,11 @@ def get_ap_nefms_report_r14_37(lobj, logger):
                      "panchayat_code", "panchayat_name"]
     #cols = location_cols + ["tjobcard"] + column_headers
     cols = location_cols + column_headers
-    df = dataframe[cols]
-    dataframe = df[:-1] # TBD df[df.name != 'Total']
+    dataframe = df = dataframe[cols]
+    logger.info(f"Before: the shape of dataframe is {dataframe.shape}")
+    #df = df[~df[df.columns[0]].str.contains('Total')]   FIXME even this did not work df[df[df.columns[0]] != 'Total'] even index 1 does not
+    dataframe = df[:-1]
+    logger.info(f"After: the shape of dataframe is {dataframe.shape}")
     return dataframe
 
 def get_ap_labour_report_r3_17(lobj, logger):
@@ -498,7 +505,7 @@ def get_ap_labour_report_r3_17(lobj, logger):
     panchayat_code = lobj.panchayat_code[8:10]
     location_id = district_code + block_code
     lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
-    date = '20/06/2020'
+    date = datetime.strftime(datetime.now() - timedelta(1), '%d/%m/%Y')
     column_headers = [
         'S.No',
         'Panchayat Name',
@@ -571,7 +578,10 @@ def get_ap_labour_report_r3_17(lobj, logger):
                      "district_name", "block_code", "block_name",
                      "panchayat_code", "panchayat_name"]
     cols = location_cols + column_headers
-    dataframe = dataframe[cols]
-    # dataframe = df[:-1] # TBD df[df.name != 'Total']
+    dataframe = df = dataframe[cols]
+    logger.info(f"Before: the shape of dataframe is {dataframe.shape}")
+    #df = df[~df[df.columns[0]].str.contains('Total')]   FIXME even this did not work df[df[df.columns[0]] != 'Total'] even index 1 does not
+    dataframe = df[:-1]
+    logger.info(f"After: the shape of dataframe is {dataframe.shape}")
 
     return dataframe
