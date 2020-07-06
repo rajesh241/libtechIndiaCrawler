@@ -122,6 +122,17 @@ def api_update_crawl_accuracy(logger, location_id, accuracy, scheme="nrega"):
     res = requests.patch(LOCATIONURL, headers=headers, data=json.dumps(data))
     logger.info(f"Patch status for data accuracy is {res.status_code}")
     
+def api_location_update(logger, location_id, data, scheme="nrega"):
+    """Given location ID, this function will update the data_json field"""
+    utc_now = pytz.utc.localize(datetime.datetime.utcnow())
+    india_now = utc_now.astimezone(pytz.timezone("Asia/Calcutta"))
+    india_now_isoformat = india_now.isoformat()
+    headers = get_authentication_header()
+    data = {
+        "id" : location_id,
+        "data_json" : data
+    }
+    res = requests.patch(LOCATIONURL, headers=headers, data=json.dumps(data))
 def get_location_dict(logger, location_code=None, location_id=None, scheme=None):
     """Given a location Code for a database Location ID, this function will
     return a dict containing all the meta data avilable by querying the API"""
@@ -271,14 +282,14 @@ def create_update_report(logger, location_id, report_type, data,
     if the report does not exists this will create the report
     or update to an existing report"""
     headers = get_authentication_header()
-    logger.info(headers)
+    #logger.debug(headers)
     if finyear is None:
         finyear = 'NA'
     #Upload report to s3 and get the url
     report_url = upload_s3(logger, filename, data)
     if isinstance(data, pd.DataFrame):
         excel_url = report_url.rstrip('csv')+"xlsx"
-    logger.info(f"Location ID is {location_id}")
+    logger.debug(f"Location ID is {location_id}")
     #First check if report Exists
     data = {
         'report_type' : report_type,
@@ -296,8 +307,6 @@ def create_update_report(logger, location_id, report_type, data,
             'report_url': report_url,
             'excel_url': excel_url,
             }
-        logger.info(REPORTURL)
-        logger.info(post_data)
         res = requests.post(REPORTURL, headers=headers, data=json.dumps(post_data))
         logger.debug(f"Post status {res.status_code} and response {res.content}")
     else:
