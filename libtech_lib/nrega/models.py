@@ -85,7 +85,6 @@ class Location():
         if self.location_type == "block":
             return filepath
         filepath = f"{filepath}/{self.panchayat_code}"
-        logger.info("filepath is ")
         return filepath
 
     def get_report_filepath(self, logger, report_type, finyear=None):
@@ -103,9 +102,9 @@ class Location():
         if self.force_download:
             return False
         filename = self.get_report_filepath(logger, report_type, finyear=finyear)
-        logger.info(f"report name is {filename}")
+        logger.debug(f"report name is {filename}")
         days_diff = days_since_modified_s3(logger, filename)
-        logger.info(f"days diff is {days_diff}")
+        logger.debug(f"days diff is {days_diff}")
         if days_diff is None:
             return False
         threshold = REPORT_THRESHOLD_DICT.get(report_type,
@@ -125,7 +124,7 @@ class Location():
         filepath = self.get_file_path(logger)
         filepath = filepath.replace("reportType", report_type)
         filename = f"{filepath}/{report_filename}"
-        logger.info(f"file name is {filename}")
+        logger.debug(f"Report will be saved at {filename}")
         create_update_report(logger, self.id, report_type,
                              data, filename, finyear=finyear)
     def fto_status_urls(self, logger):
@@ -284,7 +283,6 @@ class NREGAPanchayat(Location):
         is_updated = self.is_report_updated(logger, report_type)
         if is_updated:
             return
-        logger.info(f"District code is {self.district_code}")
         my_location = NREGADistrict(logger, self.district_code,
                                     force_download=False)
         my_location.nic_stat_urls(logger)
@@ -400,9 +398,9 @@ class NREGADistrict(Location):
         """This function will get the nic stat URLs for all the panchayats and
         blocks"""
         report_type = "nic_stat_urls"
-        logger.info(f"force download is {self.force_download}")
+        logger.debug(f"force download is {self.force_download}")
         is_updated = self.is_report_updated(logger, report_type)
-        logger.info(f"CHecking if nic stat urls is updated{is_updated}")
+        #logger.info(f"CHecking if nic stat urls is updated{is_updated}")
         if is_updated:
             return
         exit(0)
@@ -418,6 +416,15 @@ class NREGADistrict(Location):
             dataframe = pd.concat(dataframe_array)
             report_type = "nic_stat_urls"
             self.save_report(logger, dataframe, report_type)
+    def nic_stats(self, logger):
+        """This will fetch NIC Stats for all the blocks and panchayats under
+        this district"""
+        block_array = self.get_all_blocks(logger)
+        for block_code in block_array:
+            my_location = NREGABlock(logger, block_code,
+                                     force_download=self.force_download)
+            my_location.nic_stats(logger)
+
         
 
 
@@ -449,7 +456,6 @@ class NREGABlock(Location):
         is_updated = self.is_report_updated(logger, report_type)
         if is_updated:
             return
-        logger.info(f"District code is {self.district_code}")
         my_location = NREGADistrict(logger, self.district_code,
                                     force_download=False)
         my_location.nic_stat_urls(logger)
@@ -458,6 +464,11 @@ class NREGABlock(Location):
         dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
         report_type = "nic_stats"
         self.save_report(logger, dataframe, report_type)
+        panchayat_array = self.get_all_panchayats(logger)
+        for each_panchayat_code in panchayat_array:
+            my_location = NREGAPanchayat(logger, each_panchayat_code,
+                                         force_download=self.force_download)
+            dataframe = my_location.nic_stats(logger)
     def block_rejected_transactions(self, logger):
         """This will fetch all the rejected transactions of the block"""
         get_block_rejected_transactions(self, logger)

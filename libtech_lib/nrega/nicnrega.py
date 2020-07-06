@@ -22,6 +22,7 @@ from libtech_lib.generic.commons import  (get_current_finyear,
                                           )
 from libtech_lib.generic.api_interface import  (api_get_report_url,
                                                 api_get_report_dataframe,
+                                                api_location_update,
                                                 get_location_dict
                                                )
 from libtech_lib.generic.html_functions import get_dataframe_from_html, get_dataframe_from_url
@@ -740,15 +741,15 @@ def get_nic_stat_urls(lobj, logger, panchayat_code_array):
 
 def get_nic_stats(lobj, logger, nic_stat_urls_df):
     """This function will fetch nic Stats"""
-    logger.info("Going to fetch nic Stats")
-    logger.info(nic_stat_urls_df.columns)
+    logger.info(f"Going to fetch nic Stats for {lobj.code}-{lobj.name}")
+    logger.debug(nic_stat_urls_df.columns)
     filtered_df = nic_stat_urls_df[nic_stat_urls_df['location_code'] ==
                                    int(lobj.code)].reset_index()
-    logger.info(f"length of filtered_df is {len(filtered_df)}")
+    logger.debug(f"length of filtered_df is {len(filtered_df)}")
     if len(filtered_df) != 1:
         return None
     stats_url = filtered_df.loc[0, "stats_url"]
-    logger.info(stats_url)
+    logger.debug(stats_url)
     res = requests.get(stats_url)
     if res.status_code != 200:
         return None
@@ -781,7 +782,9 @@ def get_nic_stats(lobj, logger, nic_stat_urls_df):
             for each_year in fin_array:
                 fin_stat[each_year] = row.get(each_year, 0)
             stat_dict[slugify(name)] = fin_stat
-    logger.info(stat_dict)
+    data_json = lobj.data_json
+    data_json["at_a_glance"] = stat_dict
+    api_location_update(logger, lobj.id, data_json)
     return dataframe
 
 def get_data_accuracy(lobj, logger, muster_transactions_df, nic_stats_df):
