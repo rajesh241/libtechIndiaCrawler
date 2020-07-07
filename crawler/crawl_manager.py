@@ -47,7 +47,10 @@ def execute_task(logger, task_id=None, process_name=None):
     func_name = task_dict.get("report_type", None)
     scheme = task_dict.get("scheme", None)
     task_id = task_dict.get("id", None)
-    my_location = getattr(models, location_class)(logger=logger, location_code=location_code)
+    force_download = task_dict.get("force_download", False)
+    my_location = getattr(models, location_class)(logger=logger,
+                                                  location_code=location_code,
+                                                 force_download=force_download)
     status = "inProgress"
     patch_data = {
         'id' : task_id,

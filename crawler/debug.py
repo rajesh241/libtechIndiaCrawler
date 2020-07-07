@@ -4,6 +4,7 @@ import argparse
 from libtech_lib.generic.commons import logger_fetch
 from libtech_lib.nrega.models import NREGAPanchayat, NREGABlock, APPanchayat
 from libtech_lib.nrega import models
+from libtech_lib.samples.models import LibtechSample
 from libtech_lib.generic.api_interface import create_task, api_get_child_locations
 from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                             get_dataframe_from_url,
@@ -25,6 +26,8 @@ def args_fetch():
     parser.add_argument('-t', '--test', help='Test Loop',
                         required=False, action='store_const', const=1)
     parser.add_argument('-i', '--insert', help='Insert in Queue',
+                        required=False, action='store_const', const=1)
+    parser.add_argument('-p', '--populate', help='Populate Queue',
                         required=False, action='store_const', const=1)
     parser.add_argument('-notnic', '--notnic', help='Not an NIC',
                         required=False, action='store_const', const=1)
@@ -62,6 +65,20 @@ def main():
     """Main Module of this program"""
     args = args_fetch()
     logger = logger_fetch(args.get('log_level'))
+    if args['populate']:
+        logger.info("Populating Crawl Queue")
+        location_code = args.get('locationCode', None)
+        location_type = args.get('locationType', 'panchayat')
+        func_name = args.get('func_name', None)
+        is_not_nic = args.get('notnic', None)
+        is_nic = not is_not_nic
+        if args['forceDownload']:
+            force_download = True
+        else:
+            force_download = False
+        my_sample = LibtechSample(logger,location_code,location_type,
+                                  force_download=force_download)
+        my_sample.populate_queue(logger, func_name)
     if args['insert']:
         logger.info("Inserting in Crawl Queue")
         location_code = args.get('locationCode', None)

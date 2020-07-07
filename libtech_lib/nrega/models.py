@@ -56,6 +56,11 @@ class Location():
         location_dict = get_location_dict(logger, self.code, scheme=self.scheme)
         for key, value in location_dict.items():
             setattr(self, key, value)
+    def get_child_locations(self, logger):
+        """Will fetch all the child location codes"""
+        location_array = api_get_child_locations(logger, self.code,
+                                                  scheme=self.scheme)
+        return location_array
     def fetch_report_dataframe(self, logger, report_type, finyear=None):
         """Fetches the report dataframe from amazon S3"""
         dataframe = api_get_report_dataframe(logger, self.id, report_type,
