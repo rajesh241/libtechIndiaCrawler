@@ -275,7 +275,7 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
             ('ytype', ''),
             ('Date2', '-1'),
             ('ltype', ''),
-            ('year', '2020-2021'),
+            ('year', '2019-2020'),
             ('program', 'ALL'),
             ('fileName', location_id),
             ('stype', ''),
