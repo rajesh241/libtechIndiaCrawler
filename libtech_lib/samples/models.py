@@ -48,7 +48,6 @@ class LibtechSample():
             data['force_download'] = self.force_download
             logger.info(data)
             create_task(logger, data)
-            break
     def get_all_locations(self, logger):
         """This function will populate the Queue"""
         sample_location_codes = [self.parent_location_code]
