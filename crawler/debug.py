@@ -4,7 +4,7 @@ import argparse
 from libtech_lib.generic.commons import logger_fetch
 from libtech_lib.nrega.models import NREGAPanchayat, NREGABlock, APPanchayat
 from libtech_lib.nrega import models
-from libtech_lib.samples.models import LibtechSample
+from libtech_lib.samples.models import LibtechSample, APITDABlockSample
 from libtech_lib.generic.api_interface import create_task, api_get_child_locations
 from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                             get_dataframe_from_url,
@@ -36,6 +36,7 @@ def args_fetch():
                         help='Location type that needs tobe instantiated', required=False)
     parser.add_argument('-fn', '--func_name', help='Name of the function', required=False)
     parser.add_argument('-sn', '--sample_name', help='Name of the function', required=False)
+    parser.add_argument('-ls', '--location_sample', help='Location Sample Name', required=False)
     parser.add_argument('-ti1', '--testInput1', help='Test Input 1', required=False)
     parser.add_argument('-ti2', '--testInput2', help='Test Input 2', required=False)
     args = vars(parser.parse_args())
@@ -72,12 +73,19 @@ def main():
         func_name = args.get('func_name', None)
         is_not_nic = args.get('notnic', None)
         is_nic = not is_not_nic
+        location_sample = args.get("location_sample", None)
         if args['forceDownload']:
             force_download = True
         else:
             force_download = False
-        my_sample = LibtechSample(logger,location_code,location_type,
-                                  force_download=force_download)
+        if location_sample is None:
+            my_sample = LibtechSample(logger,parent_location_code=location_code,sample_type=location_type,
+                                      force_download=force_download)
+        elif location_sample == "APITDABlockSample":
+            logger.info("I am here")
+            my_sample = APITDABlockSample(logger,
+                                          force_download=force_download)
+            logger.info(my_sample.sample_location_codes)
         my_sample.populate_queue(logger, func_name)
     if args['insert']:
         logger.info("Inserting in Crawl Queue")
@@ -137,7 +145,10 @@ def main():
             force_download = False
         location_code = args.get('locationCode', None)
         func_name = args.get('func_name', None)
-        sample_name = args.get('sample_name', 'on_demand')
+        sample_name = args.get('sample_name', "on_demand")
+        if sample_name is None:
+            sample_name = "on_demand"
+        logger.info(f"in debug sample name is {sample_name}")
         location_type = args.get('locationType', 'panchayat')
         location_codes = []
         location_class = get_location_class(logger, location_type,

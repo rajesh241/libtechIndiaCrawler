@@ -19,6 +19,7 @@ from libtech_lib.generic.commons import  (get_current_finyear,
                       get_default_start_fin_year,
                       insert_location_details,
                       get_finyear_from_muster_url,
+                      insert_finyear_in_dataframe,
                       get_fto_finyear
                      )
 from libtech_lib.generic.api_interface import api_get_report_url, api_get_report_dataframe
@@ -412,20 +413,21 @@ def get_ap_nefms_report_r14_37(lobj, logger):
     lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
     column_headers = [
         'S.No.',
-        'File Name',
-        'File Sent Date',
-        'No. of Transactions',
-        'Transaction URL',
-        'No. of Wage Seekers',
-        'Total Amount',
-        'Success Transactions',
-        'Success Amount',
-        'Rejected Transactions',
-        'Rejected Amount',
-        'Response Pending Transactions',
-        'Response Pending Amount',
-        'Release Pending Transactions',
-        'Release Pending Amount'
+        'File_Name',
+        'File_Sent_Date',
+        'No._of_Transactions',
+        'Transaction_URL',
+        'No._of_Wage_Seekers',
+        'Total_Amount',
+        'Success_Transactions',
+        'Success_Amount',
+        'Rejected_Transactions',
+        'Rejected_Transaction_URL',
+        'Rejected_Amount',
+        'Response_Pending_Transactions',
+        'Response_Pending_Amount',
+        'Release_Pending_Transactions',
+        'Release_Pending_Amount'
     ]
     logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s location %s" % (district_code,block_code,panchayat_code, location_id))
     url = 'http://www.nrega.ap.gov.in/Nregs/'
@@ -482,7 +484,8 @@ def get_ap_nefms_report_r14_37(lobj, logger):
     extract_dict['column_headers'] = column_headers
     extract_dict['table_id'] = 'sortable'
     extract_dict['data_start_row'] = 3
-    extract_dict['extract_url_array'] = [3]
+    extract_dict['extract_url_array'] = [3, 8]
+    extract_dict['url_prefix'] = "http://www.nrega.ap.gov.in"
     dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
     logger.info(f"the shape of dataframe is {dataframe.shape}")
     if dataframe is None:
@@ -564,12 +567,12 @@ def get_ap_labour_report_r3_17(lobj, logger):
     url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
     logger.info('Fetching URL[%s] for cookies' % url)
     cookies = ''
-    with requests.Session() as session:
+    with requests.session() as session:
         #res = session.get(url)
         res = ap_nrega_download_page(logger, url, session=session)
         cookies = session.cookies
         if (not res) or (res.status_code != 200):
-            return None
+            return none
         logger.debug(f"cookies are {cookies}")
 
         response = ap_nrega_download_page(
@@ -577,7 +580,7 @@ def get_ap_labour_report_r3_17(lobj, logger):
             headers=headers, params=params,
             cookies=cookies)
         if (not response) or (response.status_code != 200):
-            return None
+            return none
     myhtml = response.content
     extract_dict = {}
     extract_dict['column_headers'] = column_headers
@@ -597,3 +600,116 @@ def get_ap_labour_report_r3_17(lobj, logger):
     logger.info(f"After: the shape of dataframe is {dataframe.shape}")
 
     return dataframe
+
+
+def get_ap_rejected_transactions(lobj, logger, fto_report_df):
+    """Get AP rejected transactions"""
+    logger.debug(f"Labout report df columns {fto_report_df.columns}")
+    column_headers = ['sr_no', 'tjobcard', 'worker_code', 'name',
+                      'epayorder_no', 'amount', 'nrega_account_no', 'file_sent_date',
+                      'credit_status', 'credited_account_no', 'bank_name',
+                      'bank_iin', 'utr_no', 'remarks']
+    headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+        } 
+    cookies = None
+    params = None
+    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    with requests.session() as session:
+        #res = session.get(url)
+        res = ap_nrega_download_page(logger, url, session=session)
+        cookies = session.cookies
+        if (not res) or (res.status_code != 200):
+            return none
+        logger.debug(f"cookies are {cookies}")
+    job_list = []
+    extract_dict = {}
+    extract_dict['column_headers'] = column_headers
+    extract_dict['table_id'] = 'sortable'
+    extract_dict['data_start_row'] = 2
+    static_col_names = ["panchayat_code", "panchayat_name", "fto_date"]
+    static_col_values = ["", "", ""]
+    func_name = "ap_fetch_table_from_url"
+
+    for index, row in fto_report_df.iterrows():
+        rej_count = row.get("Rejected_Transactions", 0)
+        fto_date = row.get("File_Sent_Date", None)
+        rej_url = row.get("Rejected_Transaction_URL", None)
+        panchayat_code = row.get("panchayat_code", None)
+        panchayat_name = row.get("panchayat_name", None)
+        static_col_values = [panchayat_code, panchayat_name, fto_date]
+        if rej_count > 0:
+           # func_args[1] = rej_url
+           # func_args[8] = static_col_values
+            func_args = [lobj, rej_url, session, headers, params, cookies, extract_dict,
+                 static_col_names, static_col_values]
+            job_dict = {
+                'func_name' : func_name,
+                'func_args' : func_args
+            }
+            job_list.append(job_dict)
+    csv_array = []
+    for item in job_list:
+        func_args = item["func_args"]
+        csv_array.append(func_args)
+    dataframe = pd.DataFrame(csv_array)
+    dataframe.to_csv("/tmp/c.csv")
+    dataframe = libtech_queue_manager(logger, job_list)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    dataframe['~tjobcard'] = "~" + dataframe['tjobcard']
+    dataframe = insert_finyear_in_dataframe(logger, dataframe,
+                                            "fto_date",
+                                            date_format="%d-%b-%Y")
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name", "fto_date", "finyear"]
+    cols = location_cols + ["~tjobcard"] + column_headers
+    dataframe = dataframe[dataframe["~tjobcard"]!="~2"]
+    dataframe = dataframe[cols]
+    return dataframe
+
+
+
+def get_ap_rejected_transactions1(lobj, logger):
+    """Get AP rejected transactions"""
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+    panchayat_code = lobj.panchayat_code[8:10]
+    headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+        } 
+    location_id = f'{district_code}~{block_code}~{panchayat_code}'
+    logger.info(location_id)
+    baseURL=f"http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=SmartCardreport_engRH&actionVal=NEFMS&id={location_id}&type=&Date=-1&File=&Agency=&listType=&yearMonth=-1&ReportType=&flag=-1&Rtype=-1&Date1=-1&wtype=-1&ytype=-1&Date2=-1&ltype=-1&year=&program=&fileName={location_id}&stype=-1&ptype=-1&lltype=ITDA"
+    logger.info(f"AP URL is {baseURL}")
+    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    cookies = ''
+    with requests.session() as session:
+        #res = session.get(url)
+        res = ap_nrega_download_page(logger, url, session=session)
+        cookies = session.cookies
+        if (not res) or (res.status_code != 200):
+            return none
+        logger.debug(f"cookies are {cookies}")
+
+        response = ap_nrega_download_page(
+            logger, baseURL, session=session,
+            headers=headers, params=None,
+            cookies=cookies)
+        if (not response) or (response.status_code != 200):
+            return none
+    logger.debug("Found HTML!!!")
+    myhtml = response.content
+    with open("/tmp/a.html", "wb") as f:
+        f.write(myhtml)
+

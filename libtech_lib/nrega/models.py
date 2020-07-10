@@ -35,7 +35,8 @@ from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_not_enrolled_r14_21A,
                                        get_ap_labour_report_r3_17,
                                        get_ap_suspended_payments_r14_5,
-                                       get_ap_nefms_report_r14_37
+                                       get_ap_nefms_report_r14_37,
+                                       get_ap_rejected_transactions
                                       )
 from libtech_lib.generic.aws import days_since_modified_s3
 AP_STATE_CODE = "02"
@@ -159,6 +160,9 @@ class APPanchayat(Location):
             self.home_url = "http://www.nrega.ap.gov.in/Nregs/FrontServlet"
         else:
             self.home_url = "http://www.nrega.telangana.gov.in/Nregs/FrontServlet"
+    def ap_rejected_transactions(self, logger):
+        """This will download Rejected Transactions for AP"""
+        logger.info("this method has been depreceated and instead use block level report")
     def ap_jobcard_register(self, logger):
         """Will Fetch the Jobcard Register"""
         logger.info(f"Going to fetch Jobcard register for {self.code}")
@@ -373,13 +377,24 @@ class APBlock(Location):
             if dataframe is not None:
                 #FIXME TBD merge here with Ranu's help
                 self.save_report(logger, dataframe, report_type)
-
+    
+    
     def ap_labour_report_r3_17(self, logger):
         "Will fetch R3.17"
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
         dataframe = get_ap_labour_report_r3_17(self, logger)
         report_type = "ap_labour_report_r3_17"
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+    def ap_rejected_transactions(self, logger):
+        """Will download individual level rejected transactions"""
+        self.ap_nefms_report_r14_37(logger)
+        report_type = "ap_nefms_report_r14_37"
+        fto_report_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = get_ap_rejected_transactions(self, logger, fto_report_df)
+        report_type = "ap_rejected_transactions"
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
 

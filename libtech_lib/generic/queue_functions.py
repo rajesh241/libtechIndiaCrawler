@@ -16,6 +16,7 @@ from libtech_lib.generic.commons import (insert_finyear_in_dataframe,
                                          get_default_start_fin_year,
                                          get_params_from_url,
                                          get_percentage,
+                                         ap_nrega_download_page,
                                          get_fto_finyear
                                         )
 
@@ -247,6 +248,31 @@ def get_block_rejected_transactions(lobj, logger):
     logger.info(f"Processing {lobj.code}")
     dataframe = None
    # panchayat_ids = lobj.get_all_panchayat_ids(logger)
+    return dataframe
+
+def ap_fetch_table_from_url(logger, func_args, thread_name):
+    """This function is specifically for AP and it would get the table from the
+    given url"""
+    lobj = func_args[0]
+    url = func_args[1]
+    session = func_args[2]
+    headers = func_args[3]
+    params = func_args[4]
+    cookies = func_args[5]
+    extract_dict = func_args[6]
+    static_col_names = func_args[7]
+    static_col_values = func_args[8]
+    response = ap_nrega_download_page(
+        logger, url, session=session,
+        headers=headers, params=params,
+        cookies=cookies)
+
+    if (not response) or (response.status_code != 200):
+        return None
+    myhtml = response.content
+    dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    for index, col_name in enumerate(static_col_names):
+        dataframe[col_name] = static_col_values[index]
     return dataframe
 
 def fetch_table_from_url(logger, func_args, thread_name=None):

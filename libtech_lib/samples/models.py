@@ -5,7 +5,7 @@ from libtech_lib.generic.api_interface import (create_task
 
 class LibtechSample():
     """This is the base Location Class"""
-    def __init__(self, logger, parent_location_code, sample_type, force_download='false',
+    def __init__(self, logger, parent_location_code=None, sample_type="block", force_download='false',
                  scheme='nrega', name="on_demand", is_nic=True):
         self.parent_location_code = parent_location_code
         self.sample_type = sample_type
@@ -67,5 +67,17 @@ class LibtechSample():
         self.sample_location_codes = sample_location_codes 
 
         
-
- 
+class APITDABlockSample(LibtechSample):
+    def __init__(self, logger, force_download='false',
+                 name="on_demand"):
+        self.parent_location_code = None
+        self.sample_type = "block"
+        self.name = name
+        self.scheme = "nrega"
+        self.is_nic = False
+        self.force_download = force_download
+        self.location_class = self.get_location_class(logger)
+        self.sample_location_codes = ['0203006','0203005','0203012','0203004','0203011','0203013','0203003','0203014','0203001','0203010','0203002']
+    def get_all_locations(self, logger):
+        """This function will populate the Queue"""
+        return
