@@ -34,8 +34,7 @@ def main():
         force_download = True
         location_class = "APBlock"
         itda_blocks = ['0203006','0203005','0203012','0203004','0203011','0203013','0203003','0203014','0203001','0203010','0203002']
-        report_types = ["ap_labour_report_r3_17", "ap_not_enrolled_r14_21A",
-                        "ap_suspended_payments_r14_5", "ap_nefms_report_r14_37"]
+        report_types = ["ap_suspended_payments_r14_5"]
         for report_type in report_types:
             for location_code in itda_blocks:
                 my_location = getattr(models, location_class)(logger=logger,
