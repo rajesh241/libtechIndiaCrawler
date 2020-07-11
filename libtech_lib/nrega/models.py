@@ -21,9 +21,11 @@ from libtech_lib.generic.api_interface import (get_location_dict,
 from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_worker_register,
                                         get_muster_list,
+                                        update_muster_list,
                                         get_jobcard_transactions,
                                         get_block_rejected_transactions,
                                         get_muster_transactions,
+                                        update_muster_transactions,
                                         get_fto_status_urls,
                                         get_block_rejected_stats,
                                         get_nic_stats,
@@ -228,8 +230,8 @@ class NREGAPanchayat(Location):
         if (is_updated):
             return
         logger.info(f"Going to fetch Jobcard Transactions for {self.code}")
-        self.jobcard_register(logger)
-        self.worker_register(logger)
+        #self.jobcard_register(logger)
+        #self.worker_register(logger)
         report_type = "jobcard_register"
         jobcard_register_df = self.fetch_report_dataframe(logger, report_type)
         dataframe = get_jobcard_transactions(self, logger, jobcard_register_df)
@@ -243,10 +245,13 @@ class NREGAPanchayat(Location):
         #if (is_updated) and (not self.force_download):
         if (is_updated):
             return
-        self.jobcard_transactions(logger)
+        #self.jobcard_transactions(logger)
         report_type = "jobcard_transactions"
         jobcard_transaction_df = self.fetch_report_dataframe(logger, report_type)
-        dataframe = get_muster_list(self, logger, jobcard_transaction_df)
+        report_type = "muster_list"
+        muster_list_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = update_muster_list(self, logger, jobcard_transaction_df,
+                                       muster_list_df)
         report_type = "muster_list"
         self.save_report(logger, dataframe, report_type)
     def correct(self, logger):
@@ -263,13 +268,12 @@ class NREGAPanchayat(Location):
         is_updated = self.is_report_updated(logger, report_type)
         if (is_updated) and (not self.force_download):
             return
-        self.muster_list(logger)
-        report_type = "muster_list"
-        muster_list_df = self.fetch_report_dataframe(logger, report_type)
-        report_type = "muster_transactions"
-        muster_transactions_df = self.fetch_report_dataframe(logger, report_type)
-        dataframe = get_muster_transactions(self, logger, muster_list_df,
-                                            muster_transactions_df)
+       # self.muster_list(logger)
+      # report_type = "muster_list"
+      # muster_list_df = self.fetch_report_dataframe(logger, report_type)
+      # report_type = "muster_transactions"
+      # muster_transactions_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = update_muster_transactions(self, logger)
         report_type = "muster_transactions"
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
