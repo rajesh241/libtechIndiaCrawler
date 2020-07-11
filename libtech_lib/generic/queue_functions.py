@@ -46,9 +46,9 @@ def fetch_muster_details(logger, func_args, thread_name=None):
         if not column_name.isdigit():
             columns_to_keep.append(column_name)
     dataframe = dataframe[columns_to_keep]
-    dataframe['muster_no'] = muster_no
-    dataframe['finyear'] = finyear
-    dataframe['block_code'] = block_code
+    #dataframe['muster_no'] = muster_no
+    #dataframe['finyear'] = finyear
+    #dataframe['block_code'] = block_code
     dataframe['muster_code'] = muster_code
     ##Now we will have to build a dictionary to rename the columns
     column_keys = muster_column_name_dict.keys()

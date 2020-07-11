@@ -30,6 +30,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_block_rejected_stats,
                                         get_nic_stats,
                                         get_data_accuracy,
+                                        create_work_payment_report,
                                         get_nic_stat_urls
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
@@ -230,8 +231,8 @@ class NREGAPanchayat(Location):
         if (is_updated):
             return
         logger.info(f"Going to fetch Jobcard Transactions for {self.code}")
-        #self.jobcard_register(logger)
-        #self.worker_register(logger)
+        self.jobcard_register(logger)
+        self.worker_register(logger)
         report_type = "jobcard_register"
         jobcard_register_df = self.fetch_report_dataframe(logger, report_type)
         dataframe = get_jobcard_transactions(self, logger, jobcard_register_df)
@@ -245,7 +246,7 @@ class NREGAPanchayat(Location):
         #if (is_updated) and (not self.force_download):
         if (is_updated):
             return
-        #self.jobcard_transactions(logger)
+        self.jobcard_transactions(logger)
         report_type = "jobcard_transactions"
         jobcard_transaction_df = self.fetch_report_dataframe(logger, report_type)
         report_type = "muster_list"
@@ -268,13 +269,21 @@ class NREGAPanchayat(Location):
         is_updated = self.is_report_updated(logger, report_type)
         if (is_updated) and (not self.force_download):
             return
-       # self.muster_list(logger)
-      # report_type = "muster_list"
-      # muster_list_df = self.fetch_report_dataframe(logger, report_type)
-      # report_type = "muster_transactions"
-      # muster_transactions_df = self.fetch_report_dataframe(logger, report_type)
+        self.muster_list(logger)
         dataframe = update_muster_transactions(self, logger)
         report_type = "muster_transactions"
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+    def work_payment(self, logger):
+        """this will create work payment report based on all other reports"""
+        report_type = "muster_transactions"
+        if (is_updated):
+            return
+        self.muster_transactions(logger)
+        is_updated = self.is_report_updated(logger, report_type)
+        dataframe = create_work_payment_report(self, logger)
+        report_type = "work_payment"
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
     def validate_data(self, logger):

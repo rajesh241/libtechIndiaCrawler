@@ -230,7 +230,6 @@ def update_muster_list(lobj, logger, jobcard_transactions_df,
     else:
         merged_df = jobcard_transactions_df.merge(current_muster_list_df,
                                                  on=['muster_code'], how='left', indicator=True)
-        merged_df.to_csv("/tmp/m.csv")
         filtered_df = merged_df[merged_df['_merge'] == 'left_only']
         
     logger.debug(f"the shape of filtered df is {filtered_df.shape}")
@@ -275,8 +274,7 @@ def update_muster_list(lobj, logger, jobcard_transactions_df,
         dataframe.loc[index, 'work_name'] = work_name
         dataframe.loc[index, 'work_code'] = work_code
         dataframe.loc[index, 'muster_code'] = muster_code
-        dataframe.loc[index, 'is_complete'] = False
-    dataframe['block_code'] = lobj.block_code
+    #dataframe['block_code'] = lobj.block_code
     logger.info(f"shape of dataframe is {dataframe.shape}")
     start_fin_year = get_default_start_fin_year()
     dataframe = dataframe[dataframe['finyear'] >= start_fin_year]
@@ -291,6 +289,43 @@ def update_muster_list(lobj, logger, jobcard_transactions_df,
     concat_df = concat_df.reset_index(drop=True)
     return concat_df
 
+def create_work_payment_report(lobj, logger):
+    """This function will create work payment report by merging different
+    reports"""
+    mt_df = lobj.fetch_report_dataframe(logger, "muster_transactions")
+    ml_df = lobj.fetch_report_dataframe(logger, "muster_list")
+    if mt_df is None:
+        return None
+    logger.debug(f"Shape of muster Transactions {mt_df.shape}")
+    if ml_df is not None:
+        wp_df = mt_df.merge(ml_df, on=['muster_code'], how='left')
+     #   merged_df = jobcard_transactions_df.merge(current_muster_list_df,
+     #                                            on=['muster_code'], how='left', indicator=True)
+    logger.debug(f"Shape of report after muster merge  {wp_df.shape}")
+    worker_df = lobj.fetch_report_dataframe(logger, "worker_register")
+    if worker_df is not None:
+        worker_df = worker_df.drop_duplicates(subset=['jobcard', 'name'],
+                                              keep='last')
+        wp_df = wp_df.merge(worker_df, how='left',
+                         on=['jobcard', 'name'])
+    logger.debug(f"Shape of report after worker merge  {wp_df.shape}")
+    col_list = ['state_code', 'state_name', 'district_code', 'district_name',
+                'block_code', 'block_name', 'panchayat_name', 'panchayat_code',
+                'village_name', 'jobcard', 'name', 'relationship',
+                'head_of_household', 'caste', 'IAY_LR', 'father_husband_name',
+                'gender', 'age', 'jobcard_request_date', 'jobcard_issue_date', 'jobcard_remarks',
+                'disabled', 'minority', 'jobcard_verification_date', 'work_code',
+                'work_name', 'finyear', 'muster_code', 'muster_no', 'muster_index',
+                'date_from', 'date_to', 'muster_url', 'm_caste',
+                'days_worked', 'day_wage', 'm_labour_wage', 'm_travel_cost',
+                'm_tools_cost', 'total_wage', 'm_postoffice_bank_name',
+                'm_pocode_bankbranch', 'm_poadd_bankbranchcode',
+                'm_wagelist_no', 'muster_status', 'credited_date',
+                ]
+
+    logger.info(wp_df.columns)
+    wp_df = wp_df[col_list]
+    return wp_df
 def update_muster_transactions(lobj, logger):
     """This function will download muster transactions"""
     current_mt_df = lobj.fetch_report_dataframe(logger, "muster_transactions")
@@ -324,7 +359,7 @@ def update_muster_transactions(lobj, logger):
         logger.info(url)
         muster_no = row['muster_no']
         finyear = row['finyear']
-        block_code = row['block_code']
+        block_code = lobj.block_code
         func_args = [lobj, url, cookies, muster_no, finyear, block_code,
                      muster_column_dict, muster_code]
         job_dict = {
@@ -344,8 +379,9 @@ def update_muster_transactions(lobj, logger):
     dataframe = libtech_queue_manager(logger, job_list, num_threads=500)
     if dataframe is None:
         return current_mt_df
-    dataframe = pd.concat([dataframe, current_mt_df])
-    dataframe.to_csv("/tmp/m.csv", index=False)
+    if current_mt_df is None:
+        return dataframe
+    dataframe = pd.concat([dataframe, completed_ml_df])
     return dataframe
   
 def get_muster_transactions(lobj, logger):
@@ -429,7 +465,6 @@ def get_muster_transactions1(lobj, logger, muster_list_df,
     else:
         musters_to_download_df = muster_list_df
     logger.info(musters_to_download_df.head())
-    musters_to_download_df.to_csv("/tmp/to_download.csv")
     logger.info(f"to be downloaded is {len(musters_to_download_df)}")
     logger.info(muster_list_df.columns)
     col_list = ['state_code', 'state_name', 'district_code', 'district_name',
@@ -438,8 +473,8 @@ def get_muster_transactions1(lobj, logger, muster_list_df,
                 'head_of_household', 'caste', 'IAY_LR', 'father_husband_name',
                 'gender', 'age', 'jobcard_request_date', 'jobcard_issue_date', 'jobcard_remarks',
                 'disabled', 'minority', 'jobcard_verification_date', 'work_code',
-                'work_name', 'finyear', 'muster_no', 'muster_index',
-                'date_from', 'date_to', 'muster_url',
+                'work_name', 'finyear', 'muster_code', 'muster_no', 'muster_index',
+                'date_from', 'date_to', 'muster_url', 'm_caste',
                 'days_worked', 'day_wage', 'm_labour_wage', 'm_travel_cost',
                 'm_tools_cost', 'total_wage', 'm_postoffice_bank_name',
                 'm_pocode_bankbranch', 'm_poadd_bankbranchcode',
@@ -578,7 +613,6 @@ def get_block_rejected_transactions(lobj, logger):
         dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict)
         dataframe_array.append(dataframe)
     rejected_df = pd.concat(dataframe_array, ignore_index=True)
-    #dataframe = pd.read_csv("/tmp/rejected_transactions.csv", index_col=0)
     logger.info(f"shape of dataframe is {dataframe.shape}")
     job_list = []
     func_name = "fetch_rejection_details"

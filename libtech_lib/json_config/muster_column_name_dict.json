@@ -15,7 +15,7 @@
     "उपस्थिति के अनुसार देय राशि":"m_labour_wage",
     "यात्रा और खान पान का व्यय" : "m_travel_cost",
     "Implements / Sharpening Charge":"m_tools_cost",
-    "Caste":"caste",
+    "Caste":"m_caste",
     "जाति" : "caste",
     "कुल हाजिरी":"days_worked",
     "Name/RegNo": "name_relationship",
