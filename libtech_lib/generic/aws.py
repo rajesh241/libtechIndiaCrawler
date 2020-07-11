@@ -82,7 +82,7 @@ def upload_s3(logger, filename, data, bucket_name=None):
     bucket = s3_instance.Bucket(bucket_name)
     if isinstance(data, pd.DataFrame):
         #If the data passed is a pandas dataframe
-        data['lastUpdateDate'] = datetime.datetime.now().date()
+        #data['lastUpdateDate'] = datetime.datetime.now().date()
         csv_buffer = StringIO()
         data.to_csv(csv_buffer, encoding='utf-8-sig', index=False)
         filedata = csv_buffer.getvalue()
