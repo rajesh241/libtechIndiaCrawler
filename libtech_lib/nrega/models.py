@@ -277,11 +277,11 @@ class NREGAPanchayat(Location):
 
     def work_payment(self, logger):
         """this will create work payment report based on all other reports"""
-        report_type = "muster_transactions"
+        report_type = "work_payment"
+        is_updated = self.is_report_updated(logger, report_type)
         if (is_updated):
             return
         self.muster_transactions(logger)
-        is_updated = self.is_report_updated(logger, report_type)
         dataframe = create_work_payment_report(self, logger)
         report_type = "work_payment"
         if dataframe is not None:

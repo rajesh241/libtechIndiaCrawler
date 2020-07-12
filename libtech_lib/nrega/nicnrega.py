@@ -195,7 +195,7 @@ def get_jobcard_transactions(lobj, logger, jobcards_dataframe):
             }
             job_list.append(job_dict)
     #dataframe = libtech_queue_manager(logger, job_list)
-    dataframe = libtech_queue_manager(logger, job_list[:20])
+    dataframe = libtech_queue_manager(logger, job_list)
     if dataframe is None:
         return
     transactions_columns =  ['srno', 'name', 'work_date', 'noOfDays',
