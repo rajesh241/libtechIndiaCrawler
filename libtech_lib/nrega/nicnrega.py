@@ -194,15 +194,47 @@ def get_jobcard_transactions(lobj, logger, jobcards_dataframe):
                 'func_args' : func_args
             }
             job_list.append(job_dict)
+    #dataframe = libtech_queue_manager(logger, job_list)
     dataframe = libtech_queue_manager(logger, job_list)
+    if dataframe is None:
+        return
+    transactions_columns =  ['srno', 'name', 'work_date', 'noOfDays',
+                             'work_name', 'work_name_url',
+                                    'muster_no', 'muster_no_url', 'amount',
+                             'payment_due', 'finyear']
+    logger.debug(f"transactions columns {transactions_columns}")
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    dataframe['muster_code'] = dataframe.apply(lambda row: str(row['block_code'])+"_"+str(row['finyear'])+"_"+str(row['muster_no']), axis=1)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    cols = location_cols + ["muster_code"] + transactions_columns
+    dataframe = dataframe[cols]
     return dataframe
 
-def get_muster_list(lobj, logger, jobcard_transactions_df):
+def get_muster_list(lobj, logger, jobcard_transactions_df,
+                       current_muster_list_df):
+    """Updating the muster list"""
+    if current_muster_list_df is None:
+        logger.info("Current Muster list is None")
+     
+def update_muster_list(lobj, logger, jobcard_transactions_df,
+                       current_muster_list_df):
     """From the jobcard transactions df this function will first get unique
     work urls and from work urls it will get all unique muster urls"""
-    logger.info(f"lenth of dataframe is  {len(jobcard_transactions_df)}")
-    col_list = ['muster_no', 'muster_url', 'finyear', 'date_from', 'date_to', 'work_name', 'work_code', 'block_code', 'lastUpdateDate']
-    work_url_array = jobcard_transactions_df.work_name_url.unique()
+    ##We need to find out the musters which do not exists inthe current musteirlist
+    logger.debug(f"Shape of jobcard transactiosn df is {jobcard_transactions_df.shape}")
+    logger.debug(f"jobcard transactions columns{jobcard_transactions_df.columns}")
+    if current_muster_list_df is None:
+        filtered_df = jobcard_transactions_df
+    else:
+        merged_df = jobcard_transactions_df.merge(current_muster_list_df,
+                                                 on=['muster_code'], how='left', indicator=True)
+        filtered_df = merged_df[merged_df['_merge'] == 'left_only']
+        
+    logger.debug(f"the shape of filtered df is {filtered_df.shape}")
+    col_list = ['muster_no', 'muster_url', 'finyear', 'date_from', 'date_to', 'work_name', 'work_code', 'block_code']
+    work_url_array = filtered_df.work_name_url.unique()
     logger.info(f"Number of unique work urls is {len(work_url_array)}")
     response = requests.get(lobj.panchayat_page_url)
     cookies = response.cookies
@@ -217,11 +249,11 @@ def get_muster_list(lobj, logger, jobcard_transactions_df):
         job_list.append(job_dict)
     dataframe = libtech_queue_manager(logger, job_list)
     if dataframe is None:
-        dataframe = pd.DataFrame(columns=col_list)
-        return dataframe
+        return current_muster_list_df
     #finyear_regex = re.compile(r'finyear=\d{4}-\d{4}')
     for index, row in dataframe.iterrows():
         url = row['muster_url']
+        muster_no = row['muster_no']
         parsed = urlparse.urlparse(url)
         params_dict = parse_qs(parsed.query)
         work_name = params_dict.get('wn', [''])[0]
@@ -235,12 +267,14 @@ def get_muster_list(lobj, logger, jobcard_transactions_df):
             finyear = int(finyear)
         else:
             finyear = 0
+        muster_code = f"{lobj.block_code}_{finyear}_{muster_no}"
         dataframe.loc[index, 'finyear'] = finyear
         dataframe.loc[index, 'date_from'] = date_from
         dataframe.loc[index, 'date_to'] = date_to
         dataframe.loc[index, 'work_name'] = work_name
         dataframe.loc[index, 'work_code'] = work_code
-    dataframe['block_code'] = lobj.block_code
+        dataframe.loc[index, 'muster_code'] = muster_code
+    #dataframe['block_code'] = lobj.block_code
     logger.info(f"shape of dataframe is {dataframe.shape}")
     start_fin_year = get_default_start_fin_year()
     dataframe = dataframe[dataframe['finyear'] >= start_fin_year]
@@ -248,8 +282,108 @@ def get_muster_list(lobj, logger, jobcard_transactions_df):
     dataframe = dataframe.drop_duplicates()
     logger.info(f"shape of dataframe is {dataframe.shape}")
     dataframe = dataframe.reset_index(drop=True)
-    return dataframe
+    if current_muster_list_df is None:
+        return dataframe
+    concat_df = pd.concat([dataframe, current_muster_list_df])
+    concat_df = concat_df.drop_duplicates()
+    concat_df = concat_df.reset_index(drop=True)
+    return concat_df
 
+def create_work_payment_report(lobj, logger):
+    """This function will create work payment report by merging different
+    reports"""
+    mt_df = lobj.fetch_report_dataframe(logger, "muster_transactions")
+    ml_df = lobj.fetch_report_dataframe(logger, "muster_list")
+    if mt_df is None:
+        return None
+    logger.debug(f"Shape of muster Transactions {mt_df.shape}")
+    if ml_df is not None:
+        wp_df = mt_df.merge(ml_df, on=['muster_code'], how='left')
+     #   merged_df = jobcard_transactions_df.merge(current_muster_list_df,
+     #                                            on=['muster_code'], how='left', indicator=True)
+    logger.debug(f"Shape of report after muster merge  {wp_df.shape}")
+    worker_df = lobj.fetch_report_dataframe(logger, "worker_register")
+    if worker_df is not None:
+        worker_df = worker_df.drop_duplicates(subset=['jobcard', 'name'],
+                                              keep='last')
+        wp_df = wp_df.merge(worker_df, how='left',
+                         on=['jobcard', 'name'])
+    logger.debug(f"Shape of report after worker merge  {wp_df.shape}")
+    col_list = ['state_code', 'state_name', 'district_code', 'district_name',
+                'block_code', 'block_name', 'panchayat_name', 'panchayat_code',
+                'village_name', 'jobcard', 'name', 'relationship',
+                'head_of_household', 'caste', 'IAY_LR', 'father_husband_name',
+                'gender', 'age', 'jobcard_request_date', 'jobcard_issue_date', 'jobcard_remarks',
+                'disabled', 'minority', 'jobcard_verification_date', 'work_code',
+                'work_name', 'finyear', 'muster_code', 'muster_no', 'muster_index',
+                'date_from', 'date_to', 'muster_url', 'm_caste',
+                'days_worked', 'day_wage', 'm_labour_wage', 'm_travel_cost',
+                'm_tools_cost', 'total_wage', 'm_postoffice_bank_name',
+                'm_pocode_bankbranch', 'm_poadd_bankbranchcode',
+                'm_wagelist_no', 'muster_status', 'credited_date',
+                ]
+
+    logger.info(wp_df.columns)
+    wp_df = wp_df[col_list]
+    return wp_df
+def update_muster_transactions(lobj, logger):
+    """This function will download muster transactions"""
+    current_mt_df = lobj.fetch_report_dataframe(logger, "muster_transactions")
+    if current_mt_df is None:
+        completed_muster_list = []
+    else:
+        completed_ml_df = current_mt_df[current_mt_df["is_complete"] == 1]
+        completed_muster_list = completed_ml_df.muster_code.unique()
+    logger.debug(f"Completed muster list is {completed_muster_list}")
+    ml_df = lobj.fetch_report_dataframe(logger, "muster_list")
+    logger.info(f"length of musters that need to be downloaded is {len(ml_df)}")
+    try:
+        response = requests.get(lobj.panchayat_page_url, timeout=10)
+    except requests.exceptions.Timeout as exp:
+        logger.error(exp)
+    cookies = response.cookies
+    logger.info(f"cookies are {cookies}")
+    ##Prepareing to run queue functions
+    job_list = []
+    func_name = "fetch_muster_details"
+    muster_column_config_file = f"{JSON_CONFIG_DIR}/muster_column_name_dict.json"
+    logger.info(muster_column_config_file)
+    with open(muster_column_config_file) as config_file:
+        muster_column_dict = json.load(config_file)
+    logger.info(muster_column_dict)
+    for index, row in ml_df.iterrows():
+        muster_code = row['muster_code']
+        if muster_code in completed_muster_list:
+            continue
+        url = row['muster_url']
+        logger.info(url)
+        muster_no = row['muster_no']
+        finyear = row['finyear']
+        block_code = lobj.block_code
+        func_args = [lobj, url, cookies, muster_no, finyear, block_code,
+                     muster_column_dict, muster_code]
+        job_dict = {
+            'func_name' : func_name,
+            'func_args' : func_args
+        }
+        job_list.append(job_dict)
+    muster_col_list = ['muster_index', 'jobcard', 'caste', 'days_worked', 'day_wage',
+                       'm_labour_wage',
+                              'm_travel_cost', 'm_tools_cost', 'total_wage',
+                       'm_postoffice_bank_name',
+                              'm_pocode_bankbranch', 'm_poadd_bankbranchcode',
+                       'm_wagelist_no',
+                              'muster_status', 'credited_date',
+                              'muster_no', 'finyear', 'block_code', 'name',
+                       'relationship']
+    dataframe = libtech_queue_manager(logger, job_list, num_threads=500)
+    if dataframe is None:
+        return current_mt_df
+    if current_mt_df is None:
+        return dataframe
+    dataframe = pd.concat([dataframe, completed_ml_df])
+    return dataframe
+  
 def get_muster_transactions(lobj, logger):
     """This function will download Muster Transactions"""
     """First it will take existing muster transactions, find out incomplete
@@ -331,7 +465,6 @@ def get_muster_transactions1(lobj, logger, muster_list_df,
     else:
         musters_to_download_df = muster_list_df
     logger.info(musters_to_download_df.head())
-    musters_to_download_df.to_csv("/tmp/to_download.csv")
     logger.info(f"to be downloaded is {len(musters_to_download_df)}")
     logger.info(muster_list_df.columns)
     col_list = ['state_code', 'state_name', 'district_code', 'district_name',
@@ -340,8 +473,8 @@ def get_muster_transactions1(lobj, logger, muster_list_df,
                 'head_of_household', 'caste', 'IAY_LR', 'father_husband_name',
                 'gender', 'age', 'jobcard_request_date', 'jobcard_issue_date', 'jobcard_remarks',
                 'disabled', 'minority', 'jobcard_verification_date', 'work_code',
-                'work_name', 'finyear', 'muster_no', 'muster_index',
-                'date_from', 'date_to', 'muster_url',
+                'work_name', 'finyear', 'muster_code', 'muster_no', 'muster_index',
+                'date_from', 'date_to', 'muster_url', 'm_caste',
                 'days_worked', 'day_wage', 'm_labour_wage', 'm_travel_cost',
                 'm_tools_cost', 'total_wage', 'm_postoffice_bank_name',
                 'm_pocode_bankbranch', 'm_poadd_bankbranchcode',
@@ -480,7 +613,6 @@ def get_block_rejected_transactions(lobj, logger):
         dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict)
         dataframe_array.append(dataframe)
     rejected_df = pd.concat(dataframe_array, ignore_index=True)
-    #dataframe = pd.read_csv("/tmp/rejected_transactions.csv", index_col=0)
     logger.info(f"shape of dataframe is {dataframe.shape}")
     job_list = []
     func_name = "fetch_rejection_details"
