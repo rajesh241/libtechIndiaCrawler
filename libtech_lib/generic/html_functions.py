@@ -52,7 +52,6 @@ def get_dataframe_from_url(logger, url, mydict=None, cookies=None):
     else:
         response = requests.get(url)
     dataframe = None
-    logger.info(f"REsponse status code is {response.status_code}")
     if response.status_code == 200:
         myhtml = response.content
         dataframe = get_dataframe_from_html(logger, myhtml, mydict=mydict)

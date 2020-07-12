@@ -4,6 +4,7 @@
 #pylint: disable-msg = too-many-statements
 #pylint: disable-msg = line-too-long
 import json
+import re
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -17,6 +18,7 @@ from libtech_lib.generic.commons import (insert_finyear_in_dataframe,
                                          get_params_from_url,
                                          get_percentage,
                                          ap_nrega_download_page,
+                                         get_date_object,
                                          get_fto_finyear
                                         )
 
@@ -29,23 +31,25 @@ def fetch_muster_details(logger, func_args, thread_name=None):
     finyear = func_args[4]
     block_code = func_args[5]
     muster_column_name_dict = func_args[6]
+    muster_code = func_args[7]
     extract_dict = {}
     extract_dict['pattern'] = f"{lobj.state_short_code}-"
     extract_dict['table_id_array'] = ["ctl00_ContentPlaceHolder1_grdShowRecords",
                                       "ContentPlaceHolder1_grdShowRecords"]
     extract_dict['split_cell_array'] = [1]
-    logger.info(f"Currently processing {url} by {thread_name}")
+    logger.debug(f"Currently processing {url} by {thread_name}")
     dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict,
                                        cookies=cookies)
-    logger.info(f"extracted dataframe columns {dataframe.columns}")
+    #logger.info(f"extracted dataframe columns {dataframe.columns}")
     columns_to_keep = []
     for column_name in dataframe.columns:
         if not column_name.isdigit():
             columns_to_keep.append(column_name)
     dataframe = dataframe[columns_to_keep]
-    dataframe['muster_no'] = muster_no
-    dataframe['finyear'] = finyear
-    dataframe['block_code'] = block_code
+    #dataframe['muster_no'] = muster_no
+    #dataframe['finyear'] = finyear
+    #dataframe['block_code'] = block_code
+    dataframe['muster_code'] = muster_code
     ##Now we will have to build a dictionary to rename the columns
     column_keys = muster_column_name_dict.keys()
     rename_dict = {}
@@ -53,6 +57,27 @@ def fetch_muster_details(logger, func_args, thread_name=None):
         if column_name in column_keys:
             rename_dict[column_name] = muster_column_name_dict[column_name]
     dataframe = dataframe.rename(columns=rename_dict)
+    rows_to_delete = []
+    is_complete = 1
+    for index, row in dataframe.iterrows():
+        sr_no = row.get("muster_index", None)
+        credited_date = row.get("credited_date", None)
+        if (sr_no is None) or (not sr_no.isdigit()):
+            rows_to_delete.append(index)
+        else:
+            credited_date_object = get_date_object(credited_date)
+            if credited_date_object is None:
+                is_complete = 0
+        name_relationship = row['name_relationship']
+        try:
+            relationship = re.search(r'\((.*?)\)', name_relationship).group(1)
+        except:
+            relationship = ''
+        name = name_relationship.replace(f"({relationship})", "")
+        dataframe.loc[index, 'name'] = name
+        dataframe.loc[index, 'relationship'] = relationship
+    dataframe = dataframe.drop(rows_to_delete)
+    dataframe['is_complete'] = is_complete
     return dataframe
 
 def fetch_muster_urls(logger, func_args, thread_name=None):

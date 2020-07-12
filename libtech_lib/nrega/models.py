@@ -21,13 +21,16 @@ from libtech_lib.generic.api_interface import (get_location_dict,
 from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_worker_register,
                                         get_muster_list,
+                                        update_muster_list,
                                         get_jobcard_transactions,
                                         get_block_rejected_transactions,
                                         get_muster_transactions,
+                                        update_muster_transactions,
                                         get_fto_status_urls,
                                         get_block_rejected_stats,
                                         get_nic_stats,
                                         get_data_accuracy,
+                                        create_work_payment_report,
                                         get_nic_stat_urls
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
@@ -246,7 +249,10 @@ class NREGAPanchayat(Location):
         self.jobcard_transactions(logger)
         report_type = "jobcard_transactions"
         jobcard_transaction_df = self.fetch_report_dataframe(logger, report_type)
-        dataframe = get_muster_list(self, logger, jobcard_transaction_df)
+        report_type = "muster_list"
+        muster_list_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = update_muster_list(self, logger, jobcard_transaction_df,
+                                       muster_list_df)
         report_type = "muster_list"
         self.save_report(logger, dataframe, report_type)
     def correct(self, logger):
@@ -264,13 +270,20 @@ class NREGAPanchayat(Location):
         if (is_updated) and (not self.force_download):
             return
         self.muster_list(logger)
-        report_type = "muster_list"
-        muster_list_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = update_muster_transactions(self, logger)
         report_type = "muster_transactions"
-        muster_transactions_df = self.fetch_report_dataframe(logger, report_type)
-        dataframe = get_muster_transactions(self, logger, muster_list_df,
-                                            muster_transactions_df)
-        report_type = "muster_transactions"
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+    def work_payment(self, logger):
+        """this will create work payment report based on all other reports"""
+        report_type = "work_payment"
+        is_updated = self.is_report_updated(logger, report_type)
+        if (is_updated):
+            return
+        self.muster_transactions(logger)
+        dataframe = create_work_payment_report(self, logger)
+        report_type = "work_payment"
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
     def validate_data(self, logger):
