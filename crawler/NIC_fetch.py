@@ -136,18 +136,149 @@ class NIC():
         work_codes = []
         for body_child in work_names_html:
             if isinstance(body_child, NavigableString):
-                #print(f'NavigableString[{body_child}]')
+                #logger.info(f'NavigableString[{body_child}]')
                 continue
             if isinstance(body_child, Tag):
                 work_code = body_child['value']
-                print(work_code)
+                logger.info(work_code)
                 if('---select---' in work_code):
+                    logger.warning(f'Skipping muster_no[{work_code}]')
                     continue
                 work_codes.append(work_code)
                 break
-            #print(work_name_html)
+            #logger.info(work_name_html)
         return work_codes
 
+    def fetch_muster_numbers(self, work_code):
+        logger = self.logger
+        logger.info(f'fetch_work_codes(work_code={work_code})')
+
+        headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'no-cache',
+            'X-MicrosoftAjax': 'Delta=true',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.142 Safari/537.36',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Accept': '*/*',
+            'Origin': 'http://nregasp2.nic.in',
+            'Referer': 'http://nregasp2.nic.in/netnrega/Citizen_html/Musternew.aspx?id=2&lflag=eng&ExeL=GP&fin_year=2020-2021&state_code=34&district_code=3424&block_code=3401020&panchayat_code=3401020002&State_name=JHARKHAND&District_name=KHUNTI&Block_name=TORPA&panchayat_name=BARKULI&Digest=Q+CEdRMQ8m7Jfvp6sBSfzg',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+
+        params = (
+            ('id', '2'),
+            ('lflag', 'eng'),
+            ('ExeL', 'GP'),
+            ('fin_year', '2020-2021'),
+            ('state_code', '34'),
+            ('district_code', '3424'),
+            ('block_code', '3401020'),
+            ('panchayat_code', '3401020002'),
+            ('State_name', 'JHARKHAND'),
+            ('District_name', 'KHUNTI'),
+            ('Block_name', 'TORPA'),
+            ('panchayat_name', 'BARKULI'),
+            ('Digest', 'Q CEdRMQ8m7Jfvp6sBSfzg'),
+        )
+
+        data = {
+          'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$ScriptManager1|ctl00$ContentPlaceHolder1$ddlwork',
+          '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddlwork',
+          '__EVENTARGUMENT': '',
+          '__LASTFOCUS': '',
+          '__VIEWSTATE': self.view_state,
+          '__EVENTVALIDATION': self.event_validation,
+          'ctl00$ContentPlaceHolder1$ddlFinYear': '2020-2021',
+          'ctl00$ContentPlaceHolder1$btnfill': 'btnfill',
+          'ctl00$ContentPlaceHolder1$txtSearch': '',
+          'ctl00$ContentPlaceHolder1$ddlwork': work_code,
+          'ctl00$ContentPlaceHolder1$ddlMsrno': '---select---',
+          '__ASYNCPOST': 'true',
+          '': ''
+        }
+
+        response = self.session.post('http://nregasp2.nic.in/netnrega/Citizen_html/Musternew.aspx', headers=headers, params=params, cookies=self.cookies, data=data, verify=False)
+        logger.debug(response)
+        filename = self.dir + slugify(f'{work_code}.html')
+        with open(filename, 'wb') as output:
+            print(f'Writing file[{filename}]')
+            output.write(response.content)
+
+        soup = BeautifulSoup(response.text, 'lxml')
+        logger.debug(soup)
+        muster_nos_dd = soup.find(id='ctl00_ContentPlaceHolder1_ddlMsrno')
+        logger.info(muster_nos_dd)
+        muster_nos = []
+        for body_child in muster_nos_dd:
+            if isinstance(body_child, NavigableString):
+                continue
+            if isinstance(body_child, Tag):
+                muster_no = body_child['value']
+                logger.info(muster_no)
+                if('---Select---' in muster_no):
+                    logger.warning(f'Skipping muster_no[{muster_no}]')
+                    continue
+                muster_nos.append(muster_no)
+                break
+
+
+        return muster_nos
+
+    def fetch_muster_roll(self, work_code, muster_no):
+        logger = self.logger
+        logger.info(f'fetch_muster_roll(work_code={work_code}, muster_no={muster_no})')
+        headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'no-cache',
+            'X-MicrosoftAjax': 'Delta=true',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.142 Safari/537.36',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Accept': '*/*',
+            'Origin': 'http://nregasp2.nic.in',
+            'Referer': 'http://nregasp2.nic.in/netnrega/Citizen_html/Musternew.aspx?id=2&lflag=eng&ExeL=GP&fin_year=2020-2021&state_code=34&district_code=3424&block_code=3401020&panchayat_code=3401020002&State_name=JHARKHAND&District_name=KHUNTI&Block_name=TORPA&panchayat_name=BARKULI&Digest=Q+CEdRMQ8m7Jfvp6sBSfzg',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+
+        params = (
+            ('id', '2'),
+            ('lflag', 'eng'),
+            ('ExeL', 'GP'),
+            ('fin_year', '2020-2021'),
+            ('state_code', '34'),
+            ('district_code', '3424'),
+            ('block_code', '3401020'),
+            ('panchayat_code', '3401020002'),
+            ('State_name', 'JHARKHAND'),
+            ('District_name', 'KHUNTI'),
+            ('Block_name', 'TORPA'),
+            ('panchayat_name', 'BARKULI'),
+            ('Digest', 'Q CEdRMQ8m7Jfvp6sBSfzg'),
+        )
+
+        data = {
+          'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel2|ctl00$ContentPlaceHolder1$ddlMsrno',
+          'ctl00$ContentPlaceHolder1$ddlFinYear': '2020-2021',
+          'ctl00$ContentPlaceHolder1$btnfill': 'btnfill',
+          'ctl00$ContentPlaceHolder1$txtSearch': '',
+          'ctl00$ContentPlaceHolder1$ddlwork': work_code,
+          'ctl00$ContentPlaceHolder1$ddlMsrno': muster_no,
+          '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddlMsrno',
+          '__EVENTARGUMENT': '',
+          '__LASTFOCUS': '',
+          '__VIEWSTATE': self.view_state,
+          '__EVENTVALIDATION': self.event_validation,
+          '__ASYNCPOST': 'true',
+          '': ''
+        }
+
+        response = self.session.post('http://nregasp2.nic.in/netnrega/Citizen_html/Musternew.aspx', headers=headers, params=params, cookies=self.cookies, data=data, verify=False)
+
+        filename = self.dir + slugify(f'{work_code}_{muster_no}.html')
+        with open(filename, 'wb') as output:
+            print(f'Writing file[{filename}]')
+            output.write(response.content)
+
+        return response.content
 
 class TestSuite(unittest.TestCase):
     def setUp(self):
@@ -162,6 +293,33 @@ class TestSuite(unittest.TestCase):
         nic = NIC(logger=self.logger)
         work_codes = nic.fetch_work_codes()
         if len(work_codes) != 0:
+            result = 'SUCCESS'
+        self.assertEqual(result, 'SUCCESS')
+        del nic
+
+    def test_fetch_muster_numbers(self):
+        self.logger.info('TestCase: fetch_work_codes()')
+        nic = NIC(logger=self.logger)
+        work_codes = nic.fetch_work_codes()
+        for work_code in work_codes:
+            muster_numbers = nic.fetch_muster_numbers(work_codes)
+            break
+        if len(muster_numbers) != 0:
+            result = 'SUCCESS'
+        self.assertEqual(result, 'SUCCESS')
+        del nic
+
+    def test_fetch_muster_roll(self):
+        self.logger.info('TestCase: fetch_work_codes()')
+        nic = NIC(logger=self.logger)
+        work_codes = nic.fetch_work_codes()
+        for work_code in work_codes:
+            muster_numbers = nic.fetch_muster_numbers(work_codes)
+            for muster_number in muster_numbers:
+                html = nic.fetch_muster_roll(work_code, muster_number)
+
+        print(html)
+        if len(muster_numbers) != 0:
             result = 'SUCCESS'
         self.assertEqual(result, 'SUCCESS')
         del nic
