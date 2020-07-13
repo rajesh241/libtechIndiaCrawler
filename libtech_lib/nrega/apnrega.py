@@ -644,8 +644,6 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
         panchayat_name = row.get("panchayat_name", None)
         static_col_values = [panchayat_code, panchayat_name, fto_date]
         if rej_count > 0:
-           # func_args[1] = rej_url
-           # func_args[8] = static_col_values
             func_args = [lobj, rej_url, session, headers, params, cookies, extract_dict,
                  static_col_names, static_col_values]
             job_dict = {
@@ -658,18 +656,33 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
         func_args = item["func_args"]
         csv_array.append(func_args)
     dataframe = pd.DataFrame(csv_array)
-    dataframe.to_csv("/tmp/c.csv")
     dataframe = libtech_queue_manager(logger, job_list)
     dataframe = insert_location_details(logger, lobj, dataframe)
     dataframe['~tjobcard'] = "~" + dataframe['tjobcard']
-    dataframe = insert_finyear_in_dataframe(logger, dataframe,
-                                            "fto_date",
-                                            date_format="%d-%b-%Y")
-    location_cols = ["state_code", "state_name", "district_code",
-                     "district_name", "block_code", "block_name",
-                     "panchayat_code", "panchayat_name", "fto_date", "finyear"]
-    cols = location_cols + ["~tjobcard"] + column_headers
     dataframe = dataframe[dataframe["~tjobcard"]!="~2"]
+    dataframe = insert_finyear_in_dataframe(logger, dataframe,
+                                           "fto_date",
+                                           date_format="%d-%b-%Y")
+    dataframe["tjobcard"] = dataframe["tjobcard"].astype(str).astype(int)
+    jr_df = lobj.fetch_report_dataframe(logger, "ap_jobcard_register")
+    jr_df.rename(columns = {'Jobcard ID':'tjobcard', 'Govt of India JobCard ID':'jobcard'},
+                       inplace = True)
+    col_list = ["tjobcard", "jobcard"]
+    jr_df = jr_df[col_list]
+    wr_df = lobj.fetch_report_dataframe(logger, "worker_register")
+    if jr_df is not None:
+        dataframe = dataframe.merge(jr_df, on=['tjobcard'], how='left')
+    if wr_df is not None:
+        col_list = ["jobcard", "village_name", "head_of_household", "caste"]
+        wr_df = wr_df[col_list]
+        wr_df = wr_df.drop_duplicates(subset=["jobcard"])
+        dataframe = dataframe.merge(wr_df, on=['jobcard'], how='left')
+    additional_cols = ["state_code", "state_name", "district_code",
+                      "district_name", "block_code", "block_name",
+                      "panchayat_code", "panchayat_name", "village_name", 
+                       "jobcard", "~tjobcard", "caste",
+                       "head_of_household", "finyear", "fto_date"]
+    cols = additional_cols + column_headers
     dataframe = dataframe[cols]
     return dataframe
 

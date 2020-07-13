@@ -31,7 +31,8 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_nic_stats,
                                         get_data_accuracy,
                                         create_work_payment_report,
-                                        get_nic_stat_urls
+                                        get_nic_stat_urls, 
+                                        get_ap_worker_register
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions,
@@ -163,6 +164,12 @@ class APPanchayat(Location):
             self.home_url = "http://www.nrega.ap.gov.in/Nregs/FrontServlet"
         else:
             self.home_url = "http://www.nrega.telangana.gov.in/Nregs/FrontServlet"
+    def worker_register(self, logger):
+        """This will fetch the worker register of AP from nic site"""
+        report_type = "worker_register"
+        dataframe = get_ap_worker_register(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
     def ap_rejected_transactions(self, logger):
         """This will download Rejected Transactions for AP"""
         logger.info("this method has been depreceated and instead use block level report")
@@ -332,6 +339,37 @@ class APBlock(Location):
         panchayat_array = api_get_child_locations(logger, self.code,
                                                   scheme='nrega')
         return panchayat_array
+    def ap_jobcard_register(self, logger):
+        """This function will fetch the jobcar dregister of AP"""
+        report_type = "ap_jobcard_register"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            my_location = APPanchayat(logger, each_panchayat_code)
+            dataframe = get_ap_jobcard_register(my_location, logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+    def worker_register(self, logger):
+        """this will fetch the worker register for entire block"""
+        report_type = "worker_register"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            my_location = APPanchayat(logger, each_panchayat_code)
+            dataframe = get_ap_worker_register(my_location, logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+
     def get_all_panchayat_ids(self, logger):
         """Getting all child Locations, in this case getting all panchayat
         locations IDs"""
@@ -404,6 +442,8 @@ class APBlock(Location):
     def ap_rejected_transactions(self, logger):
         """Will download individual level rejected transactions"""
         self.ap_nefms_report_r14_37(logger)
+        self.ap_jobcard_register(logger)
+        self.worker_register(logger)
         report_type = "ap_nefms_report_r14_37"
         fto_report_df = self.fetch_report_dataframe(logger, report_type)
         dataframe = get_ap_rejected_transactions(self, logger, fto_report_df)
