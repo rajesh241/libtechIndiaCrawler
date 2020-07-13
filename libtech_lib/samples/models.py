@@ -66,6 +66,8 @@ class LibtechSample():
         logger.info(f"Total samples selected is {len(sample_location_codes)}")
         self.sample_location_codes = sample_location_codes 
 
+
+
         
 class APITDABlockSample(LibtechSample):
     def __init__(self, logger, force_download='false',

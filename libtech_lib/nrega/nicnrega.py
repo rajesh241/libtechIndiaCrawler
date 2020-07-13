@@ -18,14 +18,18 @@ from libtech_lib.generic.commons import  (get_current_finyear,
                                           get_default_start_fin_year,
                                           get_percentage,
                                           get_previous_date,
-                                          insert_location_details
+                                          insert_location_details,
+                                          get_full_finyear
                                           )
 from libtech_lib.generic.api_interface import  (api_get_report_url,
                                                 api_get_report_dataframe,
                                                 api_location_update,
                                                 get_location_dict
                                                )
-from libtech_lib.generic.html_functions import get_dataframe_from_html, get_dataframe_from_url
+from libtech_lib.generic.html_functions import ( get_dataframe_from_html,
+                                                 get_dataframe_from_url,
+                                                 find_url_containing_text
+                                               )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 
 HOMEDIR = str(Path.home())
@@ -90,24 +94,27 @@ def get_jobcard_register(lobj, logger):
             dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
 
-def get_worker_register(lobj, logger):
+def get_worker_register(lobj, logger, worker_reg_url=None, cookies=None):
     """This function will get the worker register from the nrega url"""
     dataframe = None
-    logger.info(f"panchayat page url is {lobj.panchayat_page_url}")
-    res = requests.get(lobj.panchayat_page_url)
-    cookies = res.cookies
-    url = None
-    url_prefix = f"http://{lobj.crawl_ip}/netnrega/"
-    if res.status_code == 200:
-        myhtml = res.content
-        mysoup = BeautifulSoup(myhtml, "lxml")
-        links = mysoup.findAll("a")
-        for link in links:
-            href = link.get("href", "")
-            if "Panchregpeople.aspx" in href:
-                url = url_prefix + href
-                break
-    logger.info(f"url is {url}")
+    if worker_reg_url is None:
+        logger.info(f"panchayat page url is {lobj.panchayat_page_url}")
+        res = requests.get(lobj.panchayat_page_url)
+        cookies = res.cookies
+        url = None
+        url_prefix = f"http://{lobj.crawl_ip}/netnrega/"
+        if res.status_code == 200:
+            myhtml = res.content
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            links = mysoup.findAll("a")
+            for link in links:
+                href = link.get("href", "")
+                if "Panchregpeople.aspx" in href:
+                    url = url_prefix + href
+                    break
+        logger.info(f"url is {url}")
+    else:
+        url = worker_reg_url
     jobcard_prefix = f"{lobj.state_short_code}-"
     extract_dict = {}
     extract_dict['pattern'] = jobcard_prefix
@@ -943,3 +950,32 @@ def get_data_accuracy(lobj, logger, muster_transactions_df, nic_stats_df):
                               round_digits=2)
     logger.info(f"Accuracy is {accuracy}")
     return accuracy 
+
+def get_ap_worker_register(lobj, logger):
+    finyear = get_current_finyear()
+    fullfinyear = get_full_finyear(finyear)
+    block_url = f"http://mnregaweb4.nic.in/netnrega/Progofficer/PoIndexFrame.aspx?flag_debited=N&lflag=eng&District_Code={lobj.district_code}&district_name={lobj.district_name}&state_name={lobj.state_name}&state_Code={lobj.state_code}&finyear={fullfinyear}&check=1&block_name={lobj.block_name}&Block_Code={lobj.block_code}"
+    logger.info(f"block url is {block_url}")
+    res = requests.get(block_url)
+    if res.status_code != 200:
+        return None
+    myhtml = res.content
+    cookies = res.cookies
+    logger.info(f"cookies is {cookies}")
+    worker_register_identifier = "blockregpeople.aspx"
+    url_prefix = "http://mnregaweb4.nic.in/netnrega/placeholder/"
+    url = find_url_containing_text(myhtml, worker_register_identifier,
+                                   url_prefix=url_prefix)
+    logger.info(f"url is {url}")
+    res = requests.get(url, cookies=cookies)
+    if res.status_code != 200:
+        return None
+    myhtml = res.content
+    worker_register_identifier = lobj.panchayat_code
+    url_prefix = "http://mnregaweb4.nic.in/netnrega/placeholder1/placeholder2/"
+    url = find_url_containing_text(myhtml, worker_register_identifier,
+                                   url_prefix=url_prefix)
+    logger.info(f"worker url is {url}")
+    dataframe = get_worker_register(lobj, logger, worker_reg_url=url,
+                                    cookies=cookies)
+    return dataframe

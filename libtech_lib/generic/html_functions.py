@@ -8,6 +8,19 @@ import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 
+def find_url_containing_text(myhtml, mytext, url_prefix=None):
+    """This function will find the first url cotaining the mentioned text"""
+    url = None
+    if url_prefix is None:
+        url_prefix = ''
+    mysoup = BeautifulSoup(myhtml, "lxml")
+    links = mysoup.findAll("a")
+    for link in links:
+        href = link.get("href", "")
+        if mytext in href:
+            url = url_prefix + href
+            break
+    return url
 def get_urldataframe_from_html(logger, myhtml, mydict=None):
     """this will harvest urls from html based on the prameters specified in
     mydict"""
