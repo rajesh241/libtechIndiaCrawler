@@ -198,13 +198,21 @@ class NIC():
         }
 
         response = self.session.post('http://nregasp2.nic.in/netnrega/Citizen_html/Musternew.aspx', headers=headers, params=params, cookies=self.cookies, data=data, verify=False)
-        logger.debug(response)
-        filename = self.dir + slugify(f'{work_code}.html')
+        logger.info(response)
+        filename = f'{self.dir}/' + slugify(f'{work_code}') + '.html'
         with open(filename, 'wb') as output:
             print(f'Writing file[{filename}]')
             output.write(response.content)
 
-        soup = BeautifulSoup(response.text, 'lxml')
+        soup = BeautifulSoup(response.content, 'lxml')
+        body = soup.find('body')
+        logger.warning(body.text)
+        array = body.text.split('|')
+        self.view_state = array[array.index('__VIEWSTATE')+1]
+        logger.debug(self.view_state)
+        self.event_validation = array[array.index('__EVENTVALIDATION')+1]
+        logger.debug(self.event_validation)
+
         logger.debug(soup)
         muster_nos_dd = soup.find(id='ctl00_ContentPlaceHolder1_ddlMsrno')
         logger.info(muster_nos_dd)
@@ -273,7 +281,7 @@ class NIC():
 
         response = self.session.post('http://nregasp2.nic.in/netnrega/Citizen_html/Musternew.aspx', headers=headers, params=params, cookies=self.cookies, data=data, verify=False)
 
-        filename = self.dir + slugify(f'{work_code}_{muster_no}.html')
+        filename = f'{self.dir}/' + slugify(f'{work_code}_{muster_no}') + '.html'
         with open(filename, 'wb') as output:
             print(f'Writing file[{filename}]')
             output.write(response.content)
