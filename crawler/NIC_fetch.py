@@ -73,11 +73,102 @@ class NIC():
         self.cookies = self.session.cookies
         self.view_state = ''
         self.event_validation = ''
-
+        # self.set_context() Mynk FIXME TBD
+        
     def __del__(self):
         self.session.close()
         self.logger.info(f'Destructor({type(self).__name__})')
-    
+
+    def set_context(self):
+        logger = self.logger
+        logger.info(f'set_context()')
+
+        headers = {
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.142 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+
+        params = (
+            ('id', '2'),
+            ('lflag', 'eng'),
+            ('ExeL', 'GP'),
+            ('fin_year', '2020-2021'),
+            ('state_code', '34'),
+            ('district_code', '3424'),
+            ('block_code', '3401020'),
+            ('panchayat_code', '3401020002'),
+            ('State_name', 'JHARKHAND'),
+            ('District_name', 'KHUNTI'),
+            ('Block_name', 'TORPA'),
+            ('panchayat_name', 'BARKULI'),
+            ('Digest', 'Q CEdRMQ8m7Jfvp6sBSfzg'),
+        )
+
+        response = session.get('http://nregasp2.nic.in/netnrega/Citizen_html/Musternew.aspx', headers=headers, params=params, cookies=cookies, verify=False)
+        print(response)
+
+        # Update the context
+        soup = BeautifulSoup(response.text, 'lxml')
+        self.view_state = soup.find(id="__VIEWSTATE")['value']
+        self.event_validation = soup.find(id="__EVENTVALIDATION")['value']        
+
+    def set_financial_year(self, fin_year = None):
+        logger = self.logger
+        if not fin_year:
+            fin_year = '2020-2021'
+        logger.info(f'set_financial_year(fin_year={fin_year}')
+        headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'Origin': 'http://nregasp2.nic.in',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.142 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Referer': 'http://nregasp2.nic.in/netnrega/Citizen_html/Musternew.aspx?id=2&lflag=eng&ExeL=GP&fin_year=2020-2021&state_code=34&district_code=3424&block_code=3401020&panchayat_code=3401020002&State_name=JHARKHAND&District_name=KHUNTI&Block_name=TORPA&panchayat_name=BARKULI&Digest=Q+CEdRMQ8m7Jfvp6sBSfzg',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+
+        params = (
+            ('id', '2'),
+            ('lflag', 'eng'),
+            ('ExeL', 'GP'),
+            ('fin_year', fin_year),
+            ('state_code', '34'),
+            ('district_code', '3424'),
+            ('block_code', '3401020'),
+            ('panchayat_code', '3401020002'),
+            ('State_name', 'JHARKHAND'),
+            ('District_name', 'KHUNTI'),
+            ('Block_name', 'TORPA'),
+            ('panchayat_name', 'BARKULI'),
+            ('Digest', 'Q CEdRMQ8m7Jfvp6sBSfzg'),
+        )
+
+        data = {
+            '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddlFinYear',
+            '__EVENTARGUMENT': '',
+            '__LASTFOCUS': '',
+            '__VIEWSTATE': VIEWSTATE,
+            '__EVENTVALIDATION': EVENTVALIDATION,
+            'ctl00$ContentPlaceHolder1$ddlFinYear': '2019-2020',
+            'ctl00$ContentPlaceHolder1$btnfill': 'btnfill',
+            'ctl00$ContentPlaceHolder1$txtSearch': '',
+            'ctl00$ContentPlaceHolder1$ddlwork': '---select---',
+            'ctl00$ContentPlaceHolder1$ddlMsrno': '---select---'
+        }
+
+        response = session.post('http://nregasp2.nic.in/netnrega/Citizen_html/Musternew.aspx', headers=headers, params=params, cookies=cookies, data=data, verify=False)
+        print(response)
+
+        # Update the context
+        soup = BeautifulSoup(response.text, 'lxml')
+        self.view_state = soup.find(id="__VIEWSTATE")['value']
+        self.event_validation = soup.find(id="__EVENTVALIDATION")['value']        
+
     def fetch_work_codes(self, url=None):
         logger = self.logger
         if not url:
@@ -129,6 +220,8 @@ class NIC():
             html_file.write(html_source)
             
         soup = BeautifulSoup(html_source, 'lxml')
+
+        # Update the context
         self.view_state = soup.find(id="__VIEWSTATE")['value']
         self.event_validation = soup.find(id="__EVENTVALIDATION")['value']
 
@@ -151,7 +244,7 @@ class NIC():
 
     def fetch_muster_numbers(self, work_code):
         logger = self.logger
-        logger.info(f'fetch_work_codes(work_code={work_code})')
+        logger.info(f'fetch_muster_numbers(work_code={work_code})')
 
         headers = {
             'Connection': 'keep-alive',
@@ -205,6 +298,8 @@ class NIC():
             output.write(response.content)
 
         soup = BeautifulSoup(response.content, 'lxml')
+
+        # Update the context
         body = soup.find('body')
         logger.warning(body.text)
         array = body.text.split('|')
@@ -228,7 +323,6 @@ class NIC():
                     continue
                 muster_nos.append(muster_no)
                 break
-
 
         return muster_nos
 
