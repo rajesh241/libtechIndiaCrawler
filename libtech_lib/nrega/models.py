@@ -14,6 +14,7 @@ from libtech_lib.generic.commons import (get_full_finyear,
 from libtech_lib.generic.api_interface import (get_location_dict,
                                                create_update_report,
                                                api_get_report_dataframe,
+                                               api_get_report_urls,
                                                api_get_child_locations,
                                                api_get_child_location_ids,
                                                api_update_crawl_accuracy
@@ -66,6 +67,11 @@ class Location():
         location_array = api_get_child_locations(logger, self.code,
                                                   scheme=self.scheme)
         return location_array
+    def fetch_report_urls(self, logger, report_type, finyear=None):
+        """This will fetch the report urls"""
+        report_urls = api_get_report_urls(logger, self.id, report_type,
+                                          finyear=finyear)
+        return report_urls
     def fetch_report_dataframe(self, logger, report_type, finyear=None):
         """Fetches the report dataframe from amazon S3"""
         dataframe = api_get_report_dataframe(logger, self.id, report_type,

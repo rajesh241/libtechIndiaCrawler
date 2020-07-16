@@ -65,6 +65,15 @@ class LibtechSample():
             current_location_type = lobj.location_type
         logger.info(f"Total samples selected is {len(sample_location_codes)}")
         self.sample_location_codes = sample_location_codes 
+    def create_bundle(self, logger, report_types):
+        """This would create the zip bundle of all the reports"""
+        report_urls = []
+        for each_code in self.sample_location_codes:
+            lobj = Location(logger, location_code=each_code)
+            for report_type in report_types:
+                urls = lobj.fetch_report_urls(lobj, report_types)
+                report_urls = report_urls + urls
+        logger.info(report_urls)
 
 
 

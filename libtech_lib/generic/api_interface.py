@@ -262,6 +262,26 @@ def api_get_report_url(logger, location_id, report_type, finyear=None):
         report_url = report_dict.get('report_url', None)
     return report_url
 
+def api_get_report_urls(logger, location_id, report_type, finyear=None):
+    """Gets the report urls """
+    report_urls = []
+    params = {
+        'location' : location_id,
+        'report_type' : report_type
+    }
+    if finyear is not None:
+        params['finyear'] = finyear
+    response = fetch_data(logger, REPORTURL, params=params)
+    results = response.get("results", [])
+    if len(results) > 0:
+        report_dict = results[0]
+        report_url = report_dict.get('report_url', None)
+        excel_url = report_dict.get('excel_url', None)
+        report_urls.append(report_url)
+        report_urls.append(excel_url)
+    return report_urls
+
+
 def api_get_report_dataframe(logger, location_id, report_type,
                              finyear=None, index_col=0, dtype=None):
     """Gets the report dataframe"""
