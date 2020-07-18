@@ -223,9 +223,13 @@ class NREGAPanchayat(Location):
         logger.info(f"Going to fetch Jobcard register for {self.code}")
         report_type = "jobcard_register"
         is_updated = self.is_report_updated(logger, report_type)
+        dataframe = None
         if not is_updated:
             dataframe = get_jobcard_register(self, logger)
             self.save_report(logger, dataframe, report_type)
+        else:
+            dataframe = fetch_report_dataframe(logger, report_type)
+        return dataframe
     def worker_register(self, logger):
         """Will Fetch the Jobcard Register"""
         logger.info(f"Going to fetch Jobcard register for {self.code}")
@@ -233,9 +237,11 @@ class NREGAPanchayat(Location):
         is_updated = self.is_report_updated(logger, report_type)
         #if (is_updated) and (not self.force_download):
         if (is_updated):
-            return
+            dataframe = fetch_report_dataframe(logger, report_type)
+            return dataframe
         dataframe = get_worker_register(self, logger)
         self.save_report(logger, dataframe, report_type)
+        return dataframe
     def jobcard_transactions(self, logger):
         """This will fetch all jobcard transactions for the panchayat"""
         report_type = "jobcard_transactions"
@@ -548,6 +554,36 @@ class NREGABlock(Location):
             my_location = NREGAPanchayat(logger, each_panchayat_code,
                                          force_download=self.force_download)
             dataframe = my_location.nic_stats(logger)
+    def jobcard_register(self, logger):
+        """This will fetch jobcard register for each panchayat in the block"""
+        report_type = "jobcard_register"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            my_location = NREGAPanchayat(logger, each_panchayat_code)
+            dataframe = my_location.jobcard_register(logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+    def worker_register(self, logger):
+        """This will fetch worker register for each panchayat in the block"""
+        report_type = "worker_register"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            my_location = NREGAPanchayat(logger, each_panchayat_code)
+            dataframe = my_location.worker_register(logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
     def block_rejected_transactions(self, logger):
         """This will fetch all the rejected transactions of the block"""
         get_block_rejected_transactions(self, logger)
