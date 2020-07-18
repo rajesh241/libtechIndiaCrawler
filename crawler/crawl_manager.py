@@ -15,6 +15,7 @@ def args_fetch():
                                                   'you can copy this base script '))
     parser.add_argument('-l', '--log-level', help='Log level defining verbosity', required=False)
     parser.add_argument('-pn', '--processName', help='Process Name', required=False)
+    parser.add_argument('-tid', '--taskID', help='Process Name', required=False)
     parser.add_argument('-e', '--execute', help='Execute Task',
                         required=False, action='store_const', const=1)
     parser.add_argument('-t', '--test', help='Test Loop',
@@ -105,7 +106,8 @@ def main():
     if args['execute']:
         logger.info("Executing task")
         process_name = args.get("processName", "default")
-        execute_task(logger, process_name=process_name)
+        task_id = args.get("taskID", None)
+        execute_task(logger, process_name=process_name, task_id=task_id)
 
 if __name__ == '__main__':
     main()
