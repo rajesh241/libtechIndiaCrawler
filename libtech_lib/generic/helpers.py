@@ -32,4 +32,5 @@ def download_report(logger, location_code, location_type, report_name,
                                                   force_download=force_download,
                                                   sample_name=sample_name)
     method_to_call = getattr(my_location, report_name)
-    method_to_call(logger)
+    output = method_to_call(logger)
+    return output
