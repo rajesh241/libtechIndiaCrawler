@@ -4,6 +4,7 @@ import argparse
 from libtech_lib.generic.commons import logger_fetch
 from libtech_lib.nrega.models import NREGAPanchayat, NREGABlock, APPanchayat
 from libtech_lib.nrega import models
+from libtech_lib.samples import models as samplemodels
 from libtech_lib.samples.models import LibtechSample, APITDABlockSample
 from libtech_lib.generic.api_interface import create_task, api_get_child_locations
 from libtech_lib.generic.helpers import download_report
@@ -82,11 +83,14 @@ def main():
         if location_sample is None:
             my_sample = LibtechSample(logger,parent_location_code=location_code,sample_type=location_type,
                                       force_download=force_download)
-        elif location_sample == "APITDABlockSample":
-            logger.info("I am here")
-            my_sample = APITDABlockSample(logger,
-                                          force_download=force_download)
-            logger.info(my_sample.sample_location_codes)
+        else:
+            my_sample = getattr(samplemodels, location_sample)(logger,
+                                                               force_download=force_download)
+      # elif location_sample == "APITDABlockSample":
+      #     logger.info("I am here")
+      #     my_sample = APITDABlockSample(logger,
+      #                                   force_download=force_download)
+      #     logger.info(my_sample.sample_location_codes)
         my_sample.populate_queue(logger, func_name)
     if args['insert']:
         logger.info("Inserting in Crawl Queue")
@@ -155,8 +159,9 @@ def main():
         sample_name = args.get('sample_name', "on_demand")
         if sample_name is None:
             sample_name = "on_demand"
-        download_report(logger, location_code, location_type, report_name,
+        result = download_report(logger, location_code, location_type, report_name,
                         is_nic=is_nic, force_download=True)
+        logger.info(result)
         exit(0)
         logger.info(f"in debug sample name is {sample_name}")
         location_codes = []
