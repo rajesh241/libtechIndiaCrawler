@@ -7,7 +7,6 @@ import datetime
 from io import StringIO, BytesIO
 import boto3
 import pandas as pd
-import awswrangler as wr
 
 AWS_PROFILE_NAME = "libtechIndia"
 AWS_DATA_BUCKET = "libtech-india-data"
