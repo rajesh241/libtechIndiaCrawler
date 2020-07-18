@@ -4,7 +4,7 @@
 #pylint: disable-msg = too-many-statements
 #pylint: disable-msg = line-too-long
 #pylint: disable-msg = bare-except
-
+import os
 import re
 from pathlib import Path
 import urllib.parse as urlparse
@@ -32,13 +32,14 @@ from libtech_lib.generic.html_functions import ( get_dataframe_from_html,
                                                )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 
-HOMEDIR = str(Path.home())
-JSONCONFIGFILE = f"{HOMEDIR}/.libtech/crawlerConfig.json"
-with open(JSONCONFIGFILE) as CONFIG_file:
-    CONFIG = json.load(CONFIG_file)
-NREGA_DATA_DIR = CONFIG['nrega_data_dir']
-JSON_CONFIG_DIR = CONFIG['json_config_dir']
-
+#HOMEDIR = str(Path.home())
+#JSONCONFIGFILE = f"{HOMEDIR}/.libtech/crawlerConfig.json"
+#with open(JSONCONFIGFILE) as CONFIG_file:
+#    CONFIG = json.load(CONFIG_file)
+#NREGA_DATA_DIR = CONFIG['nrega_data_dir']
+#JSON_CONFIG_DIR = CONFIG['json_config_dir']
+NREGA_DATA_DIR = os.environ.get('NREGA_DATA_DIR', None)
+JSON_CONFIG_DIR = os.environ.get('JSON_CONFIG_DIR', None) 
 def nic_server_status(logger, location_code, scheme='nrega'):
     """Different States have different servers. This function will fetch the
     status of server for the corresponding location before the crawling
