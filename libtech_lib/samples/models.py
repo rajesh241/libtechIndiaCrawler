@@ -92,3 +92,59 @@ class APITDABlockSample(LibtechSample):
     def get_all_locations(self, logger):
         """This function will populate the Queue"""
         return
+
+class FESAPSample(LibtechSample):
+    def __init__(self, logger, force_download='false',
+             name="on_demand"):
+       self.parent_location_code = None
+       self.sample_type = "block"
+       self.name = name
+       self.scheme = "nrega"
+       self.is_nic = False
+       self.force_download = force_download
+       self.location_class = self.get_location_class(logger)
+       self.sample_location_codes = ['0210002', # Andhra Pradesh-Chittoor-Thamballapalle
+                                     '0210001', # Andhra Pradesh-Chittoor-Peddamandyam
+                                     '0212040' # Andhra Pradesh-Anantapur-Nambulipulikunta
+                                    ]
+    def get_all_locations(self, logger):
+        """This function will populate the Queue"""
+        return 
+
+class FESNICSample(LibtechSample):
+    def __init__(self, logger, force_download='false',
+                 name="on_demand"):
+        self.parent_location_code = None
+        self.sample_type = "block"
+        self.name = name
+        self.scheme = "nrega"
+        self.is_nic = True
+        self.force_download = force_download
+        self.location_class = self.get_location_class(logger)
+        self.sample_location_codes = ['2724007', # Rajasthan-Bhilwara-Sahada
+                                      '2724006', # Rajasthan-Bhilwara-Raipur
+                                      '2724010', # Rajasthan-Bhilwara-Jahajpur
+                                      '2724003', # Rajasthan-Bhilwara-Shahpura
+                                      '2724009', # Rajasthan-Bhilwara-Kotri
+                                      '2724005', # Rajasthan-Bhilwara-Mandal
+                                      '2724001', # Rajasthan-Bhilwara-Asind
+                                      '2724011', # Rajasthan-Bhilwara-Mandalagarh
+                                      '2726003', # Rajasthan-Udaipur-Gogunda
+                                      '2729012', # Rajasthan-Pratapgarh-Pratapgarh
+                                      '2728002', # Rajasthan-Pratapgarh-Peepalakhunt
+                                      '2729003', # Rajasthan-Chittorgarh-Begun
+                                      '2725002', # Rajasthan-Rajsamand-Devgarh
+                                      '2411003', # Odisha-Koraput-Pottangi
+                                      '2411002', # Odisha-Koraput-Semiliguda
+                                      '2421003', # Odisha-Angul-Athmallik
+                                      '2407005', # Odisha-Dhenkanal-Kankada Had
+                                      '2403007', # Odisha-Kendujhar-Bansapal
+                                      '1114006', # Gujarat-Mahisagar-Santrampur
+                                      '1114013', # Gujarat-Mahisagar-Kadana
+                                      '1528001', # Karnataka-Chikkaballapura-Bagepalli
+                                      '1528006', # Karnataka-Chikkaballapura-Sidlaghatta
+                                      '1825008' # Maharashtra-Yavatmal-Ghatanji
+                                     ]
+    def get_all_locations(self, logger):
+        """This function will populate the Queue"""
+        return 
