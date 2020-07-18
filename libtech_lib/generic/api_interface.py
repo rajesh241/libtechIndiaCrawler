@@ -1,5 +1,6 @@
 """This module has all the functions required to access REST API
 for the Django interface"""
+import os
 import datetime
 from pathlib import Path
 import json
@@ -9,15 +10,20 @@ import pytz
 
 from libtech_lib.generic.aws import upload_s3
 
-HOMEDIR = str(Path.home())
-JSONCONFIGFILE = f"{HOMEDIR}/.libtech/crawlerConfig.json"
-with open(JSONCONFIGFILE) as CONFIG_file:
-    CONFIG = json.load(CONFIG_file)
+#HOMEDIR = str(Path.home())
+#JSONCONFIGFILE = f"{HOMEDIR}/.libtech/crawlerConfig.json"
+#with open(JSONCONFIGFILE) as CONFIG_file:
+#    CONFIG = json.load(CONFIG_file)
 
-BASEURL = CONFIG['baseURL']
+#BASEURL = CONFIG['baseURL']
 #BASEURL = "http://b.libtech.in:8181"
-API_USER_NAME = CONFIG['apiusername']
-API_PASSWORD = CONFIG['apipassword']
+#API_USER_NAME = CONFIG['apiusername']
+#API_PASSWORD = CONFIG['apipassword']
+BASEURL = os.environ.get('LIBTECH_BACKEND_URL', None)
+API_USER_NAME = os.environ.get('LIBTECH_API_USERNAME', None)
+API_PASSWORD = os.environ.get('LIBTECH_API_PASSWORD', None)
+
+
 AUTHENDPOINT = '%s/api/user/token/' % (BASEURL)
 LOCATIONDATASTATUSURL = '%s/api/dataStatus/' % (BASEURL)
 LOCATIONURL = '%s/api/public/location/' % (BASEURL)
