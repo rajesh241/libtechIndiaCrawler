@@ -1,7 +1,7 @@
 """This has bunch of helper functions which can beused to initiate crawl"""
 from libtech_lib.nrega import models
 def get_location_class(logger, location_type, is_nic=True):
-    """This function will determine the class for NIC"""
+     """This function will determine the class for NIC"""
      LOCATION_CLASS = "Location"
      if location_type == "panchayat":
          if is_nic:

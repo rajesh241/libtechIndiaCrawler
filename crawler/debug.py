@@ -6,6 +6,7 @@ from libtech_lib.nrega.models import NREGAPanchayat, NREGABlock, APPanchayat
 from libtech_lib.nrega import models
 from libtech_lib.samples.models import LibtechSample, APITDABlockSample
 from libtech_lib.generic.api_interface import create_task, api_get_child_locations
+from libtech_lib.generic.helpers import download_report
 from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                             get_dataframe_from_url,
                             get_urldataframe_from_url,
@@ -145,11 +146,19 @@ def main():
             force_download = False
         location_code = args.get('locationCode', None)
         func_name = args.get('func_name', None)
+        location_type = args.get('locationType', 'panchayat')
+        if args['notnic']:
+            is_nic = False
+        else:
+            is_nic = True
+        report_name = func_name
         sample_name = args.get('sample_name', "on_demand")
         if sample_name is None:
             sample_name = "on_demand"
+        download_report(logger, location_code, location_type, report_name,
+                        is_nic=is_nic, force_download=True)
+        exit(0)
         logger.info(f"in debug sample name is {sample_name}")
-        location_type = args.get('locationType', 'panchayat')
         location_codes = []
         location_class = get_location_class(logger, location_type,
                                             args['notnic'])
