@@ -131,7 +131,58 @@ def get_ap_muster_transactions(lobj, logger):
     dataframe = dataframe.reset_index(drop=True)
     return dataframe
 
+def fetch_ap_jobcard_register_for_village(logger, cookies, block_code, panchayat_code, village_code, village_name, extract_dict):
+    logger.info(f'fetch_ap_jobcard_register_for_village(cookies={cookies}, block_code={block_code}, panchayat_code={panchayat_code}, village_code={village_code}, village_name={village_name})')
 
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'max-age=0',
+        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Mobile Safari/537.36',
+        'Origin': 'http://www.nrega.ap.gov.in',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,/;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=WageSeekersRH&actionVal=JobCardHolder&param=JCHI&type=-1&Atype=Display&Ajaxid=Village',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+
+    params = (
+        ('requestType', 'WageSeekersRH'),
+        ('actionVal', 'JobCardHolder'),
+        ('param', 'JCHI'),
+        ('type', '-1'),
+        ('Ajaxid', 'go'),
+    )
+
+    data = {
+        'State': '01',
+        'District': '03',
+        'Mandal': block_code,
+        'Panchayat': panchayat_code,
+        'Village': village_code,
+        'HouseHoldId': '',
+        'Go': ''
+    }
+
+    response = requests.post('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data, verify=False)
+    
+    content = response.content
+    try:
+        #df = pd.read_html(content, attrs = {'id': 'sortable'})[0]
+        df = get_dataframe_from_html(logger, content, mydict=extract_dict)
+    except Exception as e:
+        logger.error(f'Errored in fetch. Exception[{e}]')
+        df = pd.read_html(content, attrs = {'id': 'Table2'})[0]
+        if df.iloc[0, 0] == 'No records found for the selection made':
+            logger.error('No records found for the selection made')
+            return []
+        
+    if df is None:
+        return []
+
+    df['village_code'] = village_code
+    df['village_name'] = village_name
+    return df
 
 def get_ap_jobcard_register(lobj, logger):
     """Download Jobcard Register for a given panchayat
@@ -177,7 +228,6 @@ def get_ap_jobcard_register(lobj, logger):
       'Upgrade-Insecure-Requests': '1',
      }
 
-
     data = [
     ('State', state_code),
     ('District', district_code),
@@ -201,7 +251,32 @@ def get_ap_jobcard_register(lobj, logger):
     extract_dict['data_start_row'] = 2
     if response.status_code == 200:
         myhtml = response.content
-        dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+        filename = f'../Data/panchayat_html/{district_code}_{block_code}_{panchayat_code}.html'
+        with open(filename, 'wb') as html_file:
+            logger.info(f'Writing file[{filename}]')
+            if DEBUG:
+                html_file.write(response.content)
+
+        soup = BeautifulSoup(response.content, 'lxml')
+        select = soup.find(id = 'Village')
+        options = select.find_all('option')
+
+        dfs = []
+        for option in options:
+            logger.info(f'{option}')
+            village_code = option['value']
+            if village_code == '-1':
+                continue
+            village_name = option.text
+            logger.info(f'Fetching jobcard register for village_code[{village_code}]/village_name[{village_name}]')
+            df = fetch_ap_jobcard_register_for_village(logger, cookies, block_code, panchayat_code, village_code, village_name, extract_dict)
+            if len(df):
+                logger.info(df.head)
+                dfs.append(df)
+        dataframe = pd.concat(dfs)
+        if DEBUG:
+            dataframe.to_csv(filename.replace('.html', '.csv'), index=False)
+
     if dataframe is not None:
         dataframe = insert_location_details(logger, lobj, dataframe)
         logger.info(dataframe.head())
