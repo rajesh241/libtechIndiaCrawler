@@ -576,15 +576,7 @@ def get_muster_transactions1(lobj, logger, muster_list_df,
 def get_block_rejected_transactions(lobj, logger):
     """This function will fetch all theblock rejected transactions"""
     #As a first step we need to get all the list of jobcards for that block
-    panchayat_ids = lobj.get_all_panchayat_ids(logger)
-    jobcard_df_array = []
-    report_type = 'worker_register'
-    for panchayat_id in panchayat_ids:
-        cur_df = api_get_report_dataframe(logger, panchayat_id, report_type,
-                                          finyear=None, index_col=0, dtype=None)
-        if cur_df is not None:
-            jobcard_df_array.append(cur_df)
-    jobcard_df = pd.concat(jobcard_df_array)
+    jobcard_df = lobj.fetch_report_dataframe(logger, "worker_register")
     #As a second step we need to create array of urls that we need to download
     urls_to_download = []
     url_report_types = ["NICRejectedTransactionsURL",
