@@ -4,6 +4,7 @@ throughout the library"""
 #pylint: disable-msg = too-many-nested-blocks
 #pylint: disable-msg = too-many-branches
 #pylint: disable-msg = too-many-statements
+import os
 import logging
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
@@ -231,4 +232,26 @@ def ap_nrega_download_page(logger, url, session=None, cookies=None, params=None,
             logger.warning(f'Waiting for {timeout} seconds...')
     return res
 
+def download_save_file(logger, url, dest_folder=None):
+    """This function will download file from internet and save it to
+    destination folder"""
+    if dest_folder is None:
+        current_timestamp = str(ts = datetime.datetime.now().timestamp())
+        dest_folder = f"/tmp/{current_timestamp}"
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)  # create folder if it does not exist
 
+    filename = url.split('/')[-1].replace(" ", "_")  # be careful with file names
+    file_path = os.path.join(dest_folder, filename)
+
+    r = requests.get(url, stream=True)
+    if r.ok:
+        logger.info(f"saving to {os.path.abspath(file_path)}")
+        with open(file_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1024 * 8):
+                if chunk:
+                    f.write(chunk)
+                    f.flush()
+                    os.fsync(f.fileno())
+    else:  # HTTP status code 4XX/5XX
+        logger.info("Download failed: status code {}\n{}".format(r.status_code, r.text)) 
