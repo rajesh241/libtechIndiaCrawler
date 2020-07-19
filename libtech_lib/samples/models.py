@@ -1,8 +1,12 @@
+import datetime
+import os
+import shutil
 from libtech_lib.nrega.models import Location
 from libtech_lib.nrega import models
 from libtech_lib.generic.api_interface import (create_task
                                               )
-
+from libtech_lib.generic.commons import download_save_file
+from libtech_lib.generic.aws import upload_s3
 class LibtechSample():
     """This is the base Location Class"""
     def __init__(self, logger, parent_location_code=None, sample_type="block", force_download='false',
@@ -65,7 +69,7 @@ class LibtechSample():
             current_location_type = lobj.location_type
         logger.info(f"Total samples selected is {len(sample_location_codes)}")
         self.sample_location_codes = sample_location_codes 
-    def create_bundle(self, logger, report_types):
+    def create_bundle(self, logger, report_types, download_dir=None, zip_file_name=None, save_to_s3=True):
         """This would create the zip bundle of all the reports"""
         report_urls = []
         for each_code in self.sample_location_codes:
@@ -74,9 +78,26 @@ class LibtechSample():
                 urls = lobj.fetch_report_urls(lobj, report_types)
                 report_urls = report_urls + urls
         logger.info(report_urls)
-
-
-
+        if download_dir is None:
+            current_timestamp = str(datetime.datetime.now().timestamp())
+            download_dir = f"/tmp/{current_timestamp}"
+        if zip_file_name is None:
+            zip_file_name = f"/tmp/{current_timestamp}"
+        for url in report_urls:
+            download_save_file(logger, url, dest_folder=download_dir)
+            break
+        shutil.make_archive(zip_file_name, 'zip', download_dir)
+        if save_to_s3 == True:
+            with open(f"{zip_file_name}.zip", "rb") as f:
+                filedata = f.read()
+            content_type = 'binary/octet-stream'
+            filename = zip_file_name.split('/')[-1].replace(" ", "_")
+            filename = f"temp_archives/{filename}.zip"
+            file_url = upload_s3(logger, filename, filedata, content_type=content_type)
+            return file_url
+        else:
+            return f"{zip_file_name}.zip"
+         
         
 class APITDABlockSample(LibtechSample):
     def __init__(self, logger, force_download='false',
