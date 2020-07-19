@@ -64,7 +64,7 @@ def get_aws_bucket(logger, bucket_name=None):
     bucket = s3_instance.Bucket(bucket_name)
     return bucket
 
-def upload_s3(logger, filename, data, bucket_name=None):
+def upload_s3(logger, filename, data, bucket_name=None, content_type=None):
     """
     This function will upload to amazon S3, it can take data either as
     string or as data frame
@@ -96,7 +96,8 @@ def upload_s3(logger, filename, data, bucket_name=None):
         content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         put_object_s3(bucket, excelfilename, filedata, content_type)
     else:
-        content_type = 'text/html'
+        if content_type is None:
+            content_type = 'text/html'
         filedata = data
         put_object_s3(bucket, filename, filedata, content_type)
 
