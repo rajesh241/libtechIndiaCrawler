@@ -228,7 +228,7 @@ class NREGAPanchayat(Location):
             dataframe = get_jobcard_register(self, logger)
             self.save_report(logger, dataframe, report_type)
         else:
-            dataframe = fetch_report_dataframe(logger, report_type)
+            dataframe = self.fetch_report_dataframe(logger, report_type)
         return dataframe
     def worker_register(self, logger):
         """Will Fetch the Jobcard Register"""
@@ -237,7 +237,7 @@ class NREGAPanchayat(Location):
         is_updated = self.is_report_updated(logger, report_type)
         #if (is_updated) and (not self.force_download):
         if (is_updated):
-            dataframe = fetch_report_dataframe(logger, report_type)
+            dataframe = self.fetch_report_dataframe(logger, report_type)
             return dataframe
         dataframe = get_worker_register(self, logger)
         self.save_report(logger, dataframe, report_type)
