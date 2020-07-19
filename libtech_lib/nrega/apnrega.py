@@ -13,6 +13,8 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
+LOCAL_DOWNLOAD = True
+
 from libtech_lib.generic.commons import  (get_current_finyear,
                       get_full_finyear,
                       standardize_dates_in_dataframe,
@@ -254,7 +256,7 @@ def get_ap_jobcard_register(lobj, logger):
         filename = f'../Data/panchayat_html/{district_code}_{block_code}_{panchayat_code}.html'
         with open(filename, 'wb') as html_file:
             logger.info(f'Writing file[{filename}]')
-            if DEBUG:
+            if LOCAL_DOWNLOAD:
                 html_file.write(response.content)
 
         soup = BeautifulSoup(response.content, 'lxml')
@@ -271,10 +273,10 @@ def get_ap_jobcard_register(lobj, logger):
             logger.info(f'Fetching jobcard register for village_code[{village_code}]/village_name[{village_name}]')
             df = fetch_ap_jobcard_register_for_village(logger, cookies, block_code, panchayat_code, village_code, village_name, extract_dict)
             if len(df):
-                logger.info(df.head)
+                #logger.info(df.head)
                 dfs.append(df)
         dataframe = pd.concat(dfs)
-        if DEBUG:
+        if LOCAL_DOWNLOAD:
             dataframe.to_csv(filename.replace('.html', '.csv'), index=False)
 
     if dataframe is not None:
