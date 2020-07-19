@@ -253,11 +253,11 @@ def get_ap_jobcard_register(lobj, logger):
     extract_dict['data_start_row'] = 2
     if response.status_code == 200:
         myhtml = response.content
-        filename = f'../Data/panchayat_html/{district_code}_{block_code}_{panchayat_code}.html'
-        with open(filename, 'wb') as html_file:
-            logger.info(f'Writing file[{filename}]')
-            if LOCAL_DOWNLOAD:
-                html_file.write(response.content)
+       #filename = f'../Data/panchayat_html/{district_code}_{block_code}_{panchayat_code}.html'
+       #with open(filename, 'wb') as html_file:
+       #    logger.info(f'Writing file[{filename}]')
+       #    if LOCAL_DOWNLOAD:
+       #        html_file.write(response.content)
 
         soup = BeautifulSoup(response.content, 'lxml')
         select = soup.find(id = 'Village')
@@ -276,8 +276,8 @@ def get_ap_jobcard_register(lobj, logger):
                 #logger.info(df.head)
                 dfs.append(df)
         dataframe = pd.concat(dfs)
-        if LOCAL_DOWNLOAD:
-            dataframe.to_csv(filename.replace('.html', '.csv'), index=False)
+       #if LOCAL_DOWNLOAD:
+       #    dataframe.to_csv(filename.replace('.html', '.csv'), index=False)
 
     if dataframe is not None:
         dataframe = insert_location_details(logger, lobj, dataframe)
