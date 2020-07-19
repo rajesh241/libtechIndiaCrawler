@@ -120,6 +120,14 @@ def main():
             create_task(logger, data)
 
     if args['test']:
+        location_sample = args.get("location_sample", None)
+        my_sample = getattr(samplemodels, location_sample)(logger)
+        report_types = ["jobcard_register", "nic_stats"]
+        zip_file_name = "/Users/goli/thrash/bbb"
+        download_dir  = "/Users/goli/thrash/bbb"
+        my_sample.create_bundle(logger, report_types, download_dir=download_dir, zip_file_name=zip_file_name)
+        exit(0)
+        
         state_codes = api_get_child_locations(logger, 0)
         for state_code in state_codes:
             district_codes = api_get_child_locations(logger, state_code)
