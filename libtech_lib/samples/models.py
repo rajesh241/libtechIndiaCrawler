@@ -85,7 +85,6 @@ class LibtechSample():
             zip_file_name = f"/tmp/{current_timestamp}"
         for url in report_urls:
             download_save_file(logger, url, dest_folder=download_dir)
-            break
         shutil.make_archive(zip_file_name, 'zip', download_dir)
         if save_to_s3 == True:
             with open(f"{zip_file_name}.zip", "rb") as f:
