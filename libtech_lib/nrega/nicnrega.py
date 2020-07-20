@@ -13,6 +13,7 @@ from slugify import slugify
 import json
 import requests
 import pandas as pd
+import numpy as np
 from bs4 import BeautifulSoup
 from libtech_lib.generic.commons import  (get_current_finyear,
                                           get_default_start_fin_year,
@@ -573,30 +574,57 @@ def get_muster_transactions1(lobj, logger, muster_list_df,
     logger.info(f"Length of data frame is {len(dataframe1)}")
     return dataframe
 
-def get_block_rejected_transactions(lobj, logger):
+def get_block_rejected_transactions(lobj, logger, rej_stat_df):
     """This function will fetch all theblock rejected transactions"""
     #As a first step we need to get all the list of jobcards for that block
     jobcard_df = lobj.fetch_report_dataframe(logger, "worker_register")
+    logger.info(f"Shape of rej_df is {rej_stat_df.shape}")
+    logger.info(f"Shape of rej_df is {rej_stat_df.columns}")
+    filtered_df = rej_stat_df[rej_stat_df['block_code'] == int(lobj.block_code)]
+    start_fin_year = get_default_start_fin_year()
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    filtered_df = filtered_df[filtered_df['finyear'] > int(start_fin_year)]
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    logger.info(start_fin_year)
     #As a second step we need to create array of urls that we need to download
     urls_to_download = []
-    url_report_types = ["NICRejectedTransactionsURL",
-                        "NICRejectedTransactionsPostURL",
-                        "NICRejectedTransactionsCoBankURL"
-                       ]
-    start_fin_year = get_default_start_fin_year()
-    current_fin_year = get_current_finyear()
-    finyear_array = []
-    for finyear in range(start_fin_year, int(current_fin_year) +1):
-        finyear_array.append(finyear)
-    ##Now we will loop thorugh finyear and urls to create an array of urls that
-    ##needs to be fetched
-    for url_report_type in url_report_types:
-        for finyear in finyear_array:
-            report_url = api_get_report_url(logger, lobj.id,
-                                            url_report_type, finyear=finyear)
-            if report_url is not None:
-                urls_to_download.append(report_url)
+    filtered_df = filtered_df.fillna('')
+    for index, row in filtered_df.iterrows():
+        finyear = row['finyear']
+        fin_agency = row['fin_agency']
+        url = row['rejected_url']
+        if url != '':
+            p = {}
+            p['fin_agency'] = fin_agency
+            p['url'] = url
+            urls_to_download.append(p)
+        url = row['invalid_url']
+        if url != '':
+            p = {}
+            p['fin_agency'] = fin_agency
+            p['url'] = url
+            urls_to_download.append(p)
+        logger.info(finyear)
+    logger.info(len(urls_to_download))
     logger.info(urls_to_download)
+   #url_report_types = ["NICRejectedTransactionsURL",
+   #                    "NICRejectedTransactionsPostURL",
+   #                    "NICRejectedTransactionsCoBankURL"
+   #                   ]
+   #start_fin_year = get_default_start_fin_year()
+   #current_fin_year = get_current_finyear()
+   #finyear_array = []
+   #for finyear in range(start_fin_year, int(current_fin_year) +1):
+   #    finyear_array.append(finyear)
+   ###Now we will loop thorugh finyear and urls to create an array of urls that
+   ###needs to be fetched
+   #for url_report_type in url_report_types:
+   #    for finyear in finyear_array:
+   #        report_url = api_get_report_url(logger, lobj.id,
+   #                                        url_report_type, finyear=finyear)
+   #        if report_url is not None:
+   #            urls_to_download.append(report_url)
+   #logger.info(urls_to_download)
 
     extract_dict = {}
     column_headers = ['srno', 'fto_no', 'reference_no', 'reference_no_url',
@@ -609,9 +637,13 @@ def get_block_rejected_transactions(lobj, logger):
     extract_dict['extract_url_array'] = [2]
     extract_dict['url_prefix'] = f'http://mnregaweb4.nic.in/netnrega/FTO/'
     dataframe_array = []
-    for url in urls_to_download:
+    for p in urls_to_download:
+        url = p['url']
+        fin_agency = p['fin_agency']
         dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict)
-        dataframe_array.append(dataframe)
+        if dataframe is not None:
+            dataframe['fin_agency'] = fin_agency
+            dataframe_array.append(dataframe)
     rejected_df = pd.concat(dataframe_array, ignore_index=True)
     logger.info(f"shape of dataframe is {dataframe.shape}")
     job_list = []
@@ -637,7 +669,7 @@ def get_block_rejected_transactions(lobj, logger):
     rejected_df_columns = ['reference_no', 'reference_no_url', 'utr_no',
                            'transaction_date', 'primary_account_holder',
                            'bank_code', 'ifsc_code', 'fto_amount',
-                           'rejection_date']
+                           'rejection_date', 'fin_agency']
     rejected_df = rejected_df[rejected_df_columns]
     dataframe = pd.merge(dataframe, rejected_df, how='left',
                          on=['reference_no'])
@@ -649,7 +681,8 @@ def get_block_rejected_transactions(lobj, logger):
                 'village_name', 'jobcard', 'applicant_no', 'name',
                 'head_of_household', 'caste', 'IAY_LR', 'father_husband_name',
                 'gender', 'age', 'jobcard_request_date', 'jobcard_issue_date', 'jobcard_remarks',
-                'disabled', 'minority', 'jobcard_verification_date', 'work_code',
+                'disabled', 'minority', 'jobcard_verification_date',
+                'fin_agency', 'work_code',
                 'work_name', 'muster_no', 'attempt_count', 'record_status',
                 'wagelist_no', 'fto_no', 'fto_finyear', 'fto_amount',
                 'transaction_date', 'process_date', 'reference_no',
@@ -660,6 +693,17 @@ def get_block_rejected_transactions(lobj, logger):
     return dataframe
 def get_block_rejected_stats(lobj, logger, fto_status_df):
     """This function will get block Rejected Stats"""
+    logger.info(f"Block Level Rejection Stats for {lobj.code}")
+    current_df = lobj.fetch_report_dataframe(logger, "block_rejected_stats")
+    logger.info(f"Shape of current df is {current_df.shape}")
+    current_finyear = get_current_finyear()
+    filtered_df = current_df[current_df['finyear'] != current_finyear]
+    logger.info(f"Shape of filtered df is {filtered_df.shape}")
+    ##Calculate the current finyear urls to download
+    filtered_fto_status_df = fto_status_df[fto_status_df['finyear'] ==
+                                           current_finyear]
+    logger.info(f"shape of fto status is {fto_status_df.shape}")
+    logger.info(f"shape of filtered status is {filtered_fto_status_df.shape}")
     job_list = []
     column_headers = ["srno", "block", "total_fto_generated", "fs_fto_signed",
                       "fs_fto_pending", "ss_fto_signed",
@@ -680,7 +724,7 @@ def get_block_rejected_stats(lobj, logger, fto_status_df):
     extract_dict['extract_url_array'] = [5, 17, 18]
     extract_dict['url_prefix'] = url_prefix
     func_name = "fetch_rejected_stats"
-    for index, row in fto_status_df.iterrows():
+    for index, row in filtered_fto_status_df.iterrows():
         func_args = []
         url = row.get("dist_url", None)
         finyear = row.get("finyear", None)
@@ -692,17 +736,25 @@ def get_block_rejected_stats(lobj, logger, fto_status_df):
                 'func_args' : func_args
             }
             job_list.append(job_dict)
-    dataframe = libtech_queue_manager(logger, job_list, num_threads=50)
-    return dataframe
+    dataframe = libtech_queue_manager(logger, job_list, num_threads=25)
+    dataframe.to_csv("/tmp/a.csv")
+    concat_df = pd.concat([filtered_df, dataframe])
+    return concat_df
 
 
 def get_fto_status_urls(lobj, logger):
     """This function will download the block level Rejection Stats"""
     logger.info(f"Block Level Rejection Stats for {lobj.code}")
+    current_df = lobj.fetch_report_dataframe(logger, "fto_status_urls")
+    logger.info(f"Shape of current df is {current_df.shape}")
+    current_finyear = get_current_finyear()
+    filtered_df = current_df[current_df['finyear'] != current_finyear]
+    logger.info(f"Shape of filtered df is {filtered_df.shape}")
+
     csv_array = []
     column_headers = ["state_code", "district_code", "state_name",
                       "district_name", "finyear", "dist_url"]
-    start_finyear = get_default_start_fin_year()
+    start_finyear = get_current_finyear()
     end_finyear = get_current_finyear()
     url_prefix = "http://mnregaweb4.nic.in/netnrega/FTO/"
     for finyear in range(int(start_finyear), int(end_finyear)+1):
@@ -753,7 +805,8 @@ def get_fto_status_urls(lobj, logger):
                         csv_array.append(row)
 
     dataframe = pd.DataFrame(csv_array, columns=column_headers)
-    return dataframe
+    concat_df = pd.concat([filtered_df, dataframe])
+    return concat_df
 
 
 def get_nic_stat_urls(lobj, logger, panchayat_code_array):

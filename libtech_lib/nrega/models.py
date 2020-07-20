@@ -453,9 +453,9 @@ class APBlock(Location):
 
     def ap_rejected_transactions(self, logger):
         """Will download individual level rejected transactions"""
-        self.ap_nefms_report_r14_37(logger)
-        self.ap_jobcard_register(logger)
-        self.worker_register(logger)
+        #self.ap_nefms_report_r14_37(logger)
+        #self.ap_jobcard_register(logger)
+        #self.worker_register(logger)
         report_type = "ap_nefms_report_r14_37"
         fto_report_df = self.fetch_report_dataframe(logger, report_type)
         dataframe = get_ap_rejected_transactions(self, logger, fto_report_df)
@@ -586,7 +586,14 @@ class NREGABlock(Location):
                 self.save_report(logger, dataframe, report_type)
     def block_rejected_transactions(self, logger):
         """This will fetch all the rejected transactions of the block"""
-        get_block_rejected_transactions(self, logger)
+        report_name = "block_rejected_stats"
+        india_obj = Location(logger, '0')
+        rej_stat_df = india_obj.fetch_report_dataframe(logger, report_name)
+        dataframe = get_block_rejected_transactions(self, logger, rej_stat_df)
+        if dataframe is not None:
+            report_type = "block_rejected_transactions"
+            self.save_report(logger, dataframe, report_type)
+        
     def block_reference_document(self, logger):
         """This will crawl data for the entire block"""
         panchayat_array = self.get_all_panchayats(logger)
