@@ -744,21 +744,21 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
     jr_df = lobj.fetch_report_dataframe(logger, "ap_jobcard_register")
     jr_df.rename(columns = {'Jobcard ID':'tjobcard', 'Govt of India JobCard ID':'jobcard'},
                        inplace = True)
-    col_list = ["tjobcard", "jobcard"]
+    col_list = ["tjobcard", "jobcard", "village_code", "village_name"]
     jr_df = jr_df[col_list]
     wr_df = lobj.fetch_report_dataframe(logger, "worker_register")
     if jr_df is not None:
         dataframe = dataframe.merge(jr_df, on=['tjobcard'], how='left')
-    if wr_df is not None:
-        col_list = ["jobcard", "village_name", "head_of_household", "caste"]
-        wr_df = wr_df[col_list]
-        wr_df = wr_df.drop_duplicates(subset=["jobcard"])
-        dataframe = dataframe.merge(wr_df, on=['jobcard'], how='left')
+  # if wr_df is not None:
+  #     col_list = ["jobcard", "village_name", "head_of_household", "caste"]
+  #     wr_df = wr_df[col_list]
+  #     wr_df = wr_df.drop_duplicates(subset=["jobcard"])
+  #     dataframe = dataframe.merge(wr_df, on=['jobcard'], how='left')
     additional_cols = ["state_code", "state_name", "district_code",
                       "district_name", "block_code", "block_name",
                       "panchayat_code", "panchayat_name", "village_name", 
-                       "jobcard", "~tjobcard", "caste",
-                       "head_of_household", "finyear", "fto_date"]
+                       "village_code", "jobcard", "~tjobcard", 
+                        "finyear", "fto_date"]
     cols = additional_cols + column_headers
     dataframe = dataframe[cols]
     return dataframe
