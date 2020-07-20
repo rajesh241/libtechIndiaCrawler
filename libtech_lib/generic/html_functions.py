@@ -175,11 +175,12 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
                                 col_url = ""
                             row_data.append(col_url)
                     dataframe_array.append(row_data)
-        if len(dataframe_array[0]) > len(dataframe_columns):
-            #logger.info("Length Mismatch")
-            diff = len(dataframe_array[0]) - len(dataframe_columns)
-            for i in range(1,diff+1):
-                dataframe_columns.append("")
+        if len(dataframe_array) > 0:
+            if len(dataframe_array[0]) > len(dataframe_columns):
+                #logger.info("Length Mismatch")
+                diff = len(dataframe_array[0]) - len(dataframe_columns)
+                for i in range(1,diff+1):
+                    dataframe_columns.append("")
         dataframe = pd.DataFrame(dataframe_array, columns=dataframe_columns)
     return dataframe
 
