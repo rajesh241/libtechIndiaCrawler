@@ -24,7 +24,6 @@ def find_url_containing_text(myhtml, mytext, url_prefix=None):
 def get_urldataframe_from_html(logger, myhtml, mydict=None):
     """this will harvest urls from html based on the prameters specified in
     mydict"""
-    logger.info(f"Will extract urls from html")
     dataframe = None
     csv_array = []
     col_headers = ["muster_no", "muster_url"]
