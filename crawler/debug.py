@@ -120,12 +120,19 @@ def main():
             create_task(logger, data)
 
     if args['test']:
-        location_sample = args.get("location_sample", None)
-        my_sample = getattr(samplemodels, location_sample)(logger)
-        report_types = ["jobcard_register", "nic_stats"]
-        zip_file_name = "/Users/goli/thrash/bbb"
-        download_dir  = "/Users/goli/thrash/bbb"
-        my_sample.create_bundle(logger, report_types, download_dir=download_dir, zip_file_name=zip_file_name)
+      #  location_sample = args.get("location_sample", None)
+      #  my_sample = getattr(samplemodels, location_sample)(loggera)
+      #  my_sample = getattr(samplemodels, location_sample)(logger)
+        my_sample = LibtechSample(logger, sample_type='panchayat',
+                                  parent_location_code="3406007")
+        my_sample.get_all_locations(logger)
+        logger.info(my_sample.sample_location_codes)
+        report_types = ["worker_register", "nic_stats", "work_payment",
+                        "jobcard_transactions", "block_rejected_transactions"]
+        zip_file_name = "/tmp/thrash/mahuadanr_20july20"
+        download_dir  = "/tmp/thrash/bbb"
+        file_url = my_sample.create_bundle(logger, report_types, download_dir=download_dir, zip_file_name=zip_file_name)
+        logger.info(file_url)
         exit(0)
         
         state_codes = api_get_child_locations(logger, 0)
@@ -168,7 +175,7 @@ def main():
         if sample_name is None:
             sample_name = "on_demand"
         result = download_report(logger, location_code, location_type, report_name,
-                        is_nic=is_nic, force_download=True)
+                        is_nic=is_nic, force_download=force_download)
         logger.info(result)
         exit(0)
         logger.info(f"in debug sample name is {sample_name}")
