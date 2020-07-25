@@ -68,6 +68,7 @@ class LibtechSample():
             lobj = Location(logger, location_code=one_sample_code)
             current_location_type = lobj.location_type
         logger.info(f"Total samples selected is {len(sample_location_codes)}")
+        sample_location_codes.append(self.parent_location_code)
         self.sample_location_codes = sample_location_codes 
     def create_bundle(self, logger, report_types, download_dir=None, zip_file_name=None, save_to_s3=True):
         """This would create the zip bundle of all the reports"""
@@ -75,7 +76,7 @@ class LibtechSample():
         for each_code in self.sample_location_codes:
             lobj = Location(logger, location_code=each_code)
             for report_type in report_types:
-                urls = lobj.fetch_report_urls(lobj, report_types)
+                urls = lobj.fetch_report_urls(lobj, report_type)
                 report_urls = report_urls + urls
         logger.info(report_urls)
         if download_dir is None:
