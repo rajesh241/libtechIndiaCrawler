@@ -71,16 +71,16 @@ def execute_task(logger, task_id=None, process_name=None):
             }
         update_task(logger, patch_data)
         return "Task is parked"
-    method_to_call = getattr(my_location, func_name)
     patch_data = {
         'id' : task_id
     }
     try:
-        method_to_call(logger)
+        getattr(my_location, func_name)(logger)
         patch_data['is_error'] = False
         patch_data['is_done'] = True
         patch_data['status'] = 'completed'
     except Exception as e:
+        logger.info("I am in exception!!!!")
         remarks = str(e)
         logger.info(f"error {remarks}")
         patch_data['is_error'] = True

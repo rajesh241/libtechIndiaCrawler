@@ -351,6 +351,10 @@ class APBlock(Location):
         panchayat_array = api_get_child_locations(logger, self.code,
                                                   scheme='nrega')
         return panchayat_array
+    def nic_stats(self, logger):
+        """This will create NIC Location object and execute ni stats"""
+        my_location = NREGABlock(logger, self.code)
+        my_location.nic_stats(logger)
     def ap_jobcard_register(self, logger):
         """This function will fetch the jobcar dregister of AP"""
         report_type = "ap_jobcard_register"
