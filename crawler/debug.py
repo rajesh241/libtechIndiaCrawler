@@ -1,12 +1,13 @@
 """This is the Debug Script for testing the Library"""
 import argparse
-
+import pandas as pd
 from libtech_lib.generic.commons import logger_fetch
 from libtech_lib.nrega.models import NREGAPanchayat, NREGABlock, APPanchayat
+from libtech_lib.nrega.nicnrega import nic_server_status
 from libtech_lib.nrega import models
 from libtech_lib.samples import models as samplemodels
 from libtech_lib.samples.models import LibtechSample, APITDABlockSample
-from libtech_lib.generic.api_interface import create_task, api_get_child_locations
+from libtech_lib.generic.api_interface import create_task, api_get_child_locations, get_location_dict
 from libtech_lib.generic.helpers import download_report
 from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                             get_dataframe_from_url,
@@ -30,6 +31,8 @@ def args_fetch():
     parser.add_argument('-i', '--insert', help='Insert in Queue',
                         required=False, action='store_const', const=1)
     parser.add_argument('-p', '--populate', help='Populate Queue',
+                        required=False, action='store_const', const=1)
+    parser.add_argument('-v', '--verify', help='Verify if the state IP is working',
                         required=False, action='store_const', const=1)
     parser.add_argument('-notnic', '--notnic', help='Not an NIC',
                         required=False, action='store_const', const=1)
@@ -118,7 +121,20 @@ def main():
             data['location_code'] = location_code
             data['location_class'] = LOCATION_CLASS
             create_task(logger, data)
-
+    if args['verify']:
+        state_codes = api_get_child_locations(logger, 0)
+        csv_array = []
+        columns = ["state", "code", "server status"]
+        for state_code in state_codes:
+            logger.info(state_code)
+            ldict = get_location_dict(logger, location_code=state_code)
+            state_name = ldict.get("name", "")
+            status = nic_server_status(logger, state_code)
+            a = [state_name, state_code, status]
+            csv_array.append(a)
+        logger.info(csv_array)
+        df = pd.DataFrame(csv_array, columns=columns)
+        df.to_csv('/tmp/stateStatus.csv')
     if args['test']:
       #  location_sample = args.get("location_sample", None)
       #  my_sample = getattr(samplemodels, location_sample)(loggera)
