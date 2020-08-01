@@ -29,6 +29,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         update_muster_transactions,
                                         get_fto_status_urls,
                                         get_block_rejected_stats,
+                                        get_nic_r4_1_urls,
                                         get_nic_stats,
                                         get_data_accuracy,
                                         create_work_payment_report,
@@ -467,6 +468,25 @@ class APBlock(Location):
         report_type = "ap_rejected_transactions"
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
+
+class NREGAState(Location):
+    """This is the District class for NREGA"""
+    def __init__(self, logger, location_code, force_download=False, sample_name="on_demand"):
+        self.scheme = 'nrega'
+        self.force_download = force_download
+        self.code = location_code
+        self.sample_name = sample_name
+        Location.__init__(self, logger, self.code, scheme=self.scheme,
+                          force_download=self.force_download,
+                          sample_name=self.sample_name)
+    def nic_r4_1_urls(self, logger):
+        """This will fetch MIS URLs based on pattern"""
+        report_type = 'nic_r4_1_urls'
+        url_text = 'Fortnight_rep3.aspx'
+        url_prefix = "http://mnregaweb4.nic.in/netnrega/state_html/"
+        dataframe = get_nic_r4_1_urls(self, logger, report_type=report_type,
+                                 url_text=url_text, url_prefix=url_prefix)
+        self.save_report(logger, dataframe, report_type)
 
 class NREGADistrict(Location):
     """This is the District class for NREGA"""

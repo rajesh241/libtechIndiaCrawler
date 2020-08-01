@@ -741,6 +741,90 @@ def get_block_rejected_stats(lobj, logger, fto_status_df):
     concat_df = pd.concat([filtered_df, dataframe])
     return concat_df
 
+def get_nic_r4_1_urls(lobj, logger, report_type=None, url_text=None,
+                      url_prefix=None):
+    """This function will get the Urls at the block level"""
+    state_pattern = f"state_code={lobj.state_code}"
+    logger.info(f"Getting URLs from MIS Reports for {report_type} and pattern{url_text}")
+    current_df = lobj.fetch_report_dataframe(logger, report_type)
+    filtered_df = None
+    if current_df is not None:
+      logger.info(f"Shape of current df is {current_df.shape}")
+      current_finyear = get_current_finyear()
+      filtered_df = current_df[current_df['finyear'] != current_finyear]
+      logger.info(f"Shape of filtered df is {filtered_df.shape}")
+
+    csv_array = []
+    column_headers = ["state_code", "district_code", "block_code", "state_name",
+                      "district_name", "block_name", "finyear", "dist_url"]
+    start_finyear = get_default_start_fin_year()
+    end_finyear = get_current_finyear()
+    for finyear in range(int(start_finyear), int(end_finyear)+1):
+        logger.info(f"Downloading for FinYear {finyear}")
+        filename = f"{NREGA_DATA_DIR}/misReport_{finyear}.html"
+        logger.info(filename)
+        with open(filename, "rb") as infile:
+            myhtml = infile.read()
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        elem = mysoup.find("a", href=re.compile(url_text))
+        if elem is not None:
+            base_href = elem["href"]
+        logger.info(base_href)
+        res = requests.get(base_href)
+        myhtml = None
+        if res.status_code == 200:
+            myhtml = res.content
+        if myhtml is not None:
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            elems = mysoup.find_all("a", href=re.compile(url_text))
+            for elem in elems:
+                logger.info(elem)
+                state_href = elem["href"]
+                logger.info(f"State URL is {state_href}")
+                if state_pattern not in state_href:
+                    continue
+                url = url_prefix + state_href
+                response = requests.get(url)
+                logger.info(url)
+                dist_html = None
+                if response.status_code == 200:
+                    dist_html = response.content
+                if dist_html is not None:
+                    dist_soup = BeautifulSoup(dist_html, "lxml")
+                    elems = dist_soup.find_all("a", href=re.compile(url_text))
+                    for elem1 in elems:
+                        dist_url = url_prefix + elem1["href"]
+                        block_res = requests.get(dist_url)
+                        if block_res.status_code == 200:
+                            block_html = block_res.content
+                            block_soup = BeautifulSoup(block_html, "lxml")
+                            belems = block_soup.find_all("a", href=re.compile(url_text))
+                            for belem in belems:
+                                block_url = url_prefix + belem["href"]
+                                #logger.info(dist_url)
+                                parsed = urlparse.urlparse(block_url)
+                                params_dict = parse_qs(parsed.query)
+                                #logger.info(params_dict)
+                                state_name = params_dict.get("state_name", [''])[0]
+                                state_code = params_dict.get("state_code", [""])[0]
+                                district_name = params_dict.get("district_name",
+                                                                [""])[0]
+                                district_code = params_dict.get("district_code",
+                                                                [""])[0]
+                                block_name = params_dict.get("block_name",
+                                                                [""])[0]
+                                block_code = params_dict.get("block_code",
+                                                                [""])[0]
+                                row = [state_code, district_code, block_code, state_name,
+                                       district_name, block_name, finyear, block_url]
+                                logger.info(row)
+                                csv_array.append(row)
+
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    if filtered_df is not None:
+        dataframe = pd.concat([filtered_df, dataframe])
+    return dataframe
+
 
 def get_fto_status_urls(lobj, logger):
     """This function will download the block level Rejection Stats"""
