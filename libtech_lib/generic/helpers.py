@@ -18,6 +18,11 @@ def get_location_class(logger, location_type, is_nic=True):
              LOCATION_CLASS = "NREGADistrict"
          else:
              LOCATION_CLASS = "APDistrict"
+     if location_type == "state":
+         if is_nic:
+             LOCATION_CLASS = "NREGAState"
+         else:
+             LOCATION_CLASS = "APState"
      return LOCATION_CLASS
 
 

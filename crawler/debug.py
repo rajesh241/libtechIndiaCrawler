@@ -1,6 +1,7 @@
 """This is the Debug Script for testing the Library"""
 import argparse
 import pandas as pd
+import datetime
 from libtech_lib.generic.commons import logger_fetch
 from libtech_lib.nrega.models import NREGAPanchayat, NREGABlock, APPanchayat
 from libtech_lib.nrega.nicnrega import nic_server_status
@@ -42,6 +43,8 @@ def args_fetch():
     parser.add_argument('-fn', '--func_name', help='Name of the function', required=False)
     parser.add_argument('-sn', '--sample_name', help='Name of the function', required=False)
     parser.add_argument('-ls', '--location_sample', help='Location Sample Name', required=False)
+    parser.add_argument('-zf', '--zipfilename', help='Zip File name', required=False)
+    parser.add_argument('-td', '--tempDir', help='Temp Dir', required=False)
     parser.add_argument('-ti1', '--testInput1', help='Test Input 1', required=False)
     parser.add_argument('-ti2', '--testInput2', help='Test Input 2', required=False)
     args = vars(parser.parse_args())
@@ -136,31 +139,27 @@ def main():
         df = pd.DataFrame(csv_array, columns=columns)
         df.to_csv('/tmp/stateStatus.csv')
     if args['test']:
-      #  location_sample = args.get("location_sample", None)
-      #  my_sample = getattr(samplemodels, location_sample)(loggera)
-      #  my_sample = getattr(samplemodels, location_sample)(logger)
-        my_sample = LibtechSample(logger, sample_type='panchayat',
+        location_sample = args.get("location_sample", None)
+        zipfilename = args.get("zipfilename", "zzz")
+        tempDir = args.get("tempDir", "/tmp")
+        if location_sample is not None:
+            my_sample = getattr(samplemodels, location_sample)(logger)
+        else:
+            my_sample = LibtechSample(logger, sample_type='panchayat',
                                   parent_location_code="3406007")
-        my_sample.get_all_locations(logger)
-        logger.info(my_sample.sample_location_codes)
-        report_types = ["worker_register", "nic_stats", "work_payment",
+        report_types = ["worker_register","nic_stats", "work_payment",
                         "jobcard_transactions", "block_rejected_transactions"]
-        zip_file_name = "/tmp/thrash/mahuadanr_20july20"
-        download_dir  = "/tmp/thrash/bbb"
-        file_url = my_sample.create_bundle(logger, report_types, download_dir=download_dir, zip_file_name=zip_file_name)
-        logger.info(file_url)
-        exit(0)
-        
-        state_codes = api_get_child_locations(logger, 0)
-        for state_code in state_codes:
-            district_codes = api_get_child_locations(logger, state_code)
-            for district_code in district_codes:
-                logger.info(f"Current Processing {state_code}-{district_code}")
-                data={}
-                data['location_code'] = district_code
-                data['location_class'] = "NREGADistrict"
-                data['report_type'] = "nic_stat_urls"
-                create_task(logger, data)
+        report_types = ["nic_stats"]
+        logger.info(tempDir)
+        logger.info(zipfilename)
+        zip_file_name = tempDir + "/" + zipfilename
+        download_dir  = tempDir + "/" + str(datetime.datetime.now().timestamp()) 
+       #file_url = my_sample.create_bundle(logger, report
+       #        data={}
+       #        data['location_code'] = district_code
+       #        data['location_class'] = "NREGADistrict"
+       #        data['report_type'] = "nic_stat_urls"
+       #        create_task(logger, data)
         exit(0)
         url ="http://mnregaweb2.nic.in/Netnrega/placeHolder1/placeHolder2/../../citizen_html/musternew.aspx?lflag=&id=1&state_name=CHHATTISGARH&district_name=JASHPUR&block_name=Manora&panchayat_name=Alori&block_code=3307016&msrno=5603&finyear=2016-2017&workcode=3307016001%2fWC%2f81094155&dtfrm=27%2f02%2f2017&dtto=05%2f03%2f2017&wn=Laghu+Sichai+Talab+Nirman+Pushani+%2fRengashu+(1.60+Lakhs)&Digest=nTMkfSq3BkT80yXpUwcuFw"
         extract_dict = {}
