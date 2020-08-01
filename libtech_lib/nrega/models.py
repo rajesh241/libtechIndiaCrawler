@@ -33,7 +33,8 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_data_accuracy,
                                         create_work_payment_report,
                                         get_nic_stat_urls, 
-                                        get_ap_worker_register
+                                        get_ap_worker_register,
+                                        get_jobcard_stats
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions,
@@ -539,6 +540,27 @@ class NREGABlock(Location):
         panchayat_array = api_get_child_location_ids(logger, self.code,
                                                      scheme='nrega')
         return panchayat_array
+
+    def get_all_panchayat_objs(self, logger):
+        """Getting all child Locations, in this case getting all panchayat
+        locations"""
+        pobj_array = []
+        panchayat_array = api_get_child_locations(logger, self.code,
+                                                  scheme='nrega')
+        for panchayat_code in panchayat_array:
+            pobj_array.append(NREGAPanchayat(logger, panchayat_code))
+
+        return pobj_array
+
+    def jobcard_stats(self, logger):
+        '''
+        Get jobcard stats based on S4.15
+        '''
+        report_type = 'jobcard_stats'
+        df = get_jobcard_stats(self, logger)
+        if df is not None:
+            self.save_report(logger, df, report_type)
+
     def nic_stats(self, logger):
         """This function will fetch NIC Stats"""
         report_type = "nic_stats"

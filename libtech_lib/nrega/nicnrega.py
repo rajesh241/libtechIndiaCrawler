@@ -1025,3 +1025,243 @@ def get_ap_worker_register(lobj, logger):
     dataframe = get_worker_register(lobj, logger, worker_reg_url=url,
                                     cookies=cookies)
     return dataframe
+
+def fetch_jobcard_stats(this, logger, lobj, url):
+    logger.info(f'fetch_jobcard_stats(..., lobj.panchayat_code={lobj.panchayat_code}, url={url}])')
+
+    # Block Drop Down
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'X-MicrosoftAjax': 'Delta=true',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.142 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Accept': '*/*',
+        'Origin': 'http://nregasp2.nic.in',
+        'Referer': url,
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+
+    params = (
+        ('lflag', 'local'),
+        ('page', 'B'),
+        ('state_name', lobj.state_name),
+        ('state_code', lobj.state_code),
+        ('block_name', lobj.block_name),
+        ('block_code', lobj.block_code),
+        ('district_name', lobj.district_name),
+        ('panchayat_code', lobj.panchayat_code),
+        ('panchayat_name', lobj.panchayat_name),
+        ('district_code', lobj.district_code),
+        ('fin_year', this['finyear']),
+        ('source', ''),
+        ('Digest', url.split('&')[-1].strip('Digest=')),
+    )
+
+    data = {
+      'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_blk',
+      '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddr_blk',
+      '__EVENTARGUMENT': '',
+      '__LASTFOCUS': '',
+      '__VIEWSTATE': this['view_state'],
+      '__EVENTVALIDATION': this['event_validation'],
+      'ctl00$ContentPlaceHolder1$ddr_blk': lobj.block_code,
+      'ctl00$ContentPlaceHolder1$ddr_panch': '--Select--',
+      'ctl00$ContentPlaceHolder1$ddr_cond': '',
+      'ctl00$ContentPlaceHolder1$lbl_days': '100',
+      'ctl00$ContentPlaceHolder1$rblRegWorker': 'Y',
+      '__ASYNCPOST': 'true',
+      '': ''
+    }
+
+    # FIXME - Mynk this should work - Confirmed multiple times it does not
+    # response = this['session'].post(url, data=data, verify=False)
+    response = this['session'].post('http://nregasp2.nic.in/netnrega/state_html/empspecifydays.aspx', headers=headers, params=params, cookies=this['cookies'], data=data, verify=False)
+
+    soup = BeautifulSoup(response.content, 'lxml')
+    # logger.debug(soup)
+
+    # Update the context
+    body = soup.find('body')
+    #logger.warning(body.text)
+    array = body.text.split('|')
+    view_state = array[array.index('__VIEWSTATE')+1]
+    #logger.debug(self.view_state)
+    event_validation = array[array.index('__EVENTVALIDATION')+1]
+    #logger.debug(self.event_validation)
+
+    # Panchayat Drop Down
+    data['ctl00$ContentPlaceHolder1$ScriptManager1'] = 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_panch'
+    data['ctl00$ContentPlaceHolder1$ddr_panch'] = lobj.panchayat_code
+    data['__EVENTTARGET'] = 'ctl00$ContentPlaceHolder1$ddr_panch'
+    data['__VIEWSTATE'] = view_state
+    data['__EVENTVALIDATION'] = event_validation,
+
+    response = this['session'].post('http://nregasp2.nic.in/netnrega/state_html/empspecifydays.aspx', headers=headers, params=params, cookies=this['cookies'], data=data, verify=False)
+    response
+    soup = BeautifulSoup(response.text, 'lxml')
+    #print(soup.prettify())
+
+    # Update the context
+    body = soup.find('body')
+    #logger.warning(body.text)
+    array = body.text.split('|')
+    view_state = array[array.index('__VIEWSTATE')+1]
+    #logger.debug(self.view_state)
+    event_validation = array[array.index('__EVENTVALIDATION')+1]
+    #logger.debug(self.event_validation)
+
+    # With gt 0 and worker wise
+    data['ctl00$ContentPlaceHolder1$ScriptManager1'] = 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_cond'
+    data['ctl00$ContentPlaceHolder1$ddr_cond'] = 'gt'
+    data['ctl00$ContentPlaceHolder1$lbl_days'] = '0'
+    data['ctl00$ContentPlaceHolder1$rblRegWorker'] = 'N'
+    data['__EVENTTARGET'] = 'ctl00$ContentPlaceHolder1$ddr_cond'
+    data['__VIEWSTATE'] = view_state
+    data['__EVENTVALIDATION'] = event_validation
+    response = this['session'].post('http://nregasp2.nic.in/netnrega/state_html/empspecifydays.aspx', headers=headers, params=params, cookies=this['cookies'], data=data, verify=False)
+    soup = BeautifulSoup(response.text, 'lxml')
+    #print(soup.prettify())
+
+    # Update the context
+    body = soup.find('body')
+    #logger.warning(body.text)
+    array = body.text.split('|')
+    view_state = array[array.index('__VIEWSTATE')+1]
+    #logger.debug(self.view_state)
+    event_validation = array[array.index('__EVENTVALIDATION')+1]
+    #logger.debug(self.event_validation)
+
+    data['__EVENTTARGET'] = 'ctl00$ContentPlaceHolder1$btn_pro'
+    data['ctl00$ContentPlaceHolder1$ScriptManager1'] = 'ctl00$ContentPlaceHolder1$UpdatePanel1|' + data['__EVENTTARGET']
+    data['__VIEWSTATE'] = view_state
+    data['__EVENTVALIDATION'] = event_validation
+
+    response = this['session'].post('http://nregasp2.nic.in/netnrega/state_html/empspecifydays.aspx', headers=headers, params=params, cookies=this['cookies'], data=data, verify=False)
+
+    # Fetch the redirect URL
+
+    soup = BeautifulSoup(response.text, 'lxml')
+    # print(soup.prettify())
+
+    # Fetch the redirect URL
+    body = soup.find('body')
+    p = body.find('p')
+    array = p.text.split('|')
+    redirect_url = array[array.index('pageRedirect')+2]
+    url = 'http://nregasp2.nic.in' + redirect_url
+    logger.info(f'Final Redirect URL[{url}]')
+
+    # Fetch the report :)
+
+    response = this['session'].get(url, verify=False)
+
+    # soup = BeautifulSoup(response.text, 'lxml')
+    print(soup.prettify())
+
+    return response
+
+def get_jobcard_stats(lobj, logger):
+    logger.info(f'Fetching Jobcard Stats for lobj[{lobj.code}]')
+    start_fin_year = get_default_start_fin_year()
+    end_fin_year = get_current_finyear()
+    extract_dict = {}
+    column_headers = ['srno', 'jobcard', 'head_of_household', 'worker_name', 'no_of_person_days']
+    extract_dict['column_headers'] = column_headers
+    extract_dict['table_id'] = 'ctl00_ContentPlaceHolder1_GridView1'
+    extract_dict['data_start_row'] = 2
+
+    dataframe = None
+    dfs = []
+
+    # Set up the Session
+    this = {}    # Equivalent of self/context. Pending class use.
+    url = 'https://nrega.nic.in/netnrega/home.aspx'  # put under lobj.home_url or base_url?
+    with requests.Session() as session:
+        this['session'] = session
+        response = session.get(url)
+        this['cookies'] = session.cookies # May not be needed
+        logger.info(this['cookies'])
+
+        for finyear in range(20, 22): # FIXME - does not work for 17 & 18 range(start_fin_year, end_fin_year+1):
+            full_finyear = get_full_finyear(finyear)
+            this['finyear'] = full_finyear
+            logger.info(f'Inside Financial Year[{full_finyear}]')
+            #url = http://nregasp2.nic.in/netnrega/Progofficer/PoIndexFrame.aspx?flag_debited=D&lflag=local&District_Code=3403&district_name=GUMLA&state_name=JHARKHAND&state_Code=34&finyear=2020-2021&check=1&block_name=BASIA&Block_Code=3403009
+# Fetch the block level URL with desired finyear
+            '''
+            this.district_code = '3403'
+            this.district_name = 'GUMLA'
+            this.state_name = 'JHARKHAND'
+            this.state_code = '34'
+            this.finyear = '2020-2021'
+            this.block_name = 'BASIA'
+            this.block_code = '3403009'
+            this.panchayat_code = '3403009003'
+            this.panchayat_name = 'EITAM'
+            '''
+            url = f'http://nregasp2.nic.in/netnrega/Progofficer/PoIndexFrame.aspx?flag_debited=D&lflag=local&\
+District_Code={lobj.district_code}&district_name={lobj.district_name}&\
+state_name={lobj.state_name}&state_Code={lobj.state_code}&\
+finyear={full_finyear}&check=1&\
+block_name={lobj.block_name}&Block_Code={lobj.block_code}'
+            logger.info(f'Fetch URL[{url}] for all panchayats')
+            this['url'] = url
+
+            response = session.get(url)
+            soup = BeautifulSoup(response.text, 'lxml')
+
+            # Fetch Employment Offered Report URL
+
+            try:
+                html = soup.find(text='Employment Provided Period wise ')
+                url = 'http://nregasp2.nic.in/netnrega/state_html/pmsr.aspx' + html.parent.parent['href'].strip('../state_html/pmsr.aspx')
+                logger.info(f'Employment Offered URL[{url}]')
+
+                response = session.get(url, verify=False)
+            except Exception as e:
+                logger.error(f'Error occured Exception[{e}]')
+                return None
+            '''
+            soup = BeautifulSoup(response.text, 'lxml')
+
+            anchors = soup.find_all('a')
+
+            for anchor in anchors:
+                url = anchor['href']
+                if 'empspecifydays' not in url:
+                    continue
+                print(f'URL[{url}]')
+                url = 'http://nregasp2.nic.in/netnrega/state_html/' + url
+
+                response = session.get(url)
+                soup = BeautifulSoup(response.content, 'lxml')
+                this['view_state'] =soup.find(id="__VIEWSTATE")['value']
+                this['event_validation']=soup.find(id="__EVENTVALIDATION")['value']
+
+                fetch_jobcard_stats(this, logger, lobj, response.url)
+                exit(0)
+            '''
+            url_prefix = 'http://nregasp2.nic.in/netnrega/state_html/'
+            for pobj in lobj.get_all_panchayat_objs(logger):
+                logger.info(f'Fetch Report for pobj[{pobj}]')
+                url = find_url_containing_text(response.content, pobj.panchayat_code,
+                                       url_prefix=url_prefix)
+                logger.debug(url)
+                response = session.get(url)
+                soup = BeautifulSoup(response.content, 'lxml')
+                this['view_state'] =soup.find(id="__VIEWSTATE")['value']
+                this['event_validation']=soup.find(id="__EVENTVALIDATION")['value']
+
+                response = fetch_jobcard_stats(this, logger, pobj, url)
+                df = None
+                if response.status_code == 200:
+                    df = get_dataframe_from_html(logger, response.content, mydict=extract_dict)
+                    if df is not None:
+                        df['finyear'] = finyear
+                        df = insert_location_details(logger, lobj, dataframe)
+                        df.head(10)
+                        dfs.append(df)
+    if len(dfs) > 0:
+        dataframe = pd.concat(dfs)
+    return dataframe
