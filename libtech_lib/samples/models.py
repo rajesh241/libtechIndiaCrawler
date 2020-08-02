@@ -52,7 +52,7 @@ class LibtechSample():
             data['force_download'] = self.force_download
             logger.info(data)
             create_task(logger, data)
-    def get_all_locations(self, logger):
+    def get_sample_locations(self, logger):
         """This function will populate the Queue"""
         sample_location_codes = [self.parent_location_code]
         lobj = Location(logger, location_code=self.parent_location_code)
@@ -131,6 +131,8 @@ class FESAPSample(LibtechSample):
     def get_all_locations(self, logger):
         """This function will populate the Queue"""
         return 
+    def get_sample_locations(self, logger):
+        return
 
 class FESNICSample(LibtechSample):
     def __init__(self, logger, force_download='false',
@@ -170,6 +172,8 @@ class FESNICSample(LibtechSample):
     def get_all_locations(self, logger):
         """This function will populate the Queue"""
         return 
+    def get_sample_locations(self, logger):
+        return
 
 class FESSample(LibtechSample):
     def __init__(self, logger, force_download='false',
@@ -181,7 +185,7 @@ class FESSample(LibtechSample):
         self.is_nic = True
         self.force_download = force_download
         self.location_class = self.get_location_class(logger)
-        self.sample_block_codes = ['0210002', # Andhra Pradesh-Chittoor-Thamballapalle
+        self.sample_location_codes = ['0210002', # Andhra Pradesh-Chittoor-Thamballapalle
                                      '0210001', # Andhra Pradesh-Chittoor-Peddamandyam
                                      '0212040', # Andhra Pradesh-Anantapur-Nambulipulikunta
                                       '2724007', # Rajasthan-Bhilwara-Sahada
@@ -216,6 +220,41 @@ class FESSample(LibtechSample):
             lobj = Location(logger, location_code=each_code)
             location_array = lobj.get_child_locations(logger) 
             sample_location_codes = sample_location_codes + location_array
-        self.sample_location_codes = sample_location_codes
+        self.all_location_codes = sample_location_codes
+            
+        return
+    def get_sample_locations(self, logger):
+        return
+
+class MKSS_RAJASTHAN_REJ1(LibtechSample):
+    def __init__(self, logger, force_download='false',
+                 name="on_demand"):
+        self.parent_location_code = None
+        self.sample_type = "block"
+        self.name = name
+        self.scheme = "nrega"
+        self.is_nic = True
+        self.force_download = force_download
+        self.location_class = self.get_location_class(logger)
+        self.sample_location_codes = [
+                                   '2725001',# Bhim, Rajsamand
+                                   '2725002',# Devgarh, Rajsamad
+                                   '2721003',# Jawaja, Ajmer
+                                   '2720002',# Raipur, Pali
+                                   '2724005',# Mandal, Bhilwada
+                                   '2724001',#Asind, Bhilwada
+                                   '2721005' #Masuda, Ajmer
+                                     ]
+        self.get_all_locations(logger)
+    def get_all_locations(self, logger):
+        """Getting all the panchayat codes"""
+        sample_location_codes = self.sample_location_codes
+        for each_code in self.sample_location_codes:
+            lobj = Location(logger, location_code=each_code)
+            location_array = lobj.get_child_locations(logger) 
+            sample_location_codes = sample_location_codes + location_array
+        self.all_location_codes = sample_location_codes
             
         return 
+    def get_sample_locations(self, logger):
+        return
