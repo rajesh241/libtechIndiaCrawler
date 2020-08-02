@@ -37,6 +37,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         create_work_payment_report,
                                         get_nic_stat_urls, 
                                         get_ap_worker_register,
+                                        get_nic_urls,
                                         get_jobcard_stats
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
@@ -209,6 +210,7 @@ class NREGAPanchayat(Location):
         self.code = location_code
         self.force_download = force_download
         self.sample_name = sample_name
+        self.mis_state_url = "https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
@@ -222,6 +224,10 @@ class NREGAPanchayat(Location):
                                    f"&check=1&Panchayat_name={self.panchayat_name}"
                                    f"&Panchayat_Code={self.panchayat_code}")
 
+    def nic_urls(self, logger):
+        report_type = "nic_urls"
+        dataframe = get_nic_urls(self, logger)
+        return dataframe
     def jobcard_register(self, logger):
         """Will Fetch the Jobcard Register"""
         logger.info(f"Going to fetch Jobcard register for {self.code}")
@@ -478,6 +484,7 @@ class NREGAState(Location):
         self.force_download = force_download
         self.code = location_code
         self.sample_name = sample_name
+        self.mis_state_url = "https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
@@ -497,6 +504,7 @@ class NREGADistrict(Location):
         self.force_download = force_download
         self.code = location_code
         self.sample_name = sample_name
+        self.mis_state_url = "https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
@@ -547,6 +555,7 @@ class NREGABlock(Location):
         self.force_download = force_download
         self.code = location_code
         self.sample_name = sample_name
+        self.mis_state_url = "https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
@@ -573,7 +582,21 @@ class NREGABlock(Location):
             pobj_array.append(NREGAPanchayat(logger, panchayat_code))
 
         return pobj_array
-
+    def nic_urls(self, logger):
+        report_type = "nic_urls"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            my_location = NREGAPanchayat(logger, each_panchayat_code)
+            dataframe = my_location.nic_urls(logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+        
     def nic_r4_1(self, logger):
         '''Download MIS NIC 4_1 report'''
         report_type = "nic_r4_1"
