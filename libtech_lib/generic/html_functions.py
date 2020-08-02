@@ -8,6 +8,36 @@ import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 
+def nic_download_page(logger, url, session=None, cookies=None, params=None, headers=None):
+    max_retry = 5
+    retry = 0
+    res = None
+    timeout = 2
+    while (retry < max_retry):
+        try:
+            if session:
+                logger.info(f'Attempting using *session* to fetch the URL[{url}] for the {retry+1} time')
+                res = session.get(url, cookies=cookies, params=params,
+                                   headers=headers, verify=False)
+            else:
+                logger.info(f'Attempting using *requests* to fetch the URL[{url}] for the {retry+1} time')
+                res = requests.get(url, cookies=cookies, params=params,
+                                   headers=headers, verify=False)
+            if res.status_code == 200:
+                retry = max_retry
+            else:
+                retry = retry + 1
+                timeout += 5
+                time.sleep(timeout)
+        except Exception as e:
+            retry = retry + 1
+            timeout += 5
+            time.sleep(timeout)
+            logger.warning(f'Need to retry. Failed {retry} time(s). Exception[{e}]')
+            logger.warning(f'Waiting for {timeout} seconds...')
+    return res
+
+
 def find_url_containing_text(myhtml, mytext, url_prefix=None):
     """This function will find the first url cotaining the mentioned text"""
     url = None

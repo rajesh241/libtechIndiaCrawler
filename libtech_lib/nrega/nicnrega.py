@@ -30,6 +30,7 @@ from libtech_lib.generic.api_interface import  (api_get_report_url,
                                                )
 from libtech_lib.generic.html_functions import ( get_dataframe_from_html,
                                                  get_dataframe_from_url,
+                                                 nic_download_page, 
                                                  find_url_containing_text
                                                )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
@@ -1411,5 +1412,44 @@ def get_nic_r4_1(lobj, logger, url_df, finyear):
     dataframe = pd.concat(df_array)
     dataframe.to_csv("/tmp/b.csv")
     return dataframe
-         
-
+        
+def get_nic_urls(lobj, logger):
+    """This will get important nic URLs from the panchayat page"""
+    csv_array = []
+    logger.info(f"{lobj.state_name}-{lobj.district_name}-{lobj.block_name}-{lobj.panchayat_name}")
+    panchayat_page_url = (f"https://{lobj.crawl_ip}/netnrega/IndexFrame.aspx?"
+                              f"lflag=eng&District_Code={lobj.state_code}&"
+                              f"district_name={lobj.district_name}"
+                              f"&state_name={lobj.state_name}"
+                              f"&state_Code={lobj.state_code}&block_name={lobj.block_name}"
+                              f"&block_code={lobj.block_code}&fin_year=fullFinYear"
+                              f"&check=1&Panchayat_name={lobj.panchayat_name}"
+                              f"&Panchayat_Code={lobj.panchayat_code}")
+    start_fin_year = get_default_start_fin_year()
+    end_fin_year = get_current_finyear()
+    column_headers = ['finyear', 'report_name', 'report_slug',
+                      'state_url', 'mis_url']
+    for finyear in range(start_fin_year, end_fin_year+1):
+        logger.info(f"Currently Processing {finyear}")
+        finyear = str(finyear)
+        full_finyear = get_full_finyear(finyear)
+        base_url = panchayat_page_url.replace("fullFinYear", full_finyear)
+        logger.info(f"base url is {base_url}")
+        res = nic_download_page(logger, base_url)
+        if res.status_code != 200:
+            return None
+        myhtml = res.content
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        links = mysoup.findAll("a")
+        url_prefix = f"https://{lobj.crawl_ip}/netnrega/"
+        mis_url_prefix = f"https://mnregaweb4.nic.in/netnrega/"
+        for link in links:
+            href = link.get("href", "")
+            text = link.text
+            state_url = url_prefix + href
+            mis_url = mis_url_prefix + href
+            row = [finyear, text, slugify(text), state_url, mis_url]
+            csv_array.append(row)
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe
