@@ -744,7 +744,7 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
     jr_df = lobj.fetch_report_dataframe(logger, "ap_jobcard_register")
     jr_df.rename(columns = {'Jobcard ID':'tjobcard', 'Govt of India JobCard ID':'jobcard'},
                        inplace = True)
-    col_list = ["tjobcard", "jobcard", "village_code", "village_name"]
+    col_list = ["tjobcard", "jobcard", "village_code", "village_name", "Head of Family"]
     jr_df = jr_df[col_list]
     wr_df = lobj.fetch_report_dataframe(logger, "worker_register")
     if jr_df is not None:
@@ -757,7 +757,7 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
     additional_cols = ["state_code", "state_name", "district_code",
                       "district_name", "block_code", "block_name",
                       "panchayat_code", "panchayat_name", "village_name", 
-                       "village_code", "jobcard", "~tjobcard", 
+                       "village_code", "Head of Family", "jobcard", "~tjobcard", 
                         "finyear", "fto_date"]
     cols = additional_cols + column_headers
     dataframe = dataframe[cols]
