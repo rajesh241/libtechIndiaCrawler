@@ -215,8 +215,8 @@ class FESSample(LibtechSample):
         self.get_all_locations(logger)
     def get_all_locations(self, logger):
         """Getting all the panchayat codes"""
-        sample_location_codes = self.sample_block_codes
-        for each_code in self.sample_block_codes:
+        sample_location_codes = self.sample_location_codes
+        for each_code in self.sample_location_codes:
             lobj = Location(logger, location_code=each_code)
             location_array = lobj.get_child_locations(logger) 
             sample_location_codes = sample_location_codes + location_array
