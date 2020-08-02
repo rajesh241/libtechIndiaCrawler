@@ -467,7 +467,7 @@ class APBlock(Location):
 
     def ap_rejected_transactions(self, logger):
         """Will download individual level rejected transactions"""
-        #self.ap_nefms_report_r14_37(logger)
+        self.ap_nefms_report_r14_37(logger)
         #self.ap_jobcard_register(logger)
         #self.worker_register(logger)
         report_type = "ap_nefms_report_r14_37"
