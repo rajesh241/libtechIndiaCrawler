@@ -16,6 +16,7 @@ import pandas as pd
 import numpy as np
 from bs4 import BeautifulSoup
 from libtech_lib.generic.commons import  (get_current_finyear,
+                                          get_current_finmonth,
                                           get_default_start_fin_year,
                                           get_percentage,
                                           get_previous_date,
@@ -748,15 +749,15 @@ def get_nic_r4_1_urls(lobj, logger, report_type=None, url_text=None,
     logger.info(f"Getting URLs from MIS Reports for {report_type} and pattern{url_text}")
     current_df = lobj.fetch_report_dataframe(logger, report_type)
     filtered_df = None
-    if current_df is not None:
-      logger.info(f"Shape of current df is {current_df.shape}")
-      current_finyear = get_current_finyear()
-      filtered_df = current_df[current_df['finyear'] != current_finyear]
-      logger.info(f"Shape of filtered df is {filtered_df.shape}")
+   #if current_df is not None:
+   #  logger.info(f"Shape of current df is {current_df.shape}")
+   #  current_finyear = get_current_finyear()
+   #  filtered_df = current_df[current_df['finyear'] != current_finyear]
+   #  logger.info(f"Shape of filtered df is {filtered_df.shape}")
 
     csv_array = []
     column_headers = ["state_code", "district_code", "block_code", "state_name",
-                      "district_name", "block_name", "finyear", "dist_url"]
+                      "district_name", "block_name", "finyear", "url"]
     start_finyear = get_default_start_fin_year()
     end_finyear = get_current_finyear()
     for finyear in range(int(start_finyear), int(end_finyear)+1):
@@ -1349,3 +1350,66 @@ block_name={lobj.block_name}&Block_Code={lobj.block_code}'
     if len(dfs) > 0:
         dataframe = pd.concat(dfs)
     return dataframe
+
+def get_nic_r4_1_columns(logger, finyear):
+    if str(finyear) == str(get_current_finyear()):
+        total_months = get_current_finmonth()
+    else:
+        total_months = 12
+    total_columns = 2 + 7 + (total_months*2*7)
+    columns = []
+    ff_column_header = [
+        'Muster Roll Issued',
+        'Printed E Muster Roll(excluding zero muster)',
+        'Muster Roll Filled',
+        'Filled E-Muster Roll(excluding zero muster)',
+        'Attendance Filled For Persons on Muster Roll',
+        'Attendance Not Yet Filled On E Muster Roll',
+        'Muster Roll with Date of Payment'
+    ]
+    columns.append("sr_no")
+    columns.append("panchayat")
+    fort_array = ["first_fn", "second_fn"]
+    for i in range(0, total_months):
+        for fort in fort_array:
+            cur_month = ((i + 1 + 2) % 12)+1
+            for each_col in ff_column_header:
+                col = f"{cur_month}-{fort}-{each_col.replace(' ','_')}"
+                columns.append(col)
+    for each_col in ff_column_header:
+        col = f"total-{each_col.replace(' ','_')}"
+        columns.append(col)
+    logger.info(f"Length of columns is {len(columns)}")
+    return columns
+
+def get_nic_r4_1(lobj, logger, url_df, finyear):
+    '''Will Download NIC4_1 MIS report'''
+    if url_df is None:
+        return None
+    logger.info(f"Shape of url_df is {url_df.shape}")
+    filtered_df = url_df[url_df['block_code']==int(lobj.block_code)]
+    filtered_df = filtered_df[filtered_df['finyear']==int(finyear)]
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    df_array = []
+    for index, row in filtered_df.iterrows():
+        url = row.get('url')
+        finyear = row.get('finyear')
+        extract_dict = {}
+        column_headers = get_nic_r4_1_columns(logger, finyear)
+        extract_dict['pattern'] = "Fortnight"
+        extract_dict['column_headers'] = column_headers
+        extract_dict['data_start_row'] = 4
+        logger.info(url)
+        response = requests.get(url)
+        if response.status_code == 200:
+            myhtml = response.content
+            dataframe = get_dataframe_from_html(logger, myhtml,
+                                                mydict=extract_dict)
+            dataframe.to_csv("/tmp/a.csv")
+            dataframe['finyear'] = finyear
+            df_array.append(dataframe)
+    dataframe = pd.concat(df_array)
+    dataframe.to_csv("/tmp/b.csv")
+    return dataframe
+         
+
