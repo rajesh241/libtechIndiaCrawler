@@ -32,6 +32,13 @@ def logger_fetch(level=None):
     logger.addHandler(console_logger)
     return logger
 
+def get_current_finmonth():
+    """This would return financial month, i.e April =1, march =12"""
+    now = datetime.datetime.now()
+    if now.month > 3:
+        return now.month - 3
+    else:
+        return now.month + 9
 def get_current_finyear():
     """Returns the current financial year in two digit format"""
     now = datetime.datetime.now()

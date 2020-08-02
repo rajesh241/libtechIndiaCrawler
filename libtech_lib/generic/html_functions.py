@@ -93,6 +93,7 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
     mysoup = BeautifulSoup(myhtml, "lxml")
     mysoup = BeautifulSoup(myhtml, "html5lib")
     tables = mysoup.findAll('table')
+    logger.debug(f"Number of tables found is {len(tables)}")
     matched_tables = []
     #Match the table agains the specified pattern
     if table_id_array is None:
@@ -116,6 +117,8 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
         my_table = matched_tables[0]
     else:
         my_table = None
+        logger.debug("Did not find any table !!!")
+
     #If table found we will extract the rows and columns
     if my_table is not None:
         dataframe_columns = []

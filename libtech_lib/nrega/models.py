@@ -9,6 +9,7 @@ there is a class for each location type, and associated methods related to that
 import datetime
 import pandas as pd
 from libtech_lib.generic.commons import (get_full_finyear,
+                                         get_default_start_fin_year,
                                          get_current_finyear
                                          )
 from libtech_lib.generic.api_interface import (get_location_dict,
@@ -30,6 +31,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_fto_status_urls,
                                         get_block_rejected_stats,
                                         get_nic_r4_1_urls,
+                                        get_nic_r4_1,
                                         get_nic_stats,
                                         get_data_accuracy,
                                         create_work_payment_report,
@@ -572,6 +574,23 @@ class NREGABlock(Location):
 
         return pobj_array
 
+    def nic_r4_1(self, logger):
+        '''Download MIS NIC 4_1 report'''
+        report_type = "nic_r4_1"
+        state_obj = Location(logger, self.state_code)
+        report_name = "nic_r4_1_urls"
+        url_df = state_obj.fetch_report_dataframe(logger, report_name)
+        if url_df is None:
+            state_obj.nic_r4_1_urls(logger)
+            url_df = state_obj.fetch_report_dataframe(logger, report_name)
+        start_fin_year = get_default_start_fin_year()
+        end_fin_year = get_current_finyear()
+        for finyear in range(start_fin_year, end_fin_year+1):
+            finyear = str(finyear)
+            dataframe = get_nic_r4_1(self, logger, url_df, finyear)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type,
+                                 finyear=finyear)
     def jobcard_stats(self, logger):
         '''
         Get jobcard stats based on S4.15
