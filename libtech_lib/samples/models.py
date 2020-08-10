@@ -38,7 +38,7 @@ class LibtechSample():
             else:
                 location_class = "NREGADistrict"
         return location_class
-    def populate_queue(self, logger, report_type, finyear=None):
+    def populate_queue(self, logger, report_type, finyear=None, priority=None):
         """This function will populate the Queue"""
         logger.info("Populating queue")
         self.get_all_locations(logger)
@@ -50,6 +50,8 @@ class LibtechSample():
             data['location_code'] = each_code
             data['location_class'] = self.location_class
             data['force_download'] = self.force_download
+            if priority is not None:
+                data['priority'] = priority
             logger.info(data)
             create_task(logger, data)
     def get_sample_locations(self, logger):
@@ -73,7 +75,7 @@ class LibtechSample():
     def create_bundle(self, logger, report_types, download_dir=None, zip_file_name=None, save_to_s3=True):
         """This would create the zip bundle of all the reports"""
         report_urls = []
-        for each_code in self.sample_location_codes:
+        for each_code in self.all_location_codes:
             lobj = Location(logger, location_code=each_code)
             for report_type in report_types:
                 urls = lobj.fetch_report_urls(lobj, report_type)
@@ -110,9 +112,37 @@ class APITDABlockSample(LibtechSample):
         self.force_download = force_download
         self.location_class = self.get_location_class(logger)
         self.sample_location_codes = ['0203006','0203005','0203012','0203004','0203011','0203013','0203003','0203014','0203001','0203010','0203002']
+        self.get_all_locations(logger)
     def get_all_locations(self, logger):
-        """This function will populate the Queue"""
-        return
+        """Getting all the panchayat codes"""
+        sample_location_codes = self.sample_location_codes
+        for each_code in self.sample_location_codes:
+            lobj = Location(logger, location_code=each_code)
+            location_array = lobj.get_child_locations(logger) 
+            sample_location_codes = sample_location_codes + location_array
+        self.all_location_codes = sample_location_codes
+
+class APNatureBlockSample(LibtechSample):
+    def __init__(self, logger, force_download='false',
+                 name="on_demand"):
+        self.parent_location_code = None
+        self.sample_type = "block"
+        self.name = name
+        self.scheme = "nrega"
+        self.is_nic = False
+        self.force_download = force_download
+        self.location_class = self.get_location_class(logger)
+        self.sample_location_codes = ['0203004','0203005','0203006']
+        self.get_all_locations(logger)
+    def get_all_locations(self, logger):
+        """Getting all the panchayat codes"""
+        sample_location_codes = self.sample_location_codes
+        for each_code in self.sample_location_codes:
+            lobj = Location(logger, location_code=each_code)
+            location_array = lobj.get_child_locations(logger) 
+            sample_location_codes = sample_location_codes + location_array
+        self.all_location_codes = sample_location_codes
+
 
 class FESAPSample(LibtechSample):
     def __init__(self, logger, force_download='false',
