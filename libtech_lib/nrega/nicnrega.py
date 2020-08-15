@@ -1456,10 +1456,14 @@ def get_nic_urls(lobj, logger):
     return dataframe
 
 def scrape_muster_list(logger, lobj, finyear, url, session=None):
+    column_headers = ["finyear", "work_code",
+                      "muster_no", "from_date", "to_date",
+                      "muster_value", "work_name"]
+    csv_array = []
     full_finyear = get_full_finyear(finyear)
     r = requests.get(url)
     cookies = r.cookies
-    logger.info(cookies)
+    logger.debug(cookies)
     myhtml = r.content
     mysoup = BeautifulSoup(myhtml, "lxml")
     validation  =  mysoup.find(id = '__EVENTVALIDATION').get('value')
@@ -1514,82 +1518,48 @@ def scrape_muster_list(logger, lobj, finyear, url, session=None):
       '': ''
     }
     
-    response = requests.post(url, headers=headers,cookies=cookies, data=data)
-    with open("/tmp/f.html", "wb") as f:
-        f.write(response.content)
-    #NB. Original query string below. It seems impossible to parse and
-    #reproduce query strings 100% accurately so the one below is given
-    #in case the reproduced version is not "correct".
-    # response = requests.post('https://mnregaweb4.nic.in/netnrega/Citizen_html/Musternew.aspx?id=2&lflag=eng&ExeL=GP&fin_year=2019-2020&state_code=27&district_code=27&block_code=2724007&panchayat_code=2724007283&State_name=RAJASTHAN&District_name=BHILWARA&Block_name=SAHADA&panchayat_name=%u0905%u0930%u0928%u093f%u092f%u093e+%u0916%u093e%u0932%u0938%u093e&Digest=NV%2fnIrrL5cMS%2fYBl64Zfhg', headers=headers, cookies=cookies, data=data)
-    
-    exit(0)
 
-def scrape_muster_list1(logger, lobj, finyear, url, session=None):
-    """Get all the Muster Information"""
-    logger.debug(f"In scrape muster for url {url}")
-    select_id = 'ContentPlaceHolder1_ddlwork'
-    select_id = 'ctl00_ContentPlaceHolder1_ddlwork'
-    full_finyear = get_full_finyear(finyear)
-    
-    res = session.get(url)
-    cookies = res.cookies
-    logger.debug(f"Cookies are {cookies}")
-    logger.debug(f"Status code is {res.status_code}")
-    if res.status_code != 200:
-        return None
-    myhtml = res.content
-    with open("/tmp/d.html", "wb") as f:
-        f.write(myhtml)
-    mysoup = BeautifulSoup(myhtml, "lxml")
-    validation  =  mysoup.find(id = '__EVENTVALIDATION').get('value')
-    view_state  =  mysoup.find(id = '__VIEWSTATE').get('value')
-    #logger.debug(f"View State is {view_state}")
-    #logger.debug(f"Validation {validation}")
-    base_url = f"https://{lobj.crawl_ip}"
-    headers = {
-        'Connection': 'keep-alive',
-        'Cache-Control': 'no-cache',
-        'X-MicrosoftAjax': 'Delta=true',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.142 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Accept': '*/*',
-        'Origin': base_url,
-        'Referer': url,
-        'Accept-Language': 'en-US,en;q=0.9',
-    }
-    data = {
-      'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$ScriptManager1|ctl00$ContentPlaceHolder1$ddlwork',
-      '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddlwork',
-      '__EVENTARGUMENT': '',
-      '__LASTFOCUS': '',
-      '__VIEWSTATE': view_state,
-      '__EVENTVALIDATION': validation,
-      'ctl00$ContentPlaceHolder1$ddlFinYear': full_finyear,
-      'ctl00$ContentPlaceHolder1$btnfill': 'btnfill',
-      'ctl00$ContentPlaceHolder1$txtSearch': '',
-      'ctl00$ContentPlaceHolder1$ddlwork': '',
-      'ctl00$ContentPlaceHolder1$ddlMsrno': '---select---',
-      '__ASYNCPOST': 'true',
-      '': ''
-    }
-    options_list = get_options_list(logger, mysoup, select_id=select_id) 
+    work_select_id = 'ctl00_ContentPlaceHolder1_ddlwork'
+    muster_select_id = 'ctl00_ContentPlaceHolder1_ddlMsrno'
+    options_list = get_options_list(logger, mysoup, select_id=work_select_id) 
     for option in options_list:
         work_code = option["value"]
+        work_name = option["name"]
         if('---select---' in work_code):
-            logger.warning(f'Skipping muster_no[{work_code}]')
+            logger.debug(f'Skipping muster_no[{work_code}]')
             continue
         data["ctl00$ContentPlaceHolder1$ddlwork"] = work_code
-        response = requests.post(url, data=data, headers=headers,
-                                cookies=cookies, verify=False)
-        if response.status_code != 200:
-            continue
-        logger.info(f"workcode is {work_code}")
-        htmlsoup = BeautifulSoup(response.content, "lxml")
-        with open("/tmp/e.html", "wb") as f:
-            f.write(response.content)
-        break
-
+        logger.debug(f"processing work_code {work_code}")
+        response = requests.post(url, headers=headers,cookies=cookies, data=data)
+        if response.status_code == 200:
+            htmlsoup = BeautifulSoup(response.content, "lxml")
+            muster_options_list = get_options_list(logger, htmlsoup,
+                                                   select_id=muster_select_id) 
+            for muster_option in muster_options_list:
+                value = muster_option["value"]
+                if('---Select---' in value):
+                    logger.debug(f'Skipping muster_no[{value}]')
+                    continue
+                value_array = value.split("~~")
+                if len(value_array) == 3:
+                    muster_no = value_array[0]
+                    from_date = value_array[1]
+                    to_date = value_array[2]
+                else:
+                    muster_no = ''
+                    from_date = ''
+                    to_date = ''
+                logger.debug(f"found muster {value}")
+                row = [finyear, work_code, muster_no,
+                       from_date, to_date, value, work_name]
+                csv_array.append(row)
+    if len(csv_array) > 0:
+        dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    else:
+        dataframe = None
+    return dataframe
     
+
 def fetch_muster_list(lobj, logger, nic_urls_df):
     """This will fetch the muster list according to the new URL available"""
     logger.info(f"In Fetch muster list for {lobj.panchayat_code}")
@@ -1601,10 +1571,17 @@ def fetch_muster_list(lobj, logger, nic_urls_df):
     session = requests.Session()
     session.get(lobj.mis_state_url)
     logger.debug(f"session cookies {session.cookies}")
+    df_array = []
     for index, row in filtered_df.iterrows():
         nic_url = row.get("mis_url")
         finyear = row.get("finyear")
         logger.debug(f"Processing finyear {finyear} url {nic_url}")
-        if finyear == 20:
-            scrape_muster_list(logger, lobj, finyear, nic_url, session=session)
-            break
+        dataframe = scrape_muster_list(logger, lobj, finyear, nic_url, session=session)
+        if dataframe is not None:
+            df_array.append(dataframe)
+    if len(df_array) == 0:
+        return None
+    dataframe = pd.concat(df_array)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe
+

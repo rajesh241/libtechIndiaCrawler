@@ -269,11 +269,12 @@ class NREGAPanchayat(Location):
         dataframe = get_jobcard_transactions(self, logger, jobcard_register_df)
         report_type = "jobcard_transactions"
         self.save_report(logger, dataframe, report_type)
-    def muster_list1(self, logger):
+    def muster_list_v2(self, logger):
         report_type = "muster_list"
         my_location = NREGABlock(logger, self.block_code)
         nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_urls")
         dataframe = fetch_muster_list(self, logger, nic_urls_df)
+        return dataframe
     def muster_list(self, logger):
         """This will fetch all jobcard transactions for the panchayat"""
         logger.info(f"Going to fetch Muster list for {self.code}")
@@ -658,6 +659,21 @@ class NREGABlock(Location):
         for each_panchayat_code in panchayat_array:
             my_location = NREGAPanchayat(logger, each_panchayat_code)
             dataframe = my_location.jobcard_register(logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+    def muster_list_v2(self, logger):
+        """This will fetch jobcard register for each panchayat in the block"""
+        report_type = "muster_list_v2"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            my_location = NREGAPanchayat(logger, each_panchayat_code)
+            dataframe = my_location.muster_list_v2(logger)
             if dataframe is not None:
                 df_array.append(dataframe)
         if len(df_array) > 0:
