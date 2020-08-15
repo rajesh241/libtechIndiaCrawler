@@ -23,6 +23,7 @@ from libtech_lib.generic.api_interface import (get_location_dict,
 from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_worker_register,
                                         get_muster_list,
+                                        fetch_muster_list,
                                         update_muster_list,
                                         get_jobcard_transactions,
                                         get_block_rejected_transactions,
@@ -210,10 +211,11 @@ class NREGAPanchayat(Location):
         self.code = location_code
         self.force_download = force_download
         self.sample_name = sample_name
-        self.mis_state_url = "https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
+        self.nic_state_url = f"https://{self.crawl_ip}/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
+        self.mis_state_url = "https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         full_finyear = get_full_finyear(get_current_finyear())
         self.panchayat_page_url = (f"http://{self.crawl_ip}/netnrega/IndexFrame.aspx?"
                                    f"lflag=eng&District_Code={self.state_code}&"
@@ -267,6 +269,11 @@ class NREGAPanchayat(Location):
         dataframe = get_jobcard_transactions(self, logger, jobcard_register_df)
         report_type = "jobcard_transactions"
         self.save_report(logger, dataframe, report_type)
+    def muster_list1(self, logger):
+        report_type = "muster_list"
+        my_location = NREGABlock(logger, self.block_code)
+        nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_urls")
+        dataframe = fetch_muster_list(self, logger, nic_urls_df)
     def muster_list(self, logger):
         """This will fetch all jobcard transactions for the panchayat"""
         logger.info(f"Going to fetch Muster list for {self.code}")

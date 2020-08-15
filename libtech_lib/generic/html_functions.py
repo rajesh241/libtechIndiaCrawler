@@ -228,3 +228,19 @@ def delete_divs_by_classes(logger, mysoup, class_array):
         if my_div is not None:
             my_div.decompose()
     return mysoup
+
+def get_options_list(logger, mysoup, select_id=None):
+    """This will fetch the option dict given teh select id"""
+    my_select = mysoup.find("select", id=select_id)
+    logger.info(f"select id is {select_id}")
+    options_list = []
+    #my_select = mysoup.find("select")
+    if my_select is not None:
+        options = my_select.findAll("option")
+        for option in options:
+            my_dict = {}
+            my_dict["name"] = option.text
+            my_dict["value"] = option["value"]
+            options_list.append(my_dict)
+
+    return options_list

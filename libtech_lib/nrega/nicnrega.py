@@ -31,7 +31,8 @@ from libtech_lib.generic.api_interface import  (api_get_report_url,
 from libtech_lib.generic.html_functions import ( get_dataframe_from_html,
                                                  get_dataframe_from_url,
                                                  nic_download_page, 
-                                                 find_url_containing_text
+                                                 find_url_containing_text,
+                                                 get_options_list
                                                )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 
@@ -1453,3 +1454,157 @@ def get_nic_urls(lobj, logger):
     dataframe = pd.DataFrame(csv_array, columns=column_headers)
     dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
+
+def scrape_muster_list(logger, lobj, finyear, url, session=None):
+    full_finyear = get_full_finyear(finyear)
+    r = requests.get(url)
+    cookies = r.cookies
+    logger.info(cookies)
+    myhtml = r.content
+    mysoup = BeautifulSoup(myhtml, "lxml")
+    validation  =  mysoup.find(id = '__EVENTVALIDATION').get('value')
+    view_state  =  mysoup.find(id = '__VIEWSTATE').get('value')
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'X-MicrosoftAjax': 'Delta=true',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Accept': '*/*',
+        'Origin': 'https://mnregaweb4.nic.in',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Dest': 'empty',
+        'Referer' : url,
+      #  'Referer': 'https://mnregaweb4.nic.in/netnrega/Citizen_html/Musternew.aspx?id=2&lflag=eng&ExeL=GP&fin_year=2019-2020&state_code=27&district_code=27&block_code=2724007&panchayat_code=2724007283&State_name=RAJASTHAN&District_name=BHILWARA&Block_name=SAHADA&panchayat_name=%e0%a4%85%e0%a4%b0%e0%a4%a8%e0%a4%bf%e0%a4%af%e0%a4%be+%e0%a4%96%e0%a4%be%e0%a4%b2%e0%a4%b8%e0%a4%be&Digest=NV/nIrrL5cMS/YBl64Zfhg',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+    
+    params = (
+        ('id', '2'),
+        ('lflag', 'eng'),
+        ('ExeL', 'GP'),
+        ('fin_year', '2019-2020'),
+        ('state_code', '27'),
+        ('district_code', '27'),
+        ('block_code', '2724007'),
+        ('panchayat_code', '2724007283'),
+        ('State_name', 'RAJASTHAN'),
+        ('District_name', 'BHILWARA'),
+        ('Block_name', 'SAHADA'),
+        ('panchayat_name', '%u0905%u0930%u0928%u093f%u092f%u093e %u0916%u093e%u0932%u0938%u093e'),
+        ('Digest', 'NV/nIrrL5cMS/YBl64Zfhg'),
+    )
+    
+    data = {
+      'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$ScriptManager1|ctl00$ContentPlaceHolder1$ddlwork',
+      '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddlwork',
+      '__EVENTARGUMENT': '',
+      '__LASTFOCUS': '',
+      '__VIEWSTATE': view_state,
+      '__VIEWSTATEGENERATOR': '75DEE431',
+      '__VIEWSTATEENCRYPTED': '',
+      '__EVENTVALIDATION': validation,
+      'ctl00$ContentPlaceHolder1$ddlFinYear': full_finyear,
+      'ctl00$ContentPlaceHolder1$btnfill': 'btnfill',
+      'ctl00$ContentPlaceHolder1$txtSearch': '',
+      'ctl00$ContentPlaceHolder1$ddlwork': '2724007/RC/112908174689',
+      'ctl00$ContentPlaceHolder1$ddlMsrno': '---select---',
+      '__ASYNCPOST': 'true',
+      '': ''
+    }
+    
+    response = requests.post(url, headers=headers,cookies=cookies, data=data)
+    with open("/tmp/f.html", "wb") as f:
+        f.write(response.content)
+    #NB. Original query string below. It seems impossible to parse and
+    #reproduce query strings 100% accurately so the one below is given
+    #in case the reproduced version is not "correct".
+    # response = requests.post('https://mnregaweb4.nic.in/netnrega/Citizen_html/Musternew.aspx?id=2&lflag=eng&ExeL=GP&fin_year=2019-2020&state_code=27&district_code=27&block_code=2724007&panchayat_code=2724007283&State_name=RAJASTHAN&District_name=BHILWARA&Block_name=SAHADA&panchayat_name=%u0905%u0930%u0928%u093f%u092f%u093e+%u0916%u093e%u0932%u0938%u093e&Digest=NV%2fnIrrL5cMS%2fYBl64Zfhg', headers=headers, cookies=cookies, data=data)
+    
+    exit(0)
+
+def scrape_muster_list1(logger, lobj, finyear, url, session=None):
+    """Get all the Muster Information"""
+    logger.debug(f"In scrape muster for url {url}")
+    select_id = 'ContentPlaceHolder1_ddlwork'
+    select_id = 'ctl00_ContentPlaceHolder1_ddlwork'
+    full_finyear = get_full_finyear(finyear)
+    
+    res = session.get(url)
+    cookies = res.cookies
+    logger.debug(f"Cookies are {cookies}")
+    logger.debug(f"Status code is {res.status_code}")
+    if res.status_code != 200:
+        return None
+    myhtml = res.content
+    with open("/tmp/d.html", "wb") as f:
+        f.write(myhtml)
+    mysoup = BeautifulSoup(myhtml, "lxml")
+    validation  =  mysoup.find(id = '__EVENTVALIDATION').get('value')
+    view_state  =  mysoup.find(id = '__VIEWSTATE').get('value')
+    #logger.debug(f"View State is {view_state}")
+    #logger.debug(f"Validation {validation}")
+    base_url = f"https://{lobj.crawl_ip}"
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'X-MicrosoftAjax': 'Delta=true',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.142 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Accept': '*/*',
+        'Origin': base_url,
+        'Referer': url,
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+    data = {
+      'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$ScriptManager1|ctl00$ContentPlaceHolder1$ddlwork',
+      '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddlwork',
+      '__EVENTARGUMENT': '',
+      '__LASTFOCUS': '',
+      '__VIEWSTATE': view_state,
+      '__EVENTVALIDATION': validation,
+      'ctl00$ContentPlaceHolder1$ddlFinYear': full_finyear,
+      'ctl00$ContentPlaceHolder1$btnfill': 'btnfill',
+      'ctl00$ContentPlaceHolder1$txtSearch': '',
+      'ctl00$ContentPlaceHolder1$ddlwork': '',
+      'ctl00$ContentPlaceHolder1$ddlMsrno': '---select---',
+      '__ASYNCPOST': 'true',
+      '': ''
+    }
+    options_list = get_options_list(logger, mysoup, select_id=select_id) 
+    for option in options_list:
+        work_code = option["value"]
+        if('---select---' in work_code):
+            logger.warning(f'Skipping muster_no[{work_code}]')
+            continue
+        data["ctl00$ContentPlaceHolder1$ddlwork"] = work_code
+        response = requests.post(url, data=data, headers=headers,
+                                cookies=cookies, verify=False)
+        if response.status_code != 200:
+            continue
+        logger.info(f"workcode is {work_code}")
+        htmlsoup = BeautifulSoup(response.content, "lxml")
+        with open("/tmp/e.html", "wb") as f:
+            f.write(response.content)
+        break
+
+    
+def fetch_muster_list(lobj, logger, nic_urls_df):
+    """This will fetch the muster list according to the new URL available"""
+    logger.info(f"In Fetch muster list for {lobj.panchayat_code}")
+    logger.info(f"Shape of df is {nic_urls_df.shape}")
+    filtered_df = nic_urls_df[(nic_urls_df["report_slug"] == "muster-roll") &
+                              (nic_urls_df["panchayat_code"] == int(lobj.panchayat_code))]
+    logger.debug(f"Filtered DF shape is {filtered_df.shape}")
+    ##Establish session for request
+    session = requests.Session()
+    session.get(lobj.mis_state_url)
+    logger.debug(f"session cookies {session.cookies}")
+    for index, row in filtered_df.iterrows():
+        nic_url = row.get("mis_url")
+        finyear = row.get("finyear")
+        logger.debug(f"Processing finyear {finyear} url {nic_url}")
+        if finyear == 20:
+            scrape_muster_list(logger, lobj, finyear, nic_url, session=session)
+            break
