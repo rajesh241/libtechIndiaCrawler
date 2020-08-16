@@ -38,6 +38,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         create_work_payment_report,
                                         get_nic_stat_urls, 
                                         get_ap_worker_register,
+                                        get_worker_register_mis,
                                         get_nic_urls,
                                         get_jobcard_stats
                                        )
@@ -53,7 +54,8 @@ from libtech_lib.generic.aws import days_since_modified_s3
 AP_STATE_CODE = "02"
 REPORT_THRESHOLD_DICT = {
     "jobcard_register" : 15,
-    "worker_register" : 15,
+    "worker_register" : 1,
+    "nic_urls" : 365,
     "nic_stat_urls" : 365
 }
 DEFAULT_REPORT_THRESHOLD = 20
@@ -215,7 +217,7 @@ class NREGAPanchayat(Location):
                           force_download=self.force_download,
                           sample_name=self.sample_name)
         self.nic_state_url = f"https://{self.crawl_ip}/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
-        self.mis_state_url = "https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
+        self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         full_finyear = get_full_finyear(get_current_finyear())
         self.panchayat_page_url = (f"http://{self.crawl_ip}/netnrega/IndexFrame.aspx?"
                                    f"lflag=eng&District_Code={self.state_code}&"
@@ -251,7 +253,10 @@ class NREGAPanchayat(Location):
         if (is_updated):
             dataframe = self.fetch_report_dataframe(logger, report_type)
             return dataframe
-        dataframe = get_worker_register(self, logger)
+        my_location = NREGABlock(logger, self.block_code)
+        my_location.nic_urls(logger)
+        nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_urls")
+        dataframe = get_worker_register_mis(self, logger, nic_urls_df)
         self.save_report(logger, dataframe, report_type)
         return dataframe
     def jobcard_transactions(self, logger):
@@ -592,6 +597,9 @@ class NREGABlock(Location):
         return pobj_array
     def nic_urls(self, logger):
         report_type = "nic_urls"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
         df_array = []
