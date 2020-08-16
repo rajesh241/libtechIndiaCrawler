@@ -815,7 +815,6 @@ def get_block_rejected_stats(lobj, logger, fto_status_df):
             }
             job_list.append(job_dict)
     dataframe = libtech_queue_manager(logger, job_list, num_threads=25)
-    dataframe.to_csv("/tmp/a.csv")
     concat_df = pd.concat([filtered_df, dataframe])
     return concat_df
 
@@ -1482,11 +1481,9 @@ def get_nic_r4_1(lobj, logger, url_df, finyear):
             myhtml = response.content
             dataframe = get_dataframe_from_html(logger, myhtml,
                                                 mydict=extract_dict)
-            dataframe.to_csv("/tmp/a.csv")
             dataframe['finyear'] = finyear
             df_array.append(dataframe)
     dataframe = pd.concat(df_array)
-    dataframe.to_csv("/tmp/b.csv")
     return dataframe
         
 def get_nic_urls(lobj, logger):
