@@ -99,6 +99,81 @@ def get_jobcard_register(lobj, logger):
             dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
 
+def get_worker_register_mis(lobj, logger, nic_urls_df):
+    """This will download the worker registe based on nic_urls and df"""
+    logger.info(f"In download worker register for {lobj.panchayat_code}")
+    logger.info(f"Shape of df is {nic_urls_df.shape}")
+    finyear = get_current_finyear()
+    filtered_df = nic_urls_df[(nic_urls_df["report_slug"] == "registration-application-register") &
+                              (nic_urls_df['finyear'] == int(finyear)) &
+                              (nic_urls_df["panchayat_code"] == int(lobj.panchayat_code))]
+    logger.debug(f"Filtered DF shape is {filtered_df.shape}")
+    ##Establish session for request
+    session = requests.Session()
+    session.get(lobj.mis_state_url)
+    logger.info(lobj.mis_state_url)
+    logger.debug(f"session cookies {session.cookies}")
+    myhtml = None
+    for index, row in filtered_df.iterrows():
+        url = row.get("mis_url")
+        logger.debug(f"Url is {url}")
+        response = session.get(url)
+        if response.status_code == 200:
+            myhtml = response.content
+        break
+    if myhtml is None:
+        return None
+    jobcard_prefix = f"{lobj.state_short_code}-"
+    extract_dict = {}
+    extract_dict['pattern'] = jobcard_prefix
+    extract_dict['data_start_row'] = 2
+    extract_dict['split_cell_array'] = [9]
+    extract_dict['column_headers'] = ['sr_no', 'head_of_household', 'caste',
+                                      'IAY_LR', 'name', 'father_husband_name',
+                                      'gender', 'age', 'jobcard_request_date',
+                                      'jobcard', 'jobcard_issue_date', 'jobcard_remarks',
+                                      'disabled', 'minority',
+                                      'jobcard_verification_date']
+    dataframe = None
+    dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    ##Here we need to do some post processing dataframe entries
+    to_delete_rows = []
+    village_name = ''
+    prev_head_of_household = ''
+    prev_caste = ''
+    dataframe['village_name'] = ''
+    for index, row in dataframe.iterrows():
+        first_col = row.get('sr_no', None)
+        if first_col is None:
+            to_delete_rows.append(index)
+            break
+        name = row.get('name', None)
+        if name is not None:
+            if '*' in name:
+                name = name.replace('*', '').lstrip().rstrip()
+                dataframe.loc[index, 'name'] = name
+        head_of_household = row.get('head_of_household', '')
+        if head_of_household == '':
+            head_of_household = prev_head_of_household
+            dataframe.loc[index, 'head_of_household'] = head_of_household
+        prev_head_of_household = head_of_household
+        caste = row.get('caste', '')
+        if caste == '':
+            caste = prev_caste
+            dataframe.loc[index, 'caste'] = caste
+        prev_caste = caste
+        if not first_col.isdigit():
+            to_delete_rows.append(index)
+        if "Villages" in first_col:
+            village_name = re_extract_village_name(first_col)
+            logger.info(f" village name is {village_name}")
+        dataframe.loc[index, 'village_name'] = village_name
+    logger.info(f"rows to be deleted are {to_delete_rows}")
+    dataframe = dataframe.drop(to_delete_rows)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    dataframe = dataframe.reset_index(drop=True)
+    return dataframe
+    
 def get_worker_register(lobj, logger, worker_reg_url=None, cookies=None):
     """This function will get the worker register from the nrega url"""
     dataframe = None

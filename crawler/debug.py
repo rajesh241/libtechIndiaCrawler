@@ -41,6 +41,7 @@ def args_fetch():
     parser.add_argument('-lt', '--locationType',
                         help='Location type that needs tobe instantiated', required=False)
     parser.add_argument('-fn', '--func_name', help='Name of the function', required=False)
+    parser.add_argument('-pr', '--priority', help='Priority of the download', required=False)
     parser.add_argument('-sn', '--sample_name', help='Name of the function', required=False)
     parser.add_argument('-ls', '--location_sample', help='Location Sample Name', required=False)
     parser.add_argument('-zf', '--zipfilename', help='Zip File name', required=False)
@@ -77,6 +78,7 @@ def main():
     if args['populate']:
         logger.info("Populating Crawl Queue")
         location_code = args.get('locationCode', None)
+        priority = args.get('priority', 100)
         location_type = args.get('locationType', 'panchayat')
         func_name = args.get('func_name', None)
         is_not_nic = args.get('notnic', None)
@@ -97,7 +99,7 @@ def main():
       #     my_sample = APITDABlockSample(logger,
       #                                   force_download=force_download)
       #     logger.info(my_sample.sample_location_codes)
-        my_sample.populate_queue(logger, func_name)
+        my_sample.populate_queue(logger, func_name, priority=priority)
     if args['insert']:
         logger.info("Inserting in Crawl Queue")
         location_code = args.get('locationCode', None)
@@ -150,11 +152,16 @@ def main():
         report_types = ["worker_register","nic_stats", "work_payment",
                         "jobcard_transactions", "block_rejected_transactions"]
         report_types = ["nic_stats"]
+        report_types = ["block_rejected_transactions", "nic_r4_1"]
+        report_types = ["worker_register"]
         logger.info(tempDir)
         logger.info(zipfilename)
         zip_file_name = tempDir + "/" + zipfilename
         download_dir  = tempDir + "/" + str(datetime.datetime.now().timestamp()) 
-       #file_url = my_sample.create_bundle(logger, report
+        file_url = my_sample.create_bundle(logger, report_types,
+                                           download_dir=download_dir,
+                                           zip_file_name=zip_file_name)
+        logger.info(f"file_url is {file_url}")
        #        data={}
        #        data['location_code'] = district_code
        #        data['location_class'] = "NREGADistrict"
@@ -191,7 +198,6 @@ def main():
             sample_name = "on_demand"
         result = download_report(logger, location_code, location_type, report_name,
                         is_nic=is_nic, force_download=force_download)
-        logger.info(result)
         exit(0)
         logger.info(f"in debug sample name is {sample_name}")
         location_codes = []
