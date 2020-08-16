@@ -139,12 +139,13 @@ class Location():
 
     def save_report(self, logger, data, report_type, finyear=None):
         """Standard function to save report to the location"""
+        today = datetime.datetime.now().strftime('%d%m%Y')
         if data is None:
             return
         if finyear is None:
-            report_filename = f"{self.slug}_{self.code}_{report_type}.csv"
+            report_filename = f"{self.slug}_{self.code}_{report_type}_{today}.csv"
         else:
-            report_filename = f"{self.slug}_{self.code}_{report_type}_{finyear}.csv"
+            report_filename = f"{self.slug}_{self.code}_{report_type}_{finyear}_{today}.csv"
         filepath = self.get_file_path(logger)
         filepath = filepath.replace("reportType", report_type)
         filename = f"{filepath}/{report_filename}"
