@@ -22,8 +22,6 @@ lazy-object-proxy==1.4.3
 lxml==4.3.4
 Markdown==3.1.1
 mccabe==0.6.1
-mysql-connector-python==8.0.18
-mysqlclient==1.4.2.post1
 numpy==1.18.1
 opencv-python==4.1.2.30
 openpyxl==2.6.3
