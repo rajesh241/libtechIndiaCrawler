@@ -71,12 +71,14 @@ class LibtechSample():
             current_location_type = lobj.location_type
         logger.info(f"Total samples selected is {len(sample_location_codes)}")
         sample_location_codes.append(self.parent_location_code)
-        self.sample_location_codes = sample_location_codes 
-    def create_bundle(self, logger, report_types, download_dir=None, zip_file_name=None, save_to_s3=True):
+        self.sample_location_codes = sample_location_codes
+        self.all_location_codes = sample_location_codes 
+    def create_bundle(self, logger, report_types, download_dir=None, zip_file_name=None, save_to_s3=True, only_csv=False):
         """This would create the zip bundle of all the reports"""
         report_urls = []
         for each_code in self.all_location_codes:
             lobj = Location(logger, location_code=each_code)
+            logger.info(f"Currently processing {each_code}")
             for report_type in report_types:
                 urls = lobj.fetch_report_urls(lobj, report_type)
                 report_urls = report_urls + urls
@@ -87,7 +89,11 @@ class LibtechSample():
         if zip_file_name is None:
             zip_file_name = f"/tmp/{current_timestamp}"
         for url in report_urls:
-            download_save_file(logger, url, dest_folder=download_dir)
+            if only_csv == True:
+                if url.endswith('.csv'):
+                    download_save_file(logger, url, dest_folder=download_dir)
+            else:
+                download_save_file(logger, url, dest_folder=download_dir)
         shutil.make_archive(zip_file_name, 'zip', download_dir)
         if save_to_s3 == True:
             with open(f"{zip_file_name}.zip", "rb") as f:
