@@ -1131,6 +1131,181 @@ def get_nic_stats(lobj, logger, nic_stat_urls_df):
     data_json = lobj.data_json
     data_json["at_a_glance"] = stat_dict
     api_location_update(logger, lobj.id, data_json)
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe
+        
+def get_nic_urls(lobj, logger):
+    """This will get important nic URLs from the panchayat page"""
+    csv_array = []
+    logger.info(f"{lobj.state_name}-{lobj.district_name}-{lobj.block_name}-{lobj.panchayat_name}")
+    panchayat_page_url = (f"https://{lobj.crawl_ip}/netnrega/IndexFrame.aspx?"
+                              f"lflag=eng&District_Code={lobj.state_code}&"
+                              f"district_name={lobj.district_name}"
+                              f"&state_name={lobj.state_name}"
+                              f"&state_Code={lobj.state_code}&block_name={lobj.block_name}"
+                              f"&block_code={lobj.block_code}&fin_year=fullFinYear"
+                              f"&check=1&Panchayat_name={lobj.panchayat_name}"
+                              f"&Panchayat_Code={lobj.panchayat_code}")
+    start_fin_year = get_default_start_fin_year()
+    end_fin_year = get_current_finyear()
+    column_headers = ['finyear', 'report_name', 'report_slug',
+                      'state_url', 'mis_url']
+    for finyear in range(start_fin_year, end_fin_year+1):
+        logger.info(f"Currently Processing {finyear}")
+        finyear = str(finyear)
+        full_finyear = get_full_finyear(finyear)
+        base_url = panchayat_page_url.replace("fullFinYear", full_finyear)
+        logger.info(f"base url is {base_url}")
+        res = nic_download_page(logger, base_url)
+        if res.status_code != 200:
+            return None
+        myhtml = res.content
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        links = mysoup.findAll("a")
+        url_prefix = f"https://{lobj.crawl_ip}/netnrega/"
+        mis_url_prefix = f"https://mnregaweb4.nic.in/netnrega/"
+        for link in links:
+            href = link.get("href", "")
+            text = link.text
+            state_url = url_prefix + href
+            mis_url = mis_url_prefix + href
+            row = [finyear, text, slugify(text), state_url, mis_url]
+            csv_array.append(row)
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe
+
+def scrape_muster_list(logger, lobj, finyear, url, session=None):
+    column_headers = ["finyear", "work_code",
+                      "muster_no", "from_date", "to_date",
+                      "muster_value", "work_name"]
+    csv_array = []
+    full_finyear = get_full_finyear(finyear)
+    r = requests.get(url)
+    cookies = r.cookies
+    logger.debug(cookies)
+    myhtml = r.content
+    mysoup = BeautifulSoup(myhtml, "lxml")
+    validation  =  mysoup.find(id = '__EVENTVALIDATION').get('value')
+    view_state  =  mysoup.find(id = '__VIEWSTATE').get('value')
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'X-MicrosoftAjax': 'Delta=true',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Accept': '*/*',
+        'Origin': 'https://mnregaweb4.nic.in',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Dest': 'empty',
+        'Referer' : url,
+      #  'Referer': 'https://mnregaweb4.nic.in/netnrega/Citizen_html/Musternew.aspx?id=2&lflag=eng&ExeL=GP&fin_year=2019-2020&state_code=27&district_code=27&block_code=2724007&panchayat_code=2724007283&State_name=RAJASTHAN&District_name=BHILWARA&Block_name=SAHADA&panchayat_name=%e0%a4%85%e0%a4%b0%e0%a4%a8%e0%a4%bf%e0%a4%af%e0%a4%be+%e0%a4%96%e0%a4%be%e0%a4%b2%e0%a4%b8%e0%a4%be&Digest=NV/nIrrL5cMS/YBl64Zfhg',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+    
+    params = (
+        ('id', '2'),
+        ('lflag', 'eng'),
+        ('ExeL', 'GP'),
+        ('fin_year', '2019-2020'),
+        ('state_code', '27'),
+        ('district_code', '27'),
+        ('block_code', '2724007'),
+        ('panchayat_code', '2724007283'),
+        ('State_name', 'RAJASTHAN'),
+        ('District_name', 'BHILWARA'),
+        ('Block_name', 'SAHADA'),
+        ('panchayat_name', '%u0905%u0930%u0928%u093f%u092f%u093e %u0916%u093e%u0932%u0938%u093e'),
+        ('Digest', 'NV/nIrrL5cMS/YBl64Zfhg'),
+    )
+    
+    data = {
+      'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$ScriptManager1|ctl00$ContentPlaceHolder1$ddlwork',
+      '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddlwork',
+      '__EVENTARGUMENT': '',
+      '__LASTFOCUS': '',
+      '__VIEWSTATE': view_state,
+      '__VIEWSTATEGENERATOR': '75DEE431',
+      '__VIEWSTATEENCRYPTED': '',
+      '__EVENTVALIDATION': validation,
+      'ctl00$ContentPlaceHolder1$ddlFinYear': full_finyear,
+      'ctl00$ContentPlaceHolder1$btnfill': 'btnfill',
+      'ctl00$ContentPlaceHolder1$txtSearch': '',
+      'ctl00$ContentPlaceHolder1$ddlwork': '2724007/RC/112908174689',
+      'ctl00$ContentPlaceHolder1$ddlMsrno': '---select---',
+      '__ASYNCPOST': 'true',
+      '': ''
+    }
+    
+
+    work_select_id = 'ctl00_ContentPlaceHolder1_ddlwork'
+    muster_select_id = 'ctl00_ContentPlaceHolder1_ddlMsrno'
+    options_list = get_options_list(logger, mysoup, select_id=work_select_id) 
+    for option in options_list:
+        work_code = option["value"]
+        work_name = option["name"]
+        if('---select---' in work_code):
+            logger.debug(f'Skipping muster_no[{work_code}]')
+            continue
+        data["ctl00$ContentPlaceHolder1$ddlwork"] = work_code
+        logger.debug(f"processing work_code {work_code}")
+        response = requests.post(url, headers=headers,cookies=cookies, data=data)
+        if response.status_code == 200:
+            htmlsoup = BeautifulSoup(response.content, "lxml")
+            muster_options_list = get_options_list(logger, htmlsoup,
+                                                   select_id=muster_select_id) 
+            for muster_option in muster_options_list:
+                value = muster_option["value"]
+                if('---Select---' in value):
+                    logger.debug(f'Skipping muster_no[{value}]')
+                    continue
+                value_array = value.split("~~")
+                if len(value_array) == 3:
+                    muster_no = value_array[0]
+                    from_date = value_array[1]
+                    to_date = value_array[2]
+                else:
+                    muster_no = ''
+                    from_date = ''
+                    to_date = ''
+                logger.debug(f"found muster {value}")
+                row = [finyear, work_code, muster_no,
+                       from_date, to_date, value, work_name]
+                csv_array.append(row)
+    if len(csv_array) > 0:
+        dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    else:
+        dataframe = None
+    return dataframe
+    
+
+def fetch_muster_list(lobj, logger, nic_urls_df):
+    """This will fetch the muster list according to the new URL available"""
+    logger.info(f"In Fetch muster list for {lobj.panchayat_code}")
+    logger.info(f"Shape of df is {nic_urls_df.shape}")
+    filtered_df = nic_urls_df[(nic_urls_df["report_slug"] == "muster-roll") &
+                              (nic_urls_df["panchayat_code"] == int(lobj.panchayat_code))]
+    logger.debug(f"Filtered DF shape is {filtered_df.shape}")
+    ##Establish session for request
+    session = requests.Session()
+    session.get(lobj.mis_state_url)
+    logger.debug(f"session cookies {session.cookies}")
+    df_array = []
+    for index, row in filtered_df.iterrows():
+        nic_url = row.get("mis_url")
+        finyear = row.get("finyear")
+        logger.debug(f"Processing finyear {finyear} url {nic_url}")
+        dataframe = scrape_muster_list(logger, lobj, finyear, nic_url, session=session)
+        if dataframe is not None:
+            df_array.append(dataframe)
+    if len(df_array) == 0:
+        return None
+    dataframe = pd.concat(df_array)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe
+
     return dataframe
 
 def get_data_accuracy(lobj, logger, muster_transactions_df, nic_stats_df):
@@ -1484,6 +1659,8 @@ def get_nic_r4_1(lobj, logger, url_df, finyear):
             dataframe['finyear'] = finyear
             df_array.append(dataframe)
     dataframe = pd.concat(df_array)
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
         
 def get_nic_urls(lobj, logger):
