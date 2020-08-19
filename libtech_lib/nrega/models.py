@@ -278,8 +278,10 @@ class NREGAPanchayat(Location):
     def muster_list_v2(self, logger):
         report_type = "muster_list"
         my_location = NREGABlock(logger, self.block_code)
+        my_location.nic_urls(logger)
         nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_urls")
         dataframe = fetch_muster_list(self, logger, nic_urls_df)
+        dataframe.to_csv("/tmp/m.csv")
         return dataframe
     def muster_list(self, logger):
         """This will fetch all jobcard transactions for the panchayat"""
@@ -347,7 +349,8 @@ class NREGAPanchayat(Location):
         report_type = "nic_stats"
         is_updated = self.is_report_updated(logger, report_type)
         if is_updated:
-            return
+            dataframe = self.fetch_report_dataframe(logger, report_type)
+            return dataframe
         my_location = NREGADistrict(logger, self.district_code,
                                     force_download=False)
         my_location.nic_stat_urls(logger)
@@ -356,6 +359,7 @@ class NREGAPanchayat(Location):
         dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
         report_type = "nic_stats"
         self.save_report(logger, dataframe, report_type)
+        return dataframe
 
 
 class APBlock(Location):
@@ -653,12 +657,18 @@ class NREGABlock(Location):
         nic_stat_urls_df = my_location.fetch_report_dataframe(logger, report_type)
         dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
         report_type = "nic_stats"
-        self.save_report(logger, dataframe, report_type)
         panchayat_array = self.get_all_panchayats(logger)
+        df_array = []
+        df_array.append(dataframe)
         for each_panchayat_code in panchayat_array:
             my_location = NREGAPanchayat(logger, each_panchayat_code,
                                          force_download=self.force_download)
             dataframe = my_location.nic_stats(logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        dataframe = pd.concat(df_array)
+        self.save_report(logger, dataframe, report_type)
+
     def jobcard_register(self, logger):
         """This will fetch jobcard register for each panchayat in the block"""
         report_type = "jobcard_register"
