@@ -38,7 +38,21 @@ def nic_download_page(logger, url, session=None, cookies=None, params=None, head
             logger.warning(f'Waiting for {timeout} seconds...')
     return res
 
-
+def find_urls_containing_text(myhtml, mytext, url_prefix=None):
+    """This function will find all the urls cotaining the mentioned text"""
+    url = None
+    urls = []
+    if url_prefix is None:
+        url_prefix = ''
+    mysoup = BeautifulSoup(myhtml, "lxml")
+    links = mysoup.findAll("a")
+    for link in links:
+        href = link.get("href", "")
+        if mytext in href:
+            url = url_prefix + href
+            urls.append(url)
+    return urls
+ 
 def find_url_containing_text(myhtml, mytext, url_prefix=None):
     """This function will find the first url cotaining the mentioned text"""
     url = None

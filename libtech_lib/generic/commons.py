@@ -261,4 +261,15 @@ def download_save_file(logger, url, dest_folder=None):
                     f.flush()
                     os.fsync(f.fileno())
     else:  # HTTP status code 4XX/5XX
-        logger.info("Download failed: status code {}\n{}".format(r.status_code, r.text)) 
+        logger.info("Download failed: status code {}\n{}".format(r.status_code, r.text))
+
+def is_english(s):
+    """This function will return
+    true if the given string has only English characters
+    false if it has not English characters"""
+    try:
+        s.encode(encoding='utf-8').decode('ascii')
+    except UnicodeDecodeError:
+        return False
+    else:
+        return True

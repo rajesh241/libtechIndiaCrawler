@@ -40,6 +40,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_ap_worker_register,
                                         get_worker_register_mis,
                                         get_nic_urls,
+                                        get_nrega_locations,
                                         get_jobcard_stats
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
@@ -502,10 +503,16 @@ class NREGAState(Location):
         self.force_download = force_download
         self.code = location_code
         self.sample_name = sample_name
-        self.mis_state_url = "https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
+        self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
+    def nrega_locations(self, logger):
+        """This loop will crawl all the nrega Locations"""
+        report_type = "nrega_locations"
+        dataframe = get_nrega_locations(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
     def nic_r4_1_urls(self, logger):
         """This will fetch MIS URLs based on pattern"""
         report_type = 'nic_r4_1_urls'
