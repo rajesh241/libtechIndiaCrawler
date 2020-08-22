@@ -54,6 +54,8 @@ class LibtechSample():
                 data['priority'] = priority
             logger.info(data)
             create_task(logger, data)
+    def get_all_locations(self, logger):
+        self.get_sample_locations(logger)
     def get_sample_locations(self, logger):
         """This function will populate the Queue"""
         sample_location_codes = [self.parent_location_code]

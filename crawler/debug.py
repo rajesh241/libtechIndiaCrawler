@@ -154,6 +154,7 @@ def main():
         report_types = ["nic_stats"]
         report_types = ["block_rejected_transactions", "nic_r4_1"]
         report_types = ["worker_register"]
+        report_types = ["block_rejected_transactions"]
         logger.info(tempDir)
         logger.info(zipfilename)
         zip_file_name = tempDir + "/" + zipfilename

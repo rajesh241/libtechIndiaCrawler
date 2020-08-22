@@ -21,6 +21,7 @@ from libtech_lib.generic.commons import  (get_current_finyear,
                                           get_percentage,
                                           get_previous_date,
                                           insert_location_details,
+                                          is_english,
                                           get_full_finyear
                                           )
 from libtech_lib.generic.api_interface import  (api_get_report_url,
@@ -32,6 +33,7 @@ from libtech_lib.generic.html_functions import ( get_dataframe_from_html,
                                                  get_dataframe_from_url,
                                                  nic_download_page, 
                                                  find_url_containing_text,
+                                                 find_urls_containing_text,
                                                  get_options_list
                                                )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
@@ -1833,4 +1835,85 @@ def fetch_muster_list(lobj, logger, nic_urls_df):
     dataframe = pd.concat(df_array)
     dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
+
+def get_location_list_from_dict(mydict):
+    """"Getting location list from dict"""
+    columns = ["state_code", "state_name", "district_code", "district_name", "block_code", "block_name", "panchayat_code", "panchayat_name"]
+    mylist = []
+    for column in columns:
+        value = mydict.get(column, [""])
+        mylist.append(value[0])
+    return mylist
+
+def get_nrega_locations(lobj, logger):
+    """This loop will crawl all the nrega Locations"""
+    csv_array = []
+    logger.info(f"Crawling locations for state {lobj.state_name}")
+    url_prefix = "https://mnregaweb4.nic.in/netnrega/"
+    res = requests.get(lobj.mis_state_url)
+    logger.info(lobj.mis_state_url)
+    column_headers = ["parent_location_code", "crawl_ip", "state_short_code", "is_nic", "location_type", "name", "code", "name_not_english", "slug", "state_code", "state_name", "district_code", "district_name", "block_code", "block_name", "panchayat_code", "panchayat_name"]
+    row = ["0", lobj.crawl_ip, lobj.state_short_code, lobj.is_nic, lobj.location_type, lobj.name, lobj.code, False, lobj.slug, lobj.state_code, lobj.state_name, "", "", "", "", "", ""]
+    csv_array.append(row)
+    if res.status_code != 200:
+        return None
+    cookies = res.cookies
+    logger.debug(f"cookies are {cookies}")
+    myhtml = res.content
+    dist_identifier = "Homedist.aspx"
+    dist_urls = find_urls_containing_text(myhtml, dist_identifier,
+                                   url_prefix=url_prefix)
+    for dist_url in dist_urls:
+        parent_location_code = lobj.code
+        logger.debug(f"Currently processing {dist_url}")
+        parsed = urlparse.urlparse(dist_url.lower())
+        dist_dict = parse_qs(parsed.query)
+        name = dist_dict.get("district_name")[0]
+        code = dist_dict.get("district_code")[0]
+        district_code = code
+        slug = slugify(name)
+        row1 = [parent_location_code, lobj.crawl_ip, lobj.state_short_code, lobj.is_nic, "district", name, code, is_english(name), slugify(name)]
+        row2 = get_location_list_from_dict(dist_dict)
+        row = row1 + row2
+        csv_array.append(row)
+        block_identifier = 'PoIndexFrame.aspx'
+        res1 = requests.get(dist_url)
+        if res1.status_code != 200:
+            return None
+        disthtml = res1.content
+        block_urls = find_urls_containing_text(disthtml, block_identifier, url_prefix=url_prefix)
+        for block_url in block_urls:
+            parent_location_code = district_code
+            logger.debug(f"Block URL {block_url}")
+            parsed = urlparse.urlparse(block_url.lower())
+            block_dict = parse_qs(parsed.query)
+            name = block_dict.get("block_name")[0]
+            code = block_dict.get("block_code")[0]
+            block_code = code
+            slug = slugify(name)
+            row1 = [parent_location_code, lobj.crawl_ip, lobj.state_short_code, lobj.is_nic, "block", name, code, is_english(name), slugify(name)]
+            row2 = get_location_list_from_dict(block_dict)
+            row = row1 + row2
+            csv_array.append(row)
+            parent_location_code = code
+            res2 = requests.get(block_url)
+            if res2.status_code != 200:
+                return None
+            block_html = res2.content
+            panchayat_identifier = "IndexFrame.aspx"
+            panchayat_urls = find_urls_containing_text(block_html, panchayat_identifier, url_prefix=url_prefix)
+            for panchayat_url in panchayat_urls:
+                parent_location_code = block_code
+                parsed = urlparse.urlparse(panchayat_url.lower())
+                panchayat_dict = parse_qs(parsed.query)
+                name = panchayat_dict.get("panchayat_name")[0]
+                code = panchayat_dict.get("panchayat_code")[0]
+                slug = slugify(name)
+                row1 = [parent_location_code, lobj.crawl_ip, lobj.state_short_code, lobj.is_nic, "panchayat", name, code, is_english(name), slugify(name)]
+                row2 = get_location_list_from_dict(panchayat_dict)
+                row = row1 + row2
+                csv_array.append(row)
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    return dataframe
+
 
