@@ -37,6 +37,11 @@ class LibtechSample():
                 location_class = "APDistrict"
             else:
                 location_class = "NREGADistrict"
+        if self.sample_type == "state":
+            if not self.is_nic:
+                location_class = "NREGAState"
+            else:
+                location_class = "NREGAState"
         return location_class
     def populate_queue(self, logger, report_type, finyear=None, priority=None):
         """This function will populate the Queue"""
