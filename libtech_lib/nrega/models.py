@@ -521,6 +521,14 @@ class NREGAState(Location):
         dataframe = get_nic_r4_1_urls(self, logger, report_type=report_type,
                                  url_text=url_text, url_prefix=url_prefix)
         self.save_report(logger, dataframe, report_type)
+    def nic_r14_5_urls(self, logger):
+        """This will fetch MIS URLs based on pattern"""
+        report_type = 'nic_r14_5_urls'
+        url_text = 'delayed_payment.aspx'
+        url_prefix = "http://mnregaweb4.nic.in/netnrega/state_html/"
+        dataframe = get_nic_r4_1_urls(self, logger, report_type=report_type,
+                                 url_text=url_text, url_prefix=url_prefix)
+        self.save_report(logger, dataframe, report_type)
 
 class NREGADistrict(Location):
     """This is the District class for NREGA"""
