@@ -25,7 +25,10 @@ from libtech_lib.generic.commons import  (get_current_finyear,
                       get_fto_finyear
                      )
 from libtech_lib.generic.api_interface import api_get_report_url, api_get_report_dataframe
-from libtech_lib.generic.html_functions import get_dataframe_from_html, get_dataframe_from_url
+from libtech_lib.generic.html_functions import (get_dataframe_from_html,
+                                                get_dataframe_from_url,
+                                                request_post_with_retry_timeout
+                                                )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 
 def get_ap_muster_transactions(lobj, logger):
@@ -133,7 +136,7 @@ def get_ap_muster_transactions(lobj, logger):
     dataframe = dataframe.reset_index(drop=True)
     return dataframe
 
-def fetch_ap_jobcard_register_for_village(logger, cookies, block_code, panchayat_code, village_code, village_name, extract_dict):
+def fetch_ap_jobcard_register_for_village(logger, cookies, district_code, block_code, panchayat_code, village_code, village_name, extract_dict):
     logger.info(f'fetch_ap_jobcard_register_for_village(cookies={cookies}, block_code={block_code}, panchayat_code={panchayat_code}, village_code={village_code}, village_name={village_name})')
 
     headers = {
@@ -158,16 +161,18 @@ def fetch_ap_jobcard_register_for_village(logger, cookies, block_code, panchayat
 
     data = {
         'State': '01',
-        'District': '03',
+        'District': district_code,
         'Mandal': block_code,
         'Panchayat': panchayat_code,
         'Village': village_code,
         'HouseHoldId': '',
         'Go': ''
     }
-
-    response = requests.post('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data, verify=False)
-    
+    url = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
+    #response = requests.post('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data, verify=False)
+    response = request_post_with_retry_timeout(logger, url, data=data, headers=headers, params=params, cookies=cookies) 
+    if response is None:
+        return []
     content = response.content
     try:
         #df = pd.read_html(content, attrs = {'id': 'sortable'})[0]
@@ -271,7 +276,7 @@ def get_ap_jobcard_register(lobj, logger):
                 continue
             village_name = option.text
             logger.info(f'Fetching jobcard register for village_code[{village_code}]/village_name[{village_name}]')
-            df = fetch_ap_jobcard_register_for_village(logger, cookies, block_code, panchayat_code, village_code, village_name, extract_dict)
+            df = fetch_ap_jobcard_register_for_village(logger, cookies, district_code, block_code, panchayat_code, village_code, village_name, extract_dict)
             if len(df):
                 #logger.info(df.head)
                 dfs.append(df)

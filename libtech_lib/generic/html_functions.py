@@ -9,6 +9,32 @@ import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 
+def request_post_with_retry_timeout(logger, url, data=None, headers=None, params=None, cookies=None,
+                 timeout = 5, max_retry=5):
+    """This is the wrapper function for request post method."""
+    retry = 0
+    res = None
+    sleep_timeout = 2
+    response = None
+    while (retry < max_retry):
+        try:
+            response = requests.post(url, data=data, timeout=timeout, params=params, cookies=cookies, headers=headers)
+            if response.status_code == 200:
+                error = False
+            else:
+                error = True
+        except requests.Timeout:
+            # back off and retry
+            error = True
+        except requests.ConnectionError:
+            error = True
+        if (error == True):
+            retry = retry + 1
+            time.sleep(sleep_timeout)
+            sleep_timeout += 5
+        else:
+            retry = max_retry
+    return response
 def nic_download_page(logger, url, session=None, cookies=None, params=None, headers=None):
     max_retry = 5
     retry = 0
