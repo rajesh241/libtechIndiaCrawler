@@ -22,6 +22,64 @@ from libtech_lib.generic.commons import (insert_finyear_in_dataframe,
                                          get_fto_finyear
                                         )
 
+def fetch_new_muster(logger, func_args, thread_name=None):
+    """This will fetch muster from new url"""
+    url = func_args[0]
+    cookies = func_args[1]
+    view_state = func_args[2]
+    validation = func_args[3]
+    logger.info(url)
+    logger.info(cookies)
+   #finyear = func_args[5]
+   #muster_code = func_args[4]
+   #work_code = func_args[6]
+   #muster_param = func_args[7]
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:80.0) Gecko/20100101 Firefox/80.0',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'X-MicrosoftAjax': 'Delta=true',
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+        'Origin': 'https://mnregaweb4.nic.in',
+        'Connection': 'keep-alive',
+        'Referer': url
+    }
+
+
+    data = {
+        'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel2|ctl00$ContentPlaceHolder1$ddlMsrno',
+        'ctl00$ContentPlaceHolder1$ddlFinYear': '2020-2021',
+        'ctl00$ContentPlaceHolder1$btnfill': 'btnfill',
+        'ctl00$ContentPlaceHolder1$txtSearch': '',
+        'ctl00$ContentPlaceHolder1$ddlwork': '2724007282/DP/112908165812',
+        'ctl00$ContentPlaceHolder1$ddlMsrno': '6240~~20/10/2018~~4/11/2018',
+        '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddlMsrno',
+        '__EVENTARGUMENT': '',
+        '__LASTFOCUS': '',
+        '__VIEWSTATE': view_state,
+        '__EVENTVALIDATION': validation,
+        '__VIEWSTATEGENERATOR': '75DEE431',
+        '__VIEWSTATEENCRYPTED': '',
+        '__ASYNCPOST': 'true',
+        '': ''
+    }
+
+    response = requests.post(url, headers=headers,  cookies=cookies, data=data)
+    logger.info(f" response status code is {response.status_code}")
+    if response.status_code == 200:
+        myhtml = response.content
+        with open("/tmp/muster.html", "wb") as f:
+            f.write(myhtml)
+
+#NB. Original query string below. It seems impossible to parse and
+#reproduce query strings 100% accurately so the one below is given
+#in case the reproduced version is not "correct".
+# response = requests.post('https://mnregaweb4.nic.in/netnrega/Citizen_html/Musternew.aspx?id=2&lflag=eng&ExeL=GP&fin_year=2018-2019&state_code=27&district_code=27&block_code=2724007&panchayat_code=2724007283&State_name=RAJASTHAN&District_name=BHILWARA&Block_name=SAHADA&panchayat_name=%u0905%u0930%u0928%u093f%u092f%u093e+%u0916%u093e%u0932%u0938%u093e&Digest=wkiBNlowEM0kJzPNrxXgqA', headers=headers, cookies=cookies, data=data)
+
+
+
+
 def fetch_muster_details(logger, func_args, thread_name=None):
     """Given a muster URL, this program will fetch muster details"""
     lobj = func_args[0]

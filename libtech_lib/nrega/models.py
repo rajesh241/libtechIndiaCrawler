@@ -40,6 +40,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_ap_worker_register,
                                         get_worker_register_mis,
                                         get_nic_urls,
+                                        update_muster_transactions_v2,
                                         get_nrega_locations,
                                         get_jobcard_stats
                                        )
@@ -282,7 +283,6 @@ class NREGAPanchayat(Location):
         my_location.nic_urls(logger)
         nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_urls")
         dataframe = fetch_muster_list(self, logger, nic_urls_df)
-        dataframe.to_csv("/tmp/m.csv")
         return dataframe
     def muster_list(self, logger):
         """This will fetch all jobcard transactions for the panchayat"""
@@ -307,6 +307,7 @@ class NREGAPanchayat(Location):
         filtered_transactions_df = filtered_transactions_df[filtered_transactions_df['panchayat_code'] == int(self.code)]
         report_type = "muster_transactions"
         self.save_report(logger, filtered_transactions_df, report_type)
+    
 
     def muster_transactions(self, logger):
         """This will fetch all muster transactions for the panchayat"""
@@ -588,10 +589,10 @@ class NREGABlock(Location):
         self.force_download = force_download
         self.code = location_code
         self.sample_name = sample_name
-        self.mis_state_url = "https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
+        self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
     def get_all_panchayats(self, logger):
         """Getting all child Locations, in this case getting all panchayat
         locations"""
@@ -633,6 +634,12 @@ class NREGABlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type)
         
+    def muster_transactions_v2(self, logger):
+        """This will download muster transactions based on muster list"""
+        report_type = "muster_transactions_v2"
+        dataframe = update_muster_transactions_v2(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
     def nic_r4_1(self, logger):
         '''Download MIS NIC 4_1 report'''
         report_type = "nic_r4_1"
@@ -710,6 +717,8 @@ class NREGABlock(Location):
             dataframe = my_location.muster_list_v2(logger)
             if dataframe is not None:
                 df_array.append(dataframe)
+            if len(df_array) > 0:
+                break
         if len(df_array) > 0:
             dataframe = pd.concat(df_array)
             if dataframe is not None:
