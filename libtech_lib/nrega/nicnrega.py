@@ -1133,7 +1133,7 @@ def get_nic_stats(lobj, logger, nic_stat_urls_df):
             stat_dict[slugify(name)] = fin_stat
     data_json = lobj.data_json
     data_json["at_a_glance"] = stat_dict
-    api_location_update(logger, lobj.id, data_json)
+    #api_location_update(logger, lobj.id, data_json)
     if dataframe is not None:
         dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
