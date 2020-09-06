@@ -1775,7 +1775,7 @@ def download_muster_v2(logger, lobj, work_code_df, finyear, nic_url,
         }
         job_list.append(job_dict)
     #dataframe = libtech_queue_manager(logger, job_list)
-    dataframe = libtech_queue_manager(logger, job_list, num_threads=20)
+    dataframe = libtech_queue_manager(logger, job_list, num_threads=5)
     return dataframe
     #download_muster_for_work_code(logger, lobj, work_code, finyear,
     #                              nic_url)
