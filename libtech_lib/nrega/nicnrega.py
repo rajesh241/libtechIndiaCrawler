@@ -1131,8 +1131,8 @@ def get_nic_stats(lobj, logger, nic_stat_urls_df):
             for each_year in fin_array:
                 fin_stat[each_year] = row.get(each_year, 0)
             stat_dict[slugify(name)] = fin_stat
-    data_json = lobj.data_json
-    data_json["at_a_glance"] = stat_dict
+    #data_json = lobj.data_json
+    #data_json["at_a_glance"] = stat_dict
     #api_location_update(logger, lobj.id, data_json)
     if dataframe is not None:
         dataframe = insert_location_details(logger, lobj, dataframe)
