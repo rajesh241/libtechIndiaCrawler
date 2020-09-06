@@ -152,7 +152,7 @@ def download_muster_for_work_code(logger, func_args, thread_name=None):
         df_array.append(dataframe)
         #row = [finyear, work_code, muster_no,
         #       from_date, to_date, value, work_name]
-    if len(df_array == 0):
+    if len(df_array) == 0:
         return None
     dataframe = pd.concat(df_array)
     return dataframe
