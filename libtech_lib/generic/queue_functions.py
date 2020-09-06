@@ -11,7 +11,9 @@ from bs4 import BeautifulSoup
 from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                                                 get_dataframe_from_url,
                                                 get_urldataframe_from_url,
-                                                delete_divs_by_classes
+                                                get_options_list,
+                                                delete_divs_by_classes,
+                                                request_with_retry_timeout
                                                )
 from libtech_lib.generic.commons import (insert_finyear_in_dataframe,
                                          get_default_start_fin_year,
@@ -19,8 +21,196 @@ from libtech_lib.generic.commons import (insert_finyear_in_dataframe,
                                          get_percentage,
                                          ap_nrega_download_page,
                                          get_date_object,
-                                         get_fto_finyear
+                                         get_fto_finyear,
+                                         get_full_finyear
                                         )
+def download_muster_for_work_code(logger, func_args, thread_name=None):
+    """Download musters as per new muster.aspx"""
+    lobj = func_args[0]
+    work_code = func_args[1]
+    work_name = func_args[2]
+    finyear = func_args[3]
+    url = func_args[4]
+    muster_column_dict = func_args[5]
+    column_headers = ["finyear", "work_code",
+                      "muster_no", "from_date", "to_date",
+                      "muster_value", "work_name"]
+    df_array = []
+    full_finyear = get_full_finyear(finyear)
+    r = request_with_retry_timeout(logger, url, method="get")
+    if r is None:
+        return
+    cookies = r.cookies
+    logger.debug(cookies)
+    myhtml = r.content
+    mysoup = BeautifulSoup(myhtml, "lxml")
+    validation  =  mysoup.find(id = '__EVENTVALIDATION').get('value')
+    view_state  =  mysoup.find(id = '__VIEWSTATE').get('value')
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'X-MicrosoftAjax': 'Delta=true',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Accept': '*/*',
+        'Origin': 'https://mnregaweb4.nic.in',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Dest': 'empty',
+        'Referer' : url,
+      #  'Referer': 'https://mnregaweb4.nic.in/netnrega/Citizen_html/Musternew.aspx?id=2&lflag=eng&ExeL=GP&fin_year=2019-2020&state_code=27&district_code=27&block_code=2724007&panchayat_code=2724007283&State_name=RAJASTHAN&District_name=BHILWARA&Block_name=SAHADA&panchayat_name=%e0%a4%85%e0%a4%b0%e0%a4%a8%e0%a4%bf%e0%a4%af%e0%a4%be+%e0%a4%96%e0%a4%be%e0%a4%b2%e0%a4%b8%e0%a4%be&Digest=NV/nIrrL5cMS/YBl64Zfhg',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+    
+    
+    data = {
+      'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$ScriptManager1|ctl00$ContentPlaceHolder1$ddlwork',
+      '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddlwork',
+      '__EVENTARGUMENT': '',
+      '__LASTFOCUS': '',
+      '__VIEWSTATE': view_state,
+      '__VIEWSTATEGENERATOR': '75DEE431',
+      '__VIEWSTATEENCRYPTED': '',
+      '__EVENTVALIDATION': validation,
+      'ctl00$ContentPlaceHolder1$ddlFinYear': full_finyear,
+      'ctl00$ContentPlaceHolder1$btnfill': 'btnfill',
+      'ctl00$ContentPlaceHolder1$txtSearch': '',
+      'ctl00$ContentPlaceHolder1$ddlwork': '2724007/RC/112908174689',
+      'ctl00$ContentPlaceHolder1$ddlMsrno': '---select---',
+      '__ASYNCPOST': 'true',
+      '': ''
+    }
+    
+
+    work_select_id = 'ctl00_ContentPlaceHolder1_ddlwork'
+    muster_select_id = 'ctl00_ContentPlaceHolder1_ddlMsrno'
+    data["ctl00$ContentPlaceHolder1$ddlwork"] = work_code
+    logger.debug(f"processing work_code {work_code}")
+    response = request_with_retry_timeout(logger, url, data=data, headers=headers, cookies=cookies)
+    if response is None:
+        return None
+    if response.status_code != 200:
+        return None
+    htmlsoup = BeautifulSoup(response.content, "lxml")
+    response_array = response.text.split("|")
+    index = response_array.index('__VIEWSTATE')
+    view_state1 = response_array[index+1]
+    index = response_array.index('__EVENTVALIDATION')
+    validation1 = response_array[index+1]
+    muster_options_list = get_options_list(logger, htmlsoup,
+                                           select_id=muster_select_id) 
+    for muster_option in muster_options_list:
+        value = muster_option["value"]
+        if('---Select---' in value):
+            logger.debug(f'Skipping muster_no[{value}]')
+            continue
+        logger.info(f"Processing {thread_name}-{work_code} finyear {finyear} muster_no {value}")
+        data = {
+            'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel2|ctl00$ContentPlaceHolder1$ddlMsrno',
+            'ctl00$ContentPlaceHolder1$ddlFinYear': get_full_finyear(finyear),
+            'ctl00$ContentPlaceHolder1$btnfill': 'btnfill',
+            'ctl00$ContentPlaceHolder1$txtSearch': '',
+            'ctl00$ContentPlaceHolder1$ddlwork': work_code,
+            'ctl00$ContentPlaceHolder1$ddlMsrno': value,
+            '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddlMsrno',
+            '__EVENTARGUMENT': '',
+            '__LASTFOCUS': '',
+            '__VIEWSTATE': view_state1,
+            '__EVENTVALIDATION': validation1,
+            '__VIEWSTATEGENERATOR': '75DEE431',
+            '__VIEWSTATEENCRYPTED': '',
+            '__ASYNCPOST': 'true',
+            '': ''
+        }
+        must_response = request_with_retry_timeout(logger, url,
+                                                        data=data,
+                                                        headers=headers,
+                                                        cookies=cookies)
+        if must_response is None:
+            continue
+        must_response = requests.post(url, headers=headers,  cookies=cookies, data=data)
+        if must_response.status_code == 200:
+            myhtml = must_response.content
+        value_array = value.split("~~")
+        if len(value_array) == 3:
+            muster_no = value_array[0]
+            from_date = value_array[1]
+            to_date = value_array[2]
+        else:
+            muster_no = ''
+            from_date = ''
+            to_date = ''
+        extract_args = [lobj, myhtml, muster_no, finyear,
+                        muster_column_dict]
+        dataframe = extract_muster_details(logger, extract_args)
+        dataframe['finyear'] = finyear
+        dataframe['muster_no'] = muster_no
+        dataframe['date_from'] = from_date
+        dataframe['date_to'] = to_date
+        dataframe['work_code'] = work_code
+        dataframe['work_name'] = work_name
+        df_array.append(dataframe)
+        #row = [finyear, work_code, muster_no,
+        #       from_date, to_date, value, work_name]
+    if len(df_array == 0):
+        return None
+    dataframe = pd.concat(df_array)
+    return dataframe
+def extract_muster_details(logger, func_args):
+    """Will extract muster details from the downloaded html"""
+    lobj = func_args[0]
+    myhtml = func_args[1]
+    muster_no = func_args[2]
+    finyear = func_args[3]
+    block_code = lobj.block_code
+    muster_column_name_dict = func_args[4]
+    muster_code = f"{lobj.block_code}_{finyear}_{muster_no}"
+    extract_dict = {}
+    extract_dict['pattern'] = f"{lobj.state_short_code}-"
+    extract_dict['table_id_array'] = ["ctl00_ContentPlaceHolder1_grdShowRecords",
+                                      "ContentPlaceHolder1_grdShowRecords"]
+    extract_dict['split_cell_array'] = [1]
+    dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    #logger.info(f"extracted dataframe columns {dataframe.columns}")
+    columns_to_keep = []
+    for column_name in dataframe.columns:
+        if not column_name.isdigit():
+            columns_to_keep.append(column_name)
+    dataframe = dataframe[columns_to_keep]
+    #dataframe['muster_no'] = muster_no
+    #dataframe['finyear'] = finyear
+    #dataframe['block_code'] = block_code
+    dataframe['muster_code'] = muster_code
+    ##Now we will have to build a dictionary to rename the columns
+    column_keys = muster_column_name_dict.keys()
+    rename_dict = {}
+    for column_name in dataframe.columns:
+        if column_name in column_keys:
+            rename_dict[column_name] = muster_column_name_dict[column_name]
+    dataframe = dataframe.rename(columns=rename_dict)
+    rows_to_delete = []
+    is_complete = 1
+    for index, row in dataframe.iterrows():
+        sr_no = row.get("muster_index", None)
+        credited_date = row.get("credited_date", None)
+        if (sr_no is None) or (not sr_no.isdigit()):
+            rows_to_delete.append(index)
+        else:
+            credited_date_object = get_date_object(credited_date)
+            if credited_date_object is None:
+                is_complete = 0
+        name_relationship = row['name_relationship']
+        try:
+            relationship = re.search(r'\((.*?)\)', name_relationship).group(1)
+        except:
+            relationship = ''
+        name = name_relationship.replace(f"({relationship})", "")
+        dataframe.loc[index, 'name'] = name
+        dataframe.loc[index, 'relationship'] = relationship
+    dataframe = dataframe.drop(rows_to_delete)
+    dataframe['is_complete'] = is_complete
+    return dataframe
+
 
 def fetch_new_muster(logger, func_args, thread_name=None):
     """This will fetch muster from new url"""

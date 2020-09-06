@@ -27,7 +27,7 @@ from libtech_lib.generic.commons import  (get_current_finyear,
 from libtech_lib.generic.api_interface import api_get_report_url, api_get_report_dataframe
 from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                                                 get_dataframe_from_url,
-                                                request_post_with_retry_timeout
+                                                request_with_retry_timeout
                                                 )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 
@@ -170,7 +170,7 @@ def fetch_ap_jobcard_register_for_village(logger, cookies, district_code, block_
     }
     url = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
     #response = requests.post('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data, verify=False)
-    response = request_post_with_retry_timeout(logger, url, data=data, headers=headers, params=params, cookies=cookies) 
+    response = request_with_retry_timeout(logger, url, data=data, headers=headers, params=params, cookies=cookies) 
     if response is None:
         return []
     content = response.content
