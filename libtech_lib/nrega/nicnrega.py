@@ -34,7 +34,8 @@ from libtech_lib.generic.html_functions import ( get_dataframe_from_html,
                                                  nic_download_page, 
                                                  find_url_containing_text,
                                                  find_urls_containing_text,
-                                                 get_options_list
+                                                 get_options_list,
+                                                 request_with_retry_timeout
                                                )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 
@@ -1178,13 +1179,15 @@ def get_nic_urls(lobj, logger):
     dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
 
-def scrape_muster_list(logger, lobj, finyear, url, session=None):
+def scrape_muster_list(logger, lobj, finyear, url, cookies=None):
     column_headers = ["finyear", "work_code",
                       "muster_no", "from_date", "to_date",
                       "muster_value", "work_name"]
     csv_array = []
     full_finyear = get_full_finyear(finyear)
-    r = requests.get(url)
+    r = request_with_retry_timeout(logger, url, method="get")
+    if r is None:
+        return None
     cookies = r.cookies
     logger.debug(cookies)
     myhtml = r.content
@@ -1253,7 +1256,10 @@ def scrape_muster_list(logger, lobj, finyear, url, session=None):
             continue
         data["ctl00$ContentPlaceHolder1$ddlwork"] = work_code
         logger.debug(f"processing work_code {work_code}")
-        response = requests.post(url, headers=headers,cookies=cookies, data=data)
+        response = request_with_retry_timeout(logger, url, headers=headers,
+                                              cookies=cookies, data=data)
+        if response is None:
+            continue
         if response.status_code == 200:
             htmlsoup = BeautifulSoup(response.content, "lxml")
             muster_options_list = get_options_list(logger, htmlsoup,
@@ -1293,13 +1299,21 @@ def fetch_muster_list(lobj, logger, nic_urls_df):
     ##Establish session for request
     session = requests.Session()
     session.get(lobj.mis_state_url)
-    logger.debug(f"session cookies {session.cookies}")
+    response = request_with_retry_timeout(logger, lobj.mis_state_url,
+                                          method="get")
+    input()
+    if response is None:
+        return None
+    cookies = response.cookies
+    logger.debug(f"session cookies {cookies}")
+    input()
     df_array = []
     for index, row in filtered_df.iterrows():
         nic_url = row.get("mis_url")
         finyear = row.get("finyear")
         logger.debug(f"Processing finyear {finyear} url {nic_url}")
-        dataframe = scrape_muster_list(logger, lobj, finyear, nic_url, session=session)
+        dataframe = scrape_muster_list(logger, lobj, finyear, nic_url,
+                                       cookies=cookies)
         if dataframe is not None:
             df_array.append(dataframe)
     if len(df_array) == 0:
@@ -1743,14 +1757,74 @@ def get_nrega_locations(lobj, logger):
     dataframe = pd.DataFrame(csv_array, columns=column_headers)
     return dataframe
 
+def download_muster_v2(logger, lobj, work_code_df, finyear, nic_url,
+                       cookies=None):
+    """Download musters as per new muster.aspx"""
+    muster_column_config_file = f"{JSON_CONFIG_DIR}/muster_column_name_dict.json"
+    logger.info(muster_column_config_file)
+    with open(muster_column_config_file) as config_file:
+        muster_column_dict = json.load(config_file)
+    job_list = []
+    for index, row in work_code_df.iterrows():
+        work_code = row.get('work_code', None)
+        work_name = row.get('work_name', None)
+        func_args = [lobj, work_code, work_name, finyear, nic_url, muster_column_dict] 
+        job_dict = {
+            'func_name' : 'download_muster_for_work_code',
+            'func_args' : func_args
+        }
+        job_list.append(job_dict)
+    #dataframe = libtech_queue_manager(logger, job_list)
+    dataframe = libtech_queue_manager(logger, job_list, num_threads=20)
+    return dataframe
+    #download_muster_for_work_code(logger, lobj, work_code, finyear,
+    #                              nic_url)
+    #break
 def update_muster_transactions_v2(lobj, logger):
     """Going to update muster transactions """
     logger.info(f"Updating muster Transactions for {lobj.code}")
     ml_df = lobj.fetch_report_dataframe(logger, "muster_list_v2")
-    df_grouped = ml_df.groupby(['finyear','work_code']).agg({'muster_code': ['count']})
+    nic_urls_df = lobj.fetch_report_dataframe(logger, 'nic_urls')
+    all_panchayats = lobj.get_all_panchayats(logger)
+    logger.info(f"All panchayats are {all_panchayats}")
+    first_panchayat_code = all_panchayats[0]
+    filtered_df = nic_urls_df[(nic_urls_df["report_slug"] == "muster-roll") &
+                              (nic_urls_df["panchayat_code"] == int(first_panchayat_code))]
+    logger.debug(f"Filtered DF shape is {filtered_df.shape}")
+    df_grouped = ml_df.groupby(['finyear','work_code','work_name']).agg({'muster_code': ['count']})
     df_grouped.columns = ['count1'] 
     df_grouped = df_grouped.reset_index()
     logger.info(f"Shape of ml df is {ml_df.shape}")
     logger.info(f"Shape of df_grouped is {df_grouped.shape}")
-    
-    
+    response = request_with_retry_timeout(logger, lobj.mis_state_url,
+                                          method="get")
+    if response is None:
+        return
+    cookies = response.cookies
+    logger.debug(f"session cookies {cookies}")
+    df_array = []
+    for index, row in filtered_df.iterrows():
+        nic_url = row.get("mis_url")
+        finyear = row.get("finyear")
+        df_grouped_filtered = df_grouped[df_grouped["finyear"] == int(finyear)]
+        logger.debug(f"Processing finyear {finyear} url {nic_url}")
+        dataframe = download_muster_v2(logger, lobj, df_grouped_filtered,
+                                       finyear, nic_url, cookies=cookies)
+        if dataframe is not None:
+            df_array.append(dataframe)
+    if len(df_array) == 0:
+        return None
+    dataframe = pd.concat(df_array)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name"]
+    col_list = ['finyear', 'muster_code', 'work_code', 'work_name', 'muster_no', 'date_from',
+     'date_to', 'muster_index', 'name_relationship', 'name',
+     'relationship', 'jobcard', 'm_caste', 'Village',
+     'days_worked', 'day_wage', 'm_labour_wage', 'm_travel_cost',
+     'm_tools_cost', 'total_wage', 'm_postoffice_bank_name',
+     'm_pocode_bankbranch', 'm_poadd_bankbranchcode', 'm_wagelist_no',
+     'muster_status', 'credited_date', 'thumb_impression', 'is_complete']
+    all_cols = location_cols + col_list
+    dataframe = dataframe[all_cols]
+    return dataframe

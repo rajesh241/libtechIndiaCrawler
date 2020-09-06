@@ -9,8 +9,8 @@ import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 
-def request_post_with_retry_timeout(logger, url, data=None, headers=None, params=None, cookies=None,
-                 timeout = 5, max_retry=5):
+def request_with_retry_timeout(logger, url, data=None, headers=None, params=None, cookies=None,
+                 timeout = 5, max_retry=5, method="post"):
     """This is the wrapper function for request post method."""
     retry = 0
     res = None
@@ -18,7 +18,10 @@ def request_post_with_retry_timeout(logger, url, data=None, headers=None, params
     response = None
     while (retry < max_retry):
         try:
-            response = requests.post(url, data=data, timeout=timeout, params=params, cookies=cookies, headers=headers)
+            if method == "post":
+                response = requests.post(url, data=data, timeout=timeout, params=params, cookies=cookies, headers=headers)
+            else:
+                response = requests.get(url, timeout=timeout, params=params, cookies=cookies, headers=headers)
             if response.status_code == 200:
                 error = False
             else:
