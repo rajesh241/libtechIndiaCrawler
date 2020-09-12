@@ -764,7 +764,7 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
                       "district_name", "block_code", "block_name",
                       "panchayat_code", "panchayat_name", "village_name", 
                        "village_code", "Head of Family", "jobcard", "~tjobcard", 
-                        "finyear", "fto_date"]
+                        "finyear", "fto_date", "~epayorder_no"]
     cols = additional_cols + column_headers
     dataframe = dataframe[cols]
     return dataframe
