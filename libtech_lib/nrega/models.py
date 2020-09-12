@@ -70,6 +70,7 @@ class Location():
         self.force_download = force_download
         self.sample_name = sample_name
         location_dict = get_location_dict(logger, self.code, scheme=self.scheme)
+        self.logger = logger
         for key, value in location_dict.items():
             setattr(self, key, value)
     def get_child_locations(self, logger):
@@ -139,7 +140,8 @@ class Location():
             return False
         return True
 
-    def save_report(self, logger, data, report_type, finyear=None):
+    def save_report(self, logger, data, report_type, health="unknown",
+                    finyear=None, remarks=''):
         """Standard function to save report to the location"""
         today = datetime.datetime.now().strftime('%d%m%Y')
         if data is None:
@@ -153,7 +155,8 @@ class Location():
         filename = f"{filepath}/{report_filename}"
         logger.debug(f"Report will be saved at {filename}")
         create_update_report(logger, self.id, report_type,
-                             data, filename, finyear=finyear)
+                             data, filename, finyear=finyear, health=health,
+                             remarks=remarks)
     def fto_status_urls(self, logger):
         """This function will get and save FTO Stat"""
         dataframe = get_fto_status_urls(self, logger)
@@ -624,15 +627,24 @@ class NREGABlock(Location):
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
         df_array = []
+        count = 0
+        remarks = ''
+        health = 'green'
         for each_panchayat_code in panchayat_array:
+            count = count + 1
             my_location = NREGAPanchayat(logger, each_panchayat_code)
             dataframe = my_location.nic_urls(logger)
             if dataframe is not None:
+                logger.info(f"Processed {count} {my_location.code}")
                 df_array.append(dataframe)
+            else:
+                health = "red"
+                remarks = remarks + "unable to download for " + each_panchayat_code
         if len(df_array) > 0:
             dataframe = pd.concat(df_array)
             if dataframe is not None:
-                self.save_report(logger, dataframe, report_type)
+                self.save_report(logger, dataframe, report_type, health,
+                                 remarks)
         
     def muster_transactions_v2(self, logger):
         """This will download muster transactions based on muster list"""

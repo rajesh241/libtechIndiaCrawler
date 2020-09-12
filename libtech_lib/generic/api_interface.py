@@ -304,7 +304,7 @@ def api_get_report_dataframe(logger, location_id, report_type,
         dataframe = None
     return dataframe
 def create_update_report(logger, location_id, report_type, data,
-                         filename, finyear=None):
+                         filename, finyear=None, health="unknown", remarks=''):
     """Updates report URL to the API Meta data
     if the report does not exists this will create the report
     or update to an existing report"""
@@ -333,16 +333,20 @@ def create_update_report(logger, location_id, report_type, data,
             'finyear' : finyear,
             'report_url': report_url,
             'excel_url': excel_url,
+            'remarks' : remarks,
+            'health' : health
             }
         res = requests.post(REPORTURL, headers=headers, data=json.dumps(post_data))
-        logger.debug(f"Post status {res.status_code} and response {res.content}")
+        logger.info(f"Post status {res.status_code} and response {res.content}")
     else:
         patch_data = {
             "id" : report_id,
             "report_url" : report_url,
             'excel_url': excel_url,
+            'remarks' : remarks,
+            'health' : health
             }
         res = requests.patch(REPORTURL, headers=headers,
                              data=json.dumps(patch_data))
-        logger.debug(f"Patch status {res.status_code} and response {res.content}")
+        logger.info(f"Patch status {res.status_code} and response {res.content}")
     return report_url

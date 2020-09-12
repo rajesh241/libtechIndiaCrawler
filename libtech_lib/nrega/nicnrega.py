@@ -1155,12 +1155,11 @@ def get_nic_urls(lobj, logger):
     column_headers = ['finyear', 'report_name', 'report_slug',
                       'state_url', 'mis_url']
     for finyear in range(start_fin_year, end_fin_year+1):
-        logger.info(f"Currently Processing {finyear}")
+        logger.debug(f"Currently Processing {finyear} for {lobj.code}")
         finyear = str(finyear)
         full_finyear = get_full_finyear(finyear)
         base_url = panchayat_page_url.replace("fullFinYear", full_finyear)
-        logger.info(f"base url is {base_url}")
-        res = nic_download_page(logger, base_url)
+        res = request_with_retry_timeout(logger, base_url)
         if res.status_code != 200:
             return None
         myhtml = res.content

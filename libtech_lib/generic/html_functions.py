@@ -46,11 +46,11 @@ def nic_download_page(logger, url, session=None, cookies=None, params=None, head
     while (retry < max_retry):
         try:
             if session:
-                logger.info(f'Attempting using *session* to fetch the URL[{url}] for the {retry+1} time')
+                logger.debug(f'Attempting using *session* to fetch the URL[{url}] for the {retry+1} time')
                 res = session.get(url, cookies=cookies, params=params,
                                    headers=headers, verify=False)
             else:
-                logger.info(f'Attempting using *requests* to fetch the URL[{url}] for the {retry+1} time')
+                logger.debug(f'Attempting using *requests* to fetch the URL[{url}] for the {retry+1} time')
                 res = requests.get(url, cookies=cookies, params=params,
                                    headers=headers, verify=False)
             if res.status_code == 200:
