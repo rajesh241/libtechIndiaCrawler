@@ -54,7 +54,7 @@ def get_default_start_fin_year():
     for example if current finyear is 20,
     start fin year would be 17"""
     cur_fin_year = get_current_finyear()
-    start_fin_year = cur_fin_year - 3
+    start_fin_year = cur_fin_year - 2
     return start_fin_year
 
 def get_full_finyear(finyear):
