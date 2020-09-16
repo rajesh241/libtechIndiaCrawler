@@ -250,8 +250,9 @@ class NREGAPanchayat(Location):
             dataframe = self.fetch_report_dataframe(logger, report_type)
             return dataframe
         my_location = NREGABlock(logger, self.block_code)
-        nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_urls")
+        nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_block_urls")
         dataframe = get_jobcard_register_mis(self, logger, nic_urls_df)
+        logger.info(dataframe.shape)
         self.save_report(logger, dataframe, report_type)
         return dataframe
     def worker_register(self, logger):
