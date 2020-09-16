@@ -38,7 +38,7 @@ from libtech_lib.generic.html_functions import ( get_dataframe_from_html,
                                                  request_with_retry_timeout
                                                )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
-
+mis_url = "https://mnregaweb4.nic.in"
 #HOMEDIR = str(Path.home())
 #JSONCONFIGFILE = f"{HOMEDIR}/.libtech/crawlerConfig.json"
 #with open(JSONCONFIGFILE) as CONFIG_file:
@@ -47,6 +47,81 @@ from libtech_lib.generic.libtech_queue import libtech_queue_manager
 #JSON_CONFIG_DIR = CONFIG['json_config_dir']
 NREGA_DATA_DIR = os.environ.get('NREGA_DATA_DIR', None)
 JSON_CONFIG_DIR = os.environ.get('JSON_CONFIG_DIR', None) 
+
+def get_nic_block_urls(lobj, logger):
+    """Will download NIC Block URLs"""
+    csv_array = []
+    finyear = get_current_finyear()
+    full_finyear = get_full_finyear(finyear)
+    url = lobj.mis_block_url.replace("fullFinYear", full_finyear)
+    logger.debug(f"Block page is {url}")
+    start_fin_year = get_default_start_fin_year()
+    end_fin_year = get_current_finyear()
+    column_headers = ['finyear', 'report_name', 'report_slug',
+                       'mis_url', 'location_type', 'panchayat_code']
+    mis_url_prefix = f"https://mnregaweb4.nic.in/netnrega/placeHolder1/"
+    mis_url_prefix_panchayat = f"https://mnregaweb4.nic.in/netnrega/placeHolder1/placeHolder2/"
+    for finyear in range(start_fin_year, end_fin_year+1):
+        logger.debug(f"Currently Processing {finyear} for {lobj.code}")
+        finyear = str(finyear)
+        full_finyear = get_full_finyear(finyear)
+        base_url = lobj.mis_block_url.replace("fullFinYear", full_finyear)
+        res = request_with_retry_timeout(logger, base_url,  method="get")
+        if res.status_code != 200:
+            return None
+        myhtml = res.content
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        links = mysoup.findAll("a")
+        for link in links:
+            href = link.get("href", "")
+            text = link.text
+            mis_url = mis_url_prefix + href
+            location_type = 'block'
+            panchayat_code = ''
+            row = [finyear, text, slugify(text), mis_url, location_type,
+                   panchayat_code]
+            csv_array.append(row)
+            if (finyear == str(get_current_finyear())) and (slugify(text) == "registration-application-register"):
+                response = request_with_retry_timeout(logger, mis_url,
+                                                      method="get")
+                if response is not None:
+                    html = response.content
+                    soup = BeautifulSoup(html, "lxml")
+                    mylinks = soup.findAll("a")
+                    for mylink in mylinks:
+                        href = mylink.get("href", "")
+                        if "panchregpeople.aspx" in href:
+                            mis_url = mis_url_prefix_panchayat + href
+                            location_type = 'panchayat'
+                            parsed = urlparse.urlparse(mis_url)
+                            params_dict = parse_qs(parsed.query)
+                            panchayat_code = params_dict.get('panchayat_code', [''])[0]
+                            row = [finyear, text, slugify(text), mis_url,
+                                   location_type, panchayat_code]
+                            csv_array.append(row)
+            if (finyear == str(get_current_finyear())) and (slugify(text) == "job-card-employment-register"):
+                response = request_with_retry_timeout(logger, mis_url,
+                                                      method="get")
+                if response is not None:
+                    html = response.content
+                    soup = BeautifulSoup(html, "lxml")
+                    mylinks = soup.findAll("a")
+                    for mylink in mylinks:
+                        href = mylink.get("href", "")
+                        if "JobCardReg.aspx" in href:
+                            mis_url = mis_url_prefix_panchayat + href
+                            location_type = 'panchayat'
+                            parsed = urlparse.urlparse(mis_url)
+                            params_dict = parse_qs(parsed.query)
+                            panchayat_code = params_dict.get('Panchayat_code', [''])[0]
+                            row = [finyear, text, slugify(text), mis_url,
+                                   location_type, panchayat_code]
+                            csv_array.append(row)
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe
+
+
 def nic_server_status(logger, location_code, scheme='nrega'):
     """Different States have different servers. This function will fetch the
     status of server for the corresponding location before the crawling
@@ -102,6 +177,43 @@ def get_jobcard_register(lobj, logger):
             dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
 
+def get_jobcard_register_mis(lobj, logger, nic_urls_df):
+    """Download Jobcard Register for a given panchayat"""
+    logger.debug(f"In download jobcard register for {lobj.panchayat_code}")
+    logger.debug(f"Shape of df is {nic_urls_df.shape}")
+    finyear = get_current_finyear()
+    filtered_df = nic_urls_df[(nic_urls_df["report_slug"] == "job-card-employment-register") &
+                              (nic_urls_df['finyear'] == int(finyear)) &
+                              (nic_urls_df["panchayat_code"] == int(lobj.panchayat_code))]
+    logger.debug(f"Filtered DF shape is {filtered_df.shape}")
+    ##Establish session for request
+    session = requests.Session()
+    session.get(lobj.mis_state_url)
+    cookies = session.cookies
+    logger.debug(lobj.mis_state_url)
+    logger.debug(f"session cookies {session.cookies}")
+    myhtml = None
+    for index, row in filtered_df.iterrows():
+        url = row.get("mis_url")
+        logger.debug(f"Url is {url}")
+        response = request_with_retry_timeout(logger, url, cookies=cookies,
+                                              method="get")
+        myhtml = response.content
+        break
+    if myhtml is None:
+        return None
+    jobcard_prefix = f"{lobj.state_short_code}-"
+    extract_dict = {}
+    column_headers = ['srno', 'jobcard', 'jobcard_url', 'head_of_household']
+    extract_dict['pattern'] = jobcard_prefix
+    extract_dict['column_headers'] = column_headers
+    extract_dict['extract_url_array'] = [1]
+    extract_dict['base_url'] = url
+    extract_dict['url_prefix'] = f'{mis_url}/netnrega/placeHolder1/placeHolder2/'
+    dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe
+
 def get_worker_register_mis(lobj, logger, nic_urls_df):
     """This will download the worker registe based on nic_urls and df"""
     logger.info(f"In download worker register for {lobj.panchayat_code}")
@@ -114,7 +226,7 @@ def get_worker_register_mis(lobj, logger, nic_urls_df):
     ##Establish session for request
     session = requests.Session()
     session.get(lobj.mis_state_url)
-    logger.info(lobj.mis_state_url)
+    logger.debug(lobj.mis_state_url)
     logger.debug(f"session cookies {session.cookies}")
     myhtml = None
     for index, row in filtered_df.iterrows():
@@ -169,9 +281,9 @@ def get_worker_register_mis(lobj, logger, nic_urls_df):
             to_delete_rows.append(index)
         if "Villages" in first_col:
             village_name = re_extract_village_name(first_col)
-            logger.info(f" village name is {village_name}")
+            logger.debug(f" village name is {village_name}")
         dataframe.loc[index, 'village_name'] = village_name
-    logger.info(f"rows to be deleted are {to_delete_rows}")
+    logger.debug(f"rows to be deleted are {to_delete_rows}")
     dataframe = dataframe.drop(to_delete_rows)
     dataframe = insert_location_details(logger, lobj, dataframe)
     dataframe = dataframe.reset_index(drop=True)
