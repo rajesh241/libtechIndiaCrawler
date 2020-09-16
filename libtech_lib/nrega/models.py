@@ -21,6 +21,8 @@ from libtech_lib.generic.api_interface import (get_location_dict,
                                                api_update_crawl_accuracy
                                               )
 from libtech_lib.nrega.nicnrega import (get_jobcard_register,
+                                        get_nic_block_urls,
+                                        get_jobcard_register_mis,
                                         get_worker_register,
                                         get_muster_list,
                                         fetch_muster_list,
@@ -244,11 +246,13 @@ class NREGAPanchayat(Location):
         report_type = "jobcard_register"
         is_updated = self.is_report_updated(logger, report_type)
         dataframe = None
-        if not is_updated:
-            dataframe = get_jobcard_register(self, logger)
-            self.save_report(logger, dataframe, report_type)
-        else:
+        if (is_updated):
             dataframe = self.fetch_report_dataframe(logger, report_type)
+            return dataframe
+        my_location = NREGABlock(logger, self.block_code)
+        nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_urls")
+        dataframe = get_jobcard_register_mis(self, logger, nic_urls_df)
+        self.save_report(logger, dataframe, report_type)
         return dataframe
     def worker_register(self, logger):
         """Will Fetch the Jobcard Register"""
@@ -596,6 +600,7 @@ class NREGABlock(Location):
                           force_download=self.force_download,
                           sample_name=self.sample_name)
         self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
+        self.mis_block_url = f"https://mnregaweb4.nic.in/netnrega/Progofficer/PoIndexFrame.aspx?flag_debited=S&lflag=eng&District_Code={self.district_code}&district_name={self.district_name}&state_name={self.state_name}&state_Code={self.state_code}&finyear=fullFinYear&check=1&block_name={self.block_name}&Block_Code={self.block_code}"
     def get_all_panchayats(self, logger):
         """Getting all child Locations, in this case getting all panchayat
         locations"""
@@ -619,6 +624,11 @@ class NREGABlock(Location):
             pobj_array.append(NREGAPanchayat(logger, panchayat_code))
 
         return pobj_array
+    def nic_block_urls(self, logger):
+        report_type = "nic_block_urls"
+        dataframe = get_nic_block_urls(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
     def nic_urls(self, logger):
         report_type = "nic_urls"
         is_updated = self.is_report_updated(logger, report_type)

@@ -188,6 +188,10 @@ class FESNICSample(LibtechSample):
         self.force_download = force_download
         self.location_class = self.get_location_class(logger)
         self.sample_location_codes = [
+                                      '3403009', # jharkhand-gumla-basia
+                                      '3403002', #jharkhand-gumla-ghaghra
+                                      '3401006', # jharkhand-khunti-arki
+                                      '3402002', # jharkhand-lohardaga-kisko
                                       '2724007', # Rajasthan-Bhilwara-Sahada
                                       '2724006', # Rajasthan-Bhilwara-Raipur
                                       '2724010', # Rajasthan-Bhilwara-Jahajpur
