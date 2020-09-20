@@ -252,8 +252,13 @@ class NREGAPanchayat(Location):
         my_location = NREGABlock(logger, self.block_code)
         nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_block_urls")
         dataframe = get_jobcard_register_mis(self, logger, nic_urls_df)
-        logger.info(dataframe.shape)
-        self.save_report(logger, dataframe, report_type)
+        health = 'green'
+        remarks = ''
+        if len(dataframe) == 0:
+            health = 'red'
+            remarks = 'not able to find any table'
+        self.save_report(logger, dataframe, report_type, health=health,
+                         remarks=remarks)
         return dataframe
     def worker_register(self, logger):
         """Will Fetch the Jobcard Register"""
@@ -266,7 +271,7 @@ class NREGAPanchayat(Location):
             return dataframe
         my_location = NREGABlock(logger, self.block_code)
         my_location.nic_urls(logger)
-        nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_urls")
+        nic_urls_df = my_location.fetch_report_dataframe(logger, "nic_block_urls")
         dataframe = get_worker_register_mis(self, logger, nic_urls_df)
         self.save_report(logger, dataframe, report_type)
         return dataframe
@@ -720,15 +725,21 @@ class NREGABlock(Location):
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
         df_array = []
+        remarks = ''
+        health = 'green'
         for each_panchayat_code in panchayat_array:
             my_location = NREGAPanchayat(logger, each_panchayat_code)
             dataframe = my_location.jobcard_register(logger)
-            if dataframe is not None:
+            if ( (dataframe is None) or (len(dataframe) == 0)):
+                health = "red"
+                remarks = remarks + f"Unable to download for {each_panchayat_code}\n"
+            else:
                 df_array.append(dataframe)
         if len(df_array) > 0:
             dataframe = pd.concat(df_array)
             if dataframe is not None:
-                self.save_report(logger, dataframe, report_type)
+                self.save_report(logger, dataframe, report_type, health=health,
+                                remarks=remarks)
     def muster_list_v2(self, logger):
         """This will fetch jobcard register for each panchayat in the block"""
         report_type = "muster_list_v2"
