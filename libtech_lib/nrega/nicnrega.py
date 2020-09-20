@@ -211,7 +211,16 @@ def get_jobcard_register_mis(lobj, logger, nic_urls_df):
     extract_dict['base_url'] = url
     extract_dict['url_prefix'] = f'{mis_url}/netnrega/placeHolder1/placeHolder2/'
     dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
-    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    all_cols = location_cols + column_headers
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+    if dataframe is None:
+        dataframe = pd.DataFrame(columns=all_cols)
+    else:
+        dataframe = dataframe[all_cols]
     return dataframe
 
 def get_worker_register_mis(lobj, logger, nic_urls_df):

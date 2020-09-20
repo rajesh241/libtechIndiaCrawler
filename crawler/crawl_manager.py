@@ -1,6 +1,7 @@
 """Blank file which can server as starting point for writing any script file"""
 import argparse
 import pytz
+import traceback
 import datetime
 from libtech_lib.generic.commons import logger_fetch
 from libtech_lib.generic.api_interface import get_task, update_task
@@ -81,7 +82,7 @@ def execute_task(logger, task_id=None, process_name=None):
         patch_data['status'] = 'completed'
     except Exception as e:
         logger.info("I am in exception!!!!")
-        remarks = str(e)
+        remarks = "".join(traceback.TracebackException.from_exception(e).format())
         logger.info(f"error {remarks}")
         patch_data['is_error'] = True
         patch_data['is_done'] = False
