@@ -61,7 +61,9 @@ def execute_task(logger, task_id=None, process_name=None):
         'start_time' : start_time,
         }
     update_task(logger,  patch_data)
-    is_server_running = nic_server_status(logger, location_code)
+    #is_server_running = nic_server_status(logger, location_code)
+    is_server_running = True   #Always set is server running to false, 
+    #we are downloading everything from mnregaweb4.nic.in
     logger.info(is_server_running)
     if not is_server_running:
         status = 'parked'
