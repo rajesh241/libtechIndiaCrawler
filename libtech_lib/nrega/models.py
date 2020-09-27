@@ -363,6 +363,7 @@ class NREGAPanchayat(Location):
         """This function will fetch NIC Stats"""
         report_type = "nic_stats"
         is_updated = self.is_report_updated(logger, report_type)
+        logger.info(f"Is report updated {is_updated}")
         if is_updated:
             dataframe = self.fetch_report_dataframe(logger, report_type)
             return dataframe
@@ -705,19 +706,32 @@ class NREGABlock(Location):
         my_location.nic_stat_urls(logger)
         report_type = "nic_stat_urls"
         nic_stat_urls_df = my_location.fetch_report_dataframe(logger, report_type)
-        dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
+        health = "green"
+        remarks = ''
+        df_array = []
         report_type = "nic_stats"
         panchayat_array = self.get_all_panchayats(logger)
-        df_array = []
-        df_array.append(dataframe)
+        dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
+        if len(dataframe) > 0:
+            df_array.append(dataframe)
+        else:
+            health = "red"
+            remarks = f"Unable to download for {self.code}"
         for each_panchayat_code in panchayat_array:
             my_location = NREGAPanchayat(logger, each_panchayat_code,
                                          force_download=self.force_download)
             dataframe = my_location.nic_stats(logger)
-            if dataframe is not None:
+            if ( (dataframe is None) or (len(dataframe) == 0)):
+                health = "red"
+                remarks = remarks + f"Unable to download for {each_panchayat_code}\n"
+            else:
                 df_array.append(dataframe)
-        dataframe = pd.concat(df_array)
-        self.save_report(logger, dataframe, report_type)
+
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type, health=health,
+                                remarks=remarks)
 
     def jobcard_register(self, logger):
         """This will fetch jobcard register for each panchayat in the block"""
