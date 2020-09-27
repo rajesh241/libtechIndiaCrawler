@@ -179,6 +179,12 @@ def get_jobcard_register(lobj, logger):
 
 def get_jobcard_register_mis(lobj, logger, nic_urls_df):
     """Download Jobcard Register for a given panchayat"""
+    column_headers = ['srno', 'jobcard', 'jobcard_url', 'head_of_household']
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    all_cols = location_cols + column_headers
+    dataframe = pd.DataFrame(columns=all_cols)
     logger.debug(f"In download jobcard register for {lobj.panchayat_code}")
     logger.debug(f"Shape of df is {nic_urls_df.shape}")
     finyear = get_current_finyear()
@@ -187,40 +193,35 @@ def get_jobcard_register_mis(lobj, logger, nic_urls_df):
                               (nic_urls_df["panchayat_code"] == int(lobj.panchayat_code))]
     logger.debug(f"Filtered DF shape is {filtered_df.shape}")
     ##Establish session for request
-    session = requests.Session()
-    session.get(lobj.mis_state_url)
-    cookies = session.cookies
+    #session = requests.Session()
+    #session.get(lobj.mis_state_url)
+    #cookies = session.cookies
+    response = request_with_retry_timeout(logger, lobj.mis_state_url)
+    cookies = response.cookies
     logger.debug(lobj.mis_state_url)
-    logger.debug(f"session cookies {session.cookies}")
+    logger.debug(f"session cookies {cookies}")
     myhtml = None
     for index, row in filtered_df.iterrows():
         url = row.get("mis_url")
         logger.debug(f"Url is {url}")
         response = request_with_retry_timeout(logger, url, cookies=cookies,
                                               method="get")
-        myhtml = response.content
         break
-    if myhtml is None:
-        return None
+    if response is None:
+        return dataframe
+    myhtml = response.content
     jobcard_prefix = f"{lobj.state_short_code}-"
     extract_dict = {}
-    column_headers = ['srno', 'jobcard', 'jobcard_url', 'head_of_household']
     extract_dict['pattern'] = jobcard_prefix
     extract_dict['column_headers'] = column_headers
     extract_dict['extract_url_array'] = [1]
     extract_dict['base_url'] = url
     extract_dict['url_prefix'] = f'{mis_url}/netnrega/placeHolder1/placeHolder2/'
     dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
-    location_cols = ["state_code", "state_name", "district_code",
-                     "district_name", "block_code", "block_name",
-                     "panchayat_code", "panchayat_name"]
-    all_cols = location_cols + column_headers
     if dataframe is not None:
         dataframe = insert_location_details(logger, lobj, dataframe)
-    if dataframe is None:
-        dataframe = pd.DataFrame(columns=all_cols)
-    else:
         dataframe = dataframe[all_cols]
+        return dataframe
     return dataframe
 
 def get_worker_register_mis(lobj, logger, nic_urls_df):
@@ -1211,6 +1212,12 @@ def get_nic_stat_urls(lobj, logger, panchayat_code_array):
 
 def get_nic_stats(lobj, logger, nic_stat_urls_df):
     """This function will fetch nic Stats"""
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    transpose_columns = ["stat", "finyear", "value"]
+    all_cols = location_cols + transpose_columns
+    empty_dataframe = pd.DataFrame(columns=all_cols)
     logger.info(f"Going to fetch nic Stats for {lobj.code}-{lobj.name}")
     logger.debug(nic_stat_urls_df.columns)
     filtered_df = nic_stat_urls_df[nic_stat_urls_df['location_code'] ==
@@ -1220,9 +1227,11 @@ def get_nic_stats(lobj, logger, nic_stat_urls_df):
         return None
     stats_url = filtered_df.loc[0, "stats_url"]
     logger.debug(stats_url)
-    res = requests.get(stats_url)
-    if res.status_code != 200:
-        return None
+    #res = requests.get(stats_url)
+    res = request_with_retry_timeout(logger, stats_url, method="get")
+    #res = requests.get(stats_url)
+    if res is None:
+        return empty_dataframe
     myhtml = res.content
     extract_dict = {}
     extract_dict['table_id'] = 'GridView1'
@@ -1232,6 +1241,13 @@ def get_nic_stats(lobj, logger, nic_stat_urls_df):
     extract_dict['column_headers'] = column_headers
     dataframe = get_dataframe_from_html(logger, myhtml,
                                         mydict=extract_dict)
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        if lobj.location_type == "block":
+            dataframe["panchayat_code"] = ''
+            dataframe["panchayat_name"] = ''
+        return dataframe
+    return empty_dataframe
     ##Now we will convert this dataframe to JSON
     ignored_rows = ["I             Job Card", "II             Progress",
                     "III             Works",
@@ -1239,6 +1255,7 @@ def get_nic_stats(lobj, logger, nic_stat_urls_df):
                    ]
     stat_dict = {}
     finyear_wise = False
+    csv_array = []
     for index, row in dataframe.iterrows():
         name = row.get("name", "")
         if name == "II             Progress":
@@ -1247,17 +1264,28 @@ def get_nic_stats(lobj, logger, nic_stat_urls_df):
             continue
         if not finyear_wise:
             stat_dict[slugify(name)] = row.get(finyear, 0)
+            row1 = [slugify(name), finyear, row.get(finyear, 0)]
+            csv_array.append(row1)
         else:
             fin_stat = {}
             for each_year in fin_array:
                 fin_stat[each_year] = row.get(each_year, 0)
+                row1 = [slugify(name), each_year, row.get(each_year, 0)]
+                csv_array.append(row1)
             stat_dict[slugify(name)] = fin_stat
     #data_json = lobj.data_json
     #data_json["at_a_glance"] = stat_dict
     #api_location_update(logger, lobj.id, data_json)
-    if dataframe is not None:
+    if len(csv_array) > 0:
+        dataframe = pd.DataFrame(csv_array, columns=transpose_columns)
         dataframe = insert_location_details(logger, lobj, dataframe)
-    return dataframe
+        if lobj.location_type == "block":
+            dataframe["panchayat_code"] = ''
+            dataframe["panchayat_name"] = ''
+        dataframe = dataframe[all_cols]
+        return dataframe
+    else:
+        return empty_dataframe
         
 def get_nic_urls(lobj, logger):
     """This will get important nic URLs from the panchayat page"""
