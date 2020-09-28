@@ -28,6 +28,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         fetch_muster_list,
                                         update_muster_list,
                                         get_jobcard_transactions,
+                                        get_block_rejected_transactions_v2,
                                         get_block_rejected_transactions,
                                         get_muster_transactions,
                                         update_muster_transactions,
@@ -786,6 +787,16 @@ class NREGABlock(Location):
             dataframe = pd.concat(df_array)
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type)
+    def block_rejected_transactions_v2(self, logger):
+        """This will fetch all the rejected transactions of the block"""
+        report_name = "block_rejected_stats"
+        india_obj = Location(logger, '0')
+        rej_stat_df = india_obj.fetch_report_dataframe(logger, report_name)
+        dataframe = get_block_rejected_transactions_v2(self, logger, rej_stat_df)
+        if dataframe is not None:
+            report_type = "block_rejected_transactions_v2"
+            self.save_report(logger, dataframe, report_type)
+        
     def block_rejected_transactions(self, logger):
         """This will fetch all the rejected transactions of the block"""
         report_name = "block_rejected_stats"

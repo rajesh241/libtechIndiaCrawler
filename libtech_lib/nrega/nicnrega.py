@@ -625,7 +625,6 @@ def get_musters_to_be_downloaded(lobj, logger, muster_list_df,
     drop_columns = ['_merge']
     muster_list_df = muster_list_df.drop(columns=drop_columns)
     logger.info(f"Length of muster list is {len(muster_list_df)}")
-    input()
 
     grouped_muster_transactions = muster_transactions_df.groupby(["muster_url"]).agg(
                                              { 'days_worked':"sum"}
@@ -757,7 +756,6 @@ def get_muster_transactions1(lobj, logger, muster_list_df,
         logger.info("I am here since no musters to download")
         dataframe = muster_transactions_df
     logger.info(dataframe.shape)
-    input()
     logger.info(muster_list_df.columns)
     dataframe = pd.merge(dataframe, muster_list_df, how='left',
                          on=['block_code', 'finyear', 'muster_no'])
@@ -770,11 +768,90 @@ def get_muster_transactions1(lobj, logger, muster_list_df,
     dataframe = dataframe.merge(worker_df, how='left',
                          on=['jobcard', 'name'])
     logger.info(f"dataframe shape is {dataframe.shape}")
-    input()
     dataframe = dataframe[col_list]
     logger.info(f"Length of data frame is {len(dataframe)}")
     dataframe1 = dataframe[dataframe['panchayat_code'] == int(lobj.code)]
     logger.info(f"Length of data frame is {len(dataframe1)}")
+    return dataframe
+
+def get_block_rejected_transactions_v2(lobj, logger, rej_stat_df):
+    """This function will fetch all the block rejected Transactions"""
+    worker_df= lobj.fetch_report_dataframe(logger, "worker_register")
+    worker_df_cols = ["state_code", "state_name", "district_code", "district_name", "block_code", "block_name", "panchayat_code", "panchayat_name", "village_name", "caste", "head_of_household", "jobcard"]
+    worker_df = worker_df[worker_df_cols]
+    worker_df = worker_df.drop_duplicates()
+    filtered_df = rej_stat_df[rej_stat_df['block_code'] == int(lobj.block_code)]
+    start_fin_year = get_default_start_fin_year()
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    filtered_df = filtered_df[filtered_df['finyear'] >= int(start_fin_year)]
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    urls_to_download = []
+    filtered_df = filtered_df.fillna('')
+    for index, row in filtered_df.iterrows():
+        finyear = row['finyear']
+        fin_agency = row['fin_agency']
+        url = row['rejected_url']
+        nic_fin_year = row['finyear']
+        if url != '':
+            p = {}
+            p['fin_agency'] = fin_agency
+            p['url'] = url
+            p['rejection_type'] = 'rejected'
+            p['nic_fin_year'] = nic_fin_year
+            urls_to_download.append(p)
+        url = row['invalid_url']
+        if url != '':
+            p = {}
+            p['fin_agency'] = fin_agency
+            p['url'] = url
+            p['rejection_type'] = 'invalid'
+            p['nic_fin_year'] = nic_fin_year
+            urls_to_download.append(p)
+        logger.info(finyear)
+    logger.info(len(urls_to_download))
+    logger.info(urls_to_download)
+    extract_dict = {}
+    column_headers = ['srno', 'fto_no1', 'reference_no', 'reference_no_url',
+                      'utr_no', 'transaction_date', 'name_eng',
+                      'primary_account_holder', 'wagelist_no1', 'bank_code',
+                      'ifsc_code', 'fto_amount', 'rejection_date',
+                      'rejection_reason']
+    extract_dict['pattern'] = 'UTR No'
+    extract_dict['column_headers'] = column_headers
+    extract_dict['extract_url_array'] = [2]
+    extract_dict['url_prefix'] = f'http://mnregaweb4.nic.in/netnrega/FTO/'
+    dataframe_array = []
+    for p in urls_to_download:
+        url = p['url']
+        fin_agency = p['fin_agency']
+        dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict)
+        if dataframe is not None:
+            dataframe['fin_agency'] = fin_agency
+            dataframe['nic_fin_year'] = p['nic_fin_year']
+            dataframe['rejection_type'] = p['rejection_type']
+            logger.info(f"size of dataframe for {fin_agency} {p['nic_fin_year']} is {len(dataframe)}")
+            dataframe_array.append(dataframe)
+    rejected_df = pd.concat(dataframe_array, ignore_index=True)
+    column_headers = rejected_df.columns.to_list()
+    logger.info(f"shape of dataframe after concat is {rejected_df.shape}")
+    job_list = []
+    func_name = "fetch_rejection_details_v2"
+    for index, row in rejected_df.iterrows():
+        url = row['reference_no_url']
+        reference_no = row["reference_no"]
+        func_args = [lobj, url, reference_no, row, column_headers]
+        job_dict = {
+            'func_name' : func_name,
+            'func_args' : func_args
+        }
+        job_list.append(job_dict)
+    dataframe = libtech_queue_manager(logger, job_list)
+    all_cols = ['fto_fin_year', 'reference_no', 'reference_no_url', 'utr_no', 'transaction_date', 'name_eng', 'primary_account_holder', 'bank_code', 'ifsc_code', 'fto_amount', 'rejection_date', 'rejection_reason', 'fin_agency', 'nic_fin_year', 'rejection_type', 'wagelist_no',  'applicant_no', 'name', 'work_code', 'work_name', 'muster_no', 'reference_no', 'rejection_status', 'rejection_reason', 'process_date', 'fto_no', 'rejection_serial_no', 'final_reference_no', 'final_status', 'final_rejection_reason', 'final_process_date', 'final_fto_no', 'parent_reference_no', 'attempt_count', 'record_status']
+    logger.info(f"dataframe shape is {dataframe.shape}")
+    dataframe = pd.merge(dataframe, worker_df, how='left',
+                         on=['jobcard'])
+    all_cols = worker_df_cols + all_cols
+    dataframe = dataframe[all_cols]
     return dataframe
 
 def get_block_rejected_transactions(lobj, logger, rej_stat_df):
@@ -1449,12 +1526,10 @@ def fetch_muster_list(lobj, logger, nic_urls_df):
     session.get(lobj.mis_state_url)
     response = request_with_retry_timeout(logger, lobj.mis_state_url,
                                           method="get")
-    input()
     if response is None:
         return None
     cookies = response.cookies
     logger.debug(f"session cookies {cookies}")
-    input()
     df_array = []
     for index, row in filtered_df.iterrows():
         nic_url = row.get("mis_url")
