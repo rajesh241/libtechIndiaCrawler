@@ -340,6 +340,56 @@ def fetch_muster_urls(logger, func_args, thread_name=None):
     dataframe = get_urldataframe_from_url(logger, url, mydict=extract_dict,
                                           cookies=cookies)
     return dataframe
+
+def fetch_rejection_details_v2(logger, func_args, thread_name=None):
+    lobj = func_args[0]
+    url = func_args[1]
+    input_reference_no = func_args[2]
+    parent_row = func_args[3]
+    parent_cols = func_args[4]
+    dataframe = None
+    extract_dict = {}
+    extract_dict['pattern'] = "Reference No"
+    column_headers = ["wagelist_no", "jobcard", "applicant_no", "name",
+                      "work_code", "work_name", "muster_no", "reference_no",
+                      "rejection_status", "rejection_reason", "process_date", "fto_no",
+                      "rejection_serial_no"]
+    current_status_cols = ["final_reference_no", "final_status", "final_rejection_reason", "final_process_date", "final_fto_no"]
+    extract_dict['column_headers'] = column_headers
+    dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict)
+    parent_reference_no = ''
+    row1 = []
+    max_index = len(dataframe) - 1
+    row2 = 4*[""]
+    row1 = 14*[""]
+    for index, row in dataframe.iterrows():
+        reference_no = row["reference_no"]
+        if(index == 0):
+            parent_reference_no = reference_no
+        if (index == max_index):
+            row2 = [reference_no, row.get("rejection_status"), row.get("rejection_reason"), row.get("process_date"), row.get("fto_no")]
+            if (row.get("rejection_status") == "Rejected"):
+                final_index = max_index
+            else:
+                final_index = max_index - 1
+        if (reference_no == input_reference_no):
+            current_index = index
+            fto_no = row.get("fto_no")
+            fto_fin_year = get_fto_finyear(logger, fto_no)
+            row1 = row.to_list()
+    if(current_index == final_index):
+        record_status = "latest"
+    else:
+        record_status = "archive"
+    record_status_array = [fto_fin_year, parent_reference_no, current_index+1, record_status]
+    csv_array = []
+    combined_row = parent_row.to_list() + row1 + row2 + record_status_array
+    csv_array.append(combined_row)
+    record_status_cols = ["fto_fin_year", "parent_reference_no", "attempt_count", "record_status"]
+    all_cols = parent_cols + column_headers + current_status_cols + record_status_cols
+    final_df = pd.DataFrame(csv_array, columns=all_cols)
+    return final_df
+
 def fetch_rejection_details(logger, func_args, thread_name=None):
 
     """This will fetch rejection details given the reference url"""
