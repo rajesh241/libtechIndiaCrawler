@@ -572,7 +572,6 @@ class NREGADistrict(Location):
         #logger.info(f"CHecking if nic stat urls is updated{is_updated}")
         if is_updated:
             return
-        exit(0)
         dataframe_array = []
         block_array = self.get_all_blocks(logger)
         logger.info(block_array)
