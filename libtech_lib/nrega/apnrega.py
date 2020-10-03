@@ -741,6 +741,9 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
     dataframe = libtech_queue_manager(logger, job_list)
     dataframe = insert_location_details(logger, lobj, dataframe)
     dataframe['~tjobcard'] = "~" + dataframe['tjobcard']
+    '''
+    changed by Ranu
+    '''
     dataframe['~epayorder_no'] = "~" + dataframe['epayorder_no'].astype(str)
     dataframe = dataframe[dataframe["~tjobcard"]!="~2"]
     dataframe = insert_finyear_in_dataframe(logger, dataframe,
