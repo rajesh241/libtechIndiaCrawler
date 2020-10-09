@@ -2249,5 +2249,19 @@ def get_dynamic_work_report_r6_18(lobj, logger):
     with open(root_dir + f'{block_code}_{finyear}.html','wb') as f:
         f.write(response.content)
     print('html_file saved')
+    myhtml = response.content
+    extract_dict = {}
+    column_headers = ["sno","district_name1","block_name1","panchayat_name","work_start_fin_year","work_status","work_code","work_name","master_work_category_name","work_category_name","work_type","agency_name","sanction_amount_in_lakh","total_amount_paid_since_inception_in_lakh","total_mandays","no_of_units","is_secure","is_convergence","work_started_date","work_physically_completed_date"]
+    extract_dict['pattern'] = "Master Work Category Name"
+    extract_dict['column_headers'] = column_headers
+    dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name"]
+    all_cols = location_cols + column_headers
+    dataframe = dataframe[all_cols]
+    dataframe.to_csv("/tmp/dwr.csv")
+    return dataframe
 
 

@@ -668,6 +668,8 @@ class NREGABlock(Location):
         """This will fetch the dynamic work report from MIS reports"""
         report_type = "dynamic_work_report_r6_18"
         dataframe = get_dynamic_work_report_r6_18(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
     def muster_transactions_v2(self, logger):
         """This will download muster transactions based on muster list"""
         report_type = "muster_transactions_v2"
