@@ -2051,3 +2051,203 @@ def update_muster_transactions_v2(lobj, logger):
     all_cols = location_cols + col_list
     dataframe = dataframe[all_cols]
     return dataframe
+
+def get_dynamic_work_report_r6_18(lobj, logger):
+    """Will fetch dynamic work report"""
+    state_code = lobj.state_code
+    district_code = lobj.district_code
+    block_code = lobj.block_code
+    logger.info(f"Downloading Dynamic work report for {lobj.code}")
+    finyear = get_current_finyear()
+    url_text = "dynamic_work_details.aspx"
+    filename = f"{NREGA_DATA_DIR}/misReport_{finyear}.html"
+    logger.info(filename)
+    with open(filename, "rb") as infile:
+        myhtml = infile.read()
+    mysoup = BeautifulSoup(myhtml, "lxml")
+    elem = mysoup.find("a", href=re.compile(url_text))
+    if elem is None:
+        logger.debug("No such report found")
+    if elem is not None:
+        base_href = elem["href"]
+    logger.info(base_href)
+    url = base_href
+    #url = 'http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx?page=S&lflag=eng&state_name=RAJASTHAN&state_code=27&fin_year=2020-2021&source=national&Digest=iNIvQfUeFfm1zBPVK3uvFQ'
+    session = requests.Session()
+    response = session.get(url, verify=False)
+    soup = BeautifulSoup(response.text, 'lxml')
+
+    VIEWSTATE=soup.find(id="__VIEWSTATE")['value']
+    VIEWSTATEGENERATOR=soup.find(id="__VIEWSTATEGENERATOR")['value']
+    #print(VIEWSTATE, VIEWSTATEGENERATOR)
+
+
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'X-MicrosoftAjax': 'Delta=true',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Accept': '*/*',
+        'Origin': 'http://mnregaweb4.nic.in',
+        'Referer': url,
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+    data = {
+      'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddl_state',
+      '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddl_state',
+      '__EVENTARGUMENT': '',
+      '__LASTFOCUS': '',
+      '__VIEWSTATE': VIEWSTATE,
+      '__VIEWSTATEGENERATOR': VIEWSTATEGENERATOR,
+      '__VIEWSTATEENCRYPTED': '',
+      'ctl00$ContentPlaceHolder1$ddl_state': state_code,
+      'ctl00$ContentPlaceHolder1$ddl_dist': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddl_blk': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddl_pan': 'ALL',
+      'ctl00$ContentPlaceHolder1$Ddlworkcategory': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddlprostatus': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddlexpnana': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddlexpnest': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddlFin_year': '2020-2021',
+      'ctl00$ContentPlaceHolder1$Ddlwork_status': '03',
+      'ctl00$ContentPlaceHolder1$Ddlrailway_work': 'ALL',
+      '__ASYNCPOST': 'true',
+      '': ''
+    }
+    response = session.post(url, headers=headers, data=data, verify=False)
+    soup = BeautifulSoup(response.text, 'lxml')
+
+    # Update the context
+    body = soup.find('body')
+    #logger.warning(body.text)
+    array = body.text.split('|')
+    VIEWSTATE = array[array.index('__VIEWSTATE')+1]
+    #logger.debug(self.view_state)
+    VIEWSTATEGENERATOR = array[array.index('__VIEWSTATEGENERATOR')+1]
+    #logger.debug(self.event_validation)
+
+
+
+    data = {
+      'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddl_dist',
+      '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddl_dist',
+      '__EVENTARGUMENT': '',
+      '__LASTFOCUS': '',
+      '__VIEWSTATE': VIEWSTATE,
+      '__VIEWSTATEGENERATOR': VIEWSTATEGENERATOR,
+      '__VIEWSTATEENCRYPTED': '',
+      'ctl00$ContentPlaceHolder1$ddl_state': state_code,
+      'ctl00$ContentPlaceHolder1$ddl_dist': district_code,
+      'ctl00$ContentPlaceHolder1$ddl_blk': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddl_pan': 'ALL',
+      'ctl00$ContentPlaceHolder1$Ddlworkcategory': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddlprostatus': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddlexpnana': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddlexpnest': 'ALL',
+      'ctl00$ContentPlaceHolder1$ddlFin_year': '2020-2021',
+      'ctl00$ContentPlaceHolder1$Ddlwork_status': '03',
+      'ctl00$ContentPlaceHolder1$Ddlrailway_work': 'ALL',
+      '__ASYNCPOST': 'true',
+      '': ''
+    }
+
+    #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
+    response = session.post(url, headers=headers, data=data, verify=False)
+    soup = BeautifulSoup(response.text, 'lxml')
+
+    # Update the context
+    body = soup.find('body')
+    #logger.warning(body.text)
+    array = body.text.split('|')
+    VIEWSTATE = array[array.index('__VIEWSTATE')+1]
+    #logger.debug(self.view_state)
+    VIEWSTATEGENERATOR = array[array.index('__VIEWSTATEGENERATOR')+1]
+    #logger.debug(self.event_validation)
+
+    data['ctl00$ContentPlaceHolder1$ScriptManager1'] = 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddl_blk'
+    data['__EVENTTARGET'] = 'ctl00$ContentPlaceHolder1$ddl_blk'
+    data['__VIEWSTATE'] = VIEWSTATE
+    data['__VIEWSTATEGENERATOR'] = VIEWSTATEGENERATOR
+    data['ctl00$ContentPlaceHolder1$ddl_blk'] = block_code
+
+    #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
+    response = session.post(url, headers=headers, data=data, verify=False)
+    soup = BeautifulSoup(response.text, 'lxml')
+
+
+
+    # Update the context
+    body = soup.find('body')
+    #logger.warning(body.text)
+    array = body.text.split('|')
+    VIEWSTATE = array[array.index('__VIEWSTATE')+1]
+    #logger.debug(self.view_state)
+    VIEWSTATEGENERATOR = array[array.index('__VIEWSTATEGENERATOR')+1]
+    #logger.debug(self.event_validation)
+
+
+    data['ctl00$ContentPlaceHolder1$ScriptManager1'] = 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddlFin_year'
+    data['__EVENTTARGET'] = 'ctl00$ContentPlaceHolder1$ddlFin_year'
+    data['__VIEWSTATE'] = VIEWSTATE
+    data['__VIEWSTATEGENERATOR'] = VIEWSTATEGENERATOR
+    data['ctl00$ContentPlaceHolder1$ddlFin_year'] = 'ALL'
+
+
+    #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
+    response = session.post(url, headers=headers, data=data, verify=False)
+    soup = BeautifulSoup(response.text, 'lxml')
+
+
+
+    # Update the context
+    body = soup.find('body')
+    #logger.warning(body.text)
+    array = body.text.split('|')
+    VIEWSTATE = array[array.index('__VIEWSTATE')+1]
+    #logger.debug(self.view_state)
+    VIEWSTATEGENERATOR = array[array.index('__VIEWSTATEGENERATOR')+1]
+
+
+    data['ctl00$ContentPlaceHolder1$ScriptManager1'] = 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$Ddlwork_status'
+    data['__EVENTTARGET'] = 'ctl00$ContentPlaceHolder1$Ddlwork_status'
+    data['__VIEWSTATE'] = VIEWSTATE
+    data['__VIEWSTATEGENERATOR'] = VIEWSTATEGENERATOR
+    data['ctl00$ContentPlaceHolder1$Ddlwork_status'] = 'ALL'
+
+    #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
+    response = session.post(url, headers=headers, data=data, verify=False)
+    soup = BeautifulSoup(response.text, 'lxml')
+
+
+
+    # Update the context
+    body = soup.find('body')
+    #logger.warning(body.text)
+    array = body.text.split('|')
+    VIEWSTATE = array[array.index('__VIEWSTATE')+1]
+    #logger.debug(self.view_state)
+    VIEWSTATEGENERATOR = array[array.index('__VIEWSTATEGENERATOR')+1]
+    #logger.debug(self.event_validation)
+
+
+    ### Final request
+    data['ctl00$ContentPlaceHolder1$ScriptManager1'] = 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$Button1'
+    data['__EVENTTARGET'] = 'ctl00$ContentPlaceHolder1$Ddlwork_status'
+    data['__VIEWSTATE'] = VIEWSTATE
+    data['__VIEWSTATEGENERATOR'] = VIEWSTATEGENERATOR
+    data['ctl00$ContentPlaceHolder1$Button1'] = 'Submit'
+
+    #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
+    response = session.post(url, headers=headers, data=data, verify=False)
+
+    root_dir = f"/tmp/"
+    if not os.path.exists(root_dir):
+        os.makedirs(root_dir)
+    
+
+    with open(root_dir + f'{block_code}_{finyear}.html','wb') as f:
+        f.write(response.content)
+    print('html_file saved')
+
+

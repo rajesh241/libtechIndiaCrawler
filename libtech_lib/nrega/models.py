@@ -45,6 +45,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_nic_urls,
                                         update_muster_transactions_v2,
                                         get_nrega_locations,
+                                        get_dynamic_work_report_r6_18,
                                         get_jobcard_stats
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
@@ -662,7 +663,11 @@ class NREGABlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type, health,
                                  remarks)
-        
+    
+    def dynamic_work_report_r6_18(self, logger):
+        """This will fetch the dynamic work report from MIS reports"""
+        report_type = "dynamic_work_report_r6_18"
+        dataframe = get_dynamic_work_report_r6_18(self, logger)
     def muster_transactions_v2(self, logger):
         """This will download muster transactions based on muster list"""
         report_type = "muster_transactions_v2"
