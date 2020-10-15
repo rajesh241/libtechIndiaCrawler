@@ -390,10 +390,11 @@ def re_extract_village_name(in_s):
 def get_jobcard_transactions(lobj, logger, jobcards_dataframe):
     """ Given a list of jobciard urls this function will fetch all jobcard
     transactions"""
-    logger.info(f"we are going to fetch muster list")
-    logger.info(f"panchayat page url is {lobj.panchayat_page_url}")
+    logger.info(f"we are going to Jobcard Transactions")
+    logger.info(f"state page url is {lobj.mis_state_url}")
     job_list = []
-    response = requests.get(lobj.panchayat_page_url)
+    #response = requests.get(lobj.panchayat_page_url)
+    response = requests.get(lobj.mis_state_url)
     cookies = response.cookies
     ###Below is the worker function that needs to be called
     func_name = "fetch_jobcard_details"
@@ -418,6 +419,7 @@ def get_jobcard_transactions(lobj, logger, jobcards_dataframe):
     logger.debug(f"transactions columns {transactions_columns}")
     dataframe = insert_location_details(logger, lobj, dataframe)
     dataframe['muster_code'] = dataframe.apply(lambda row: str(row['block_code'])+"_"+str(row['finyear'])+"_"+str(row['muster_no']), axis=1)
+    #dataframe['muster_code'] = ''
     location_cols = ["state_code", "state_name", "district_code",
                      "district_name", "block_code", "block_name",
                      "panchayat_code", "panchayat_name"]

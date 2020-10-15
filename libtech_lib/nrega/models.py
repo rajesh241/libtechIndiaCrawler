@@ -283,15 +283,17 @@ class NREGAPanchayat(Location):
         is_updated = self.is_report_updated(logger, report_type)
         #if (is_updated) and (not self.force_download):
         if (is_updated):
-            return
+            dataframe = self.fetch_report_dataframe(logger, report_type)
+            return dataframe
         logger.info(f"Going to fetch Jobcard Transactions for {self.code}")
-        self.jobcard_register(logger)
-        self.worker_register(logger)
+        #self.jobcard_register(logger)
+        #self.worker_register(logger)
         report_type = "jobcard_register"
         jobcard_register_df = self.fetch_report_dataframe(logger, report_type)
         dataframe = get_jobcard_transactions(self, logger, jobcard_register_df)
         report_type = "jobcard_transactions"
         self.save_report(logger, dataframe, report_type)
+        return dataframe
     def muster_list_v2(self, logger):
         report_type = "muster_list"
         my_location = NREGABlock(logger, self.block_code)
@@ -652,6 +654,32 @@ class NREGABlock(Location):
             count = count + 1
             my_location = NREGAPanchayat(logger, each_panchayat_code)
             dataframe = my_location.nic_urls(logger)
+            if dataframe is not None:
+                logger.info(f"Processed {count} {my_location.code}")
+                df_array.append(dataframe)
+            else:
+                health = "red"
+                remarks = remarks + "unable to download for " + each_panchayat_code
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type, health,
+                                 remarks)
+    def jobcard_transactions(self, logger):
+        report_type = "jobcard_transactions"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        count = 0
+        remarks = ''
+        health = 'green'
+        for each_panchayat_code in panchayat_array:
+            count = count + 1
+            my_location = NREGAPanchayat(logger, each_panchayat_code)
+            dataframe = my_location.jobcard_transactions(logger)
             if dataframe is not None:
                 logger.info(f"Processed {count} {my_location.code}")
                 df_array.append(dataframe)
