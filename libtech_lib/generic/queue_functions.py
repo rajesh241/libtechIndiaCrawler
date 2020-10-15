@@ -429,7 +429,11 @@ def fetch_jobcard_details(logger, func_args, thread_name=None):
     lobj = func_args[0]
     url = func_args[1]
     cookies = func_args[2]
-    response = requests.get(url, cookies=cookies)
+    response = request_with_retry_timeout(logger, url, method="get",
+                                          cookies=cookies)
+    #response = requests.get(url, cookies=cookies)
+    if response is None:
+        return None
     logger.debug(f"Fetch data for {lobj.code} with {thread_name}")
     dataframe = None
     if response.status_code == 200:
