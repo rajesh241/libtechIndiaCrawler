@@ -16,6 +16,7 @@ from libtech_lib.generic.api_interface import (get_location_dict,
                                                create_update_report,
                                                api_get_report_dataframe,
                                                api_get_report_urls,
+                                               api_get_report_last_updated,
                                                api_get_child_locations,
                                                api_get_child_location_ids,
                                                api_update_crawl_accuracy
@@ -132,10 +133,15 @@ class Location():
         """Checks if report is updated"""
         if self.force_download:
             return False
-        filename = self.get_report_filepath(logger, report_type, finyear=finyear)
-        logger.debug(f"report name is {filename}")
-        days_diff = days_since_modified_s3(logger, filename)
-        logger.debug(f"days diff is {days_diff}")
+        try:
+            last_updated = api_get_report_last_updated(logger, self.code,
+                                                       report_type,
+                                                       finyear=finyear)
+            
+            time_diff = datetime.datetime.now(datetime.timezone.utc) - last_updated
+            days_diff = time_diff.days
+        except:
+            days_diff = None
         if days_diff is None:
             return False
         threshold = REPORT_THRESHOLD_DICT.get(report_type,
