@@ -2,6 +2,7 @@
 for the Django interface"""
 import os
 import datetime
+from dateutil.parser import parse
 from pathlib import Path
 import json
 import requests
@@ -268,6 +269,24 @@ def api_get_report_url(logger, location_id, report_type, finyear=None):
         report_dict = results[0]
         report_url = report_dict.get('report_url', None)
     return report_url
+
+def api_get_report_last_updated(logger, location_code, report_type, finyear=None):
+    """This function will get the report dataframe from the amazon S3"""
+    last_updated = None
+    params = {
+        'location_code' : location_code,
+        'report_type' : report_type
+    }
+    if finyear is not None:
+        params['finyear'] = finyear
+    response = fetch_data(logger, REPORTURL, params=params)
+    results = response.get("results", [])
+    if len(results) > 0:
+        report_dict = results[0]
+        last_updated = report_dict.get('updated', None)
+        last_updated = parse(last_updated) 
+    return last_updated
+
 
 def api_get_report_urls(logger, location_id, report_type, finyear=None):
     """Gets the report urls """
