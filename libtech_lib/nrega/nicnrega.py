@@ -185,7 +185,7 @@ def get_jobcard_register_mis(lobj, logger, nic_urls_df):
                      "district_name", "block_code", "block_name",
                      "panchayat_code", "panchayat_name"]
     all_cols = location_cols + column_headers
-    dataframe = pd.DataFrame(columns=all_cols)
+    empty_dataframe = pd.DataFrame(columns=all_cols)
     logger.debug(f"In download jobcard register for {lobj.panchayat_code}")
     logger.debug(f"Shape of df is {nic_urls_df.shape}")
     finyear = get_current_finyear()
@@ -209,7 +209,8 @@ def get_jobcard_register_mis(lobj, logger, nic_urls_df):
                                               method="get")
         break
     if response is None:
-        return dataframe
+        logger.debug("Returning from here")
+        return empty_dataframe
     myhtml = response.content
     jobcard_prefix = f"{lobj.state_short_code}-"
     extract_dict = {}
@@ -223,7 +224,7 @@ def get_jobcard_register_mis(lobj, logger, nic_urls_df):
         dataframe = insert_location_details(logger, lobj, dataframe)
         dataframe = dataframe[all_cols]
         return dataframe
-    return dataframe
+    return empty_dataframe
 
 def get_worker_register_mis(lobj, logger, nic_urls_df):
     """This will download the worker registe based on nic_urls and df"""
