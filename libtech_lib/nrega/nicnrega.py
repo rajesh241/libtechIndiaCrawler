@@ -202,12 +202,16 @@ def get_jobcard_register_mis(lobj, logger, nic_urls_df):
     logger.debug(lobj.mis_state_url)
     logger.debug(f"session cookies {cookies}")
     myhtml = None
+    url = None
+    
     for index, row in filtered_df.iterrows():
         url = row.get("mis_url")
         logger.debug(f"Url is {url}")
         response = request_with_retry_timeout(logger, url, cookies=cookies,
                                               method="get")
         break
+    if url is None:
+        return empty_dataframe
     if response is None:
         logger.debug("Returning from here")
         return empty_dataframe
