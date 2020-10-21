@@ -117,10 +117,11 @@ def get_urldataframe_from_html(logger, myhtml, mydict=None):
 def get_urldataframe_from_url(logger, url, mydict=None, cookies=None):
     """This will harvest urls from the given url based on extract dict
     parameters"""
-    if cookies is None:
-        response = requests.get(url)
-    else:
-        response = requests.get(url, cookies=cookies)
+   #if cookies is None:
+   #    response = requests.get(url)
+   #else:
+   #    response = requests.get(url, cookies=cookies)
+    response = request_with_retry_timeout(logger, url, cookies=cookies, method="get")
     dataframe = None
     if response.status_code == 200:
         myhtml = response.content
