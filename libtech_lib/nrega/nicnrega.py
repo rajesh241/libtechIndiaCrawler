@@ -456,7 +456,7 @@ def update_muster_list(lobj, logger, jobcard_transactions_df,
     col_list = ['muster_no', 'muster_url', 'finyear', 'date_from', 'date_to', 'work_name', 'work_code', 'block_code']
     work_url_array = filtered_df.work_name_url.unique()
     logger.info(f"Number of unique work urls is {len(work_url_array)}")
-    response = requests.get(lobj.panchayat_page_url)
+    response = request_with_retry_timeout(logger, lobj.mis_state_url, method="get")
     cookies = response.cookies
     job_list = []
     func_name = "fetch_muster_urls"

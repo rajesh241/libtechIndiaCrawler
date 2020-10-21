@@ -683,6 +683,7 @@ class NREGABlock(Location):
         remarks = ''
         health = 'green'
         for each_panchayat_code in panchayat_array:
+            logger.debug(f"Currently processing {each_panchayat_code}")
             count = count + 1
             my_location = NREGAPanchayat(logger, each_panchayat_code)
             dataframe = my_location.jobcard_transactions(logger)
@@ -698,6 +699,23 @@ class NREGABlock(Location):
                 self.save_report(logger, dataframe, report_type, health,
                                  remarks)
     
+    def muster_list(self, logger):
+        """This will fetch all jobcard transactions for the panchayat"""
+        logger.info(f"Going to fetch Muster list for {self.code}")
+        report_type = "muster_list"
+        is_updated = self.is_report_updated(logger, report_type)
+        #if (is_updated) and (not self.force_download):
+        if (is_updated):
+            return
+        self.jobcard_transactions(logger)
+        report_type = "jobcard_transactions"
+        jobcard_transaction_df = self.fetch_report_dataframe(logger, report_type)
+        report_type = "muster_list"
+        muster_list_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = update_muster_list(self, logger, jobcard_transaction_df,
+                                       muster_list_df)
+        report_type = "muster_list"
+        self.save_report(logger, dataframe, report_type)
     def dynamic_work_report_r6_18(self, logger):
         """This will fetch the dynamic work report from MIS reports"""
         report_type = "dynamic_work_report_r6_18"
