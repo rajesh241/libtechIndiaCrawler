@@ -36,7 +36,8 @@ from libtech_lib.generic.html_functions import ( get_dataframe_from_html,
                                                  find_url_containing_text,
                                                  find_urls_containing_text,
                                                  get_options_list,
-                                                 request_with_retry_timeout
+                                                 request_with_retry_timeout,
+                                                 get_request_with_retry_timeout
                                                )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 mis_url = "https://mnregaweb4.nic.in"
@@ -2271,4 +2272,138 @@ def get_dynamic_work_report_r6_18(lobj, logger):
     dataframe.to_csv("/tmp/dwr.csv")
     return dataframe
 
+def get_worker_stats(lobj, logger, nic_urls_df):
+    """This will fetch the worker stats"""
+    use_state_server = False
+    dataframe = None
+    empty_dataframe = None
+    logger.info(f"Going to fetch the worker register for {lobj.block_code}")
+    logger.debug(f"shape of urls df is {nic_urls_df.shape}")
+    report_slug = "household-provided-employment-with-specified-no-of-days"
+    filtered_df = nic_urls_df[nic_urls_df["report_slug"] == report_slug]
+    logger.debug(f"shape of urls df is {filtered_df.shape}")
+    logger.debug(f"Mis state URL {lobj.mis_state_url}")
+    if (use_state_server == True):
+        url = lobj.mis_state_url.replace("mnregaweb4.nic.in", lobj.crawl_ip)
+        response = get_request_with_retry_timeout(logger, lobj.mis_state_url)
+    else:
+        response = get_request_with_retry_timeout(logger, lobj.mis_state_url)
+        
+    if response is None:
+        logger.debug(f"response is noe for {lobj.mis_state_url}")
+        return empty_dataframe
+    cookies = response.cookies
+    logger.debug(f"Cookies are {cookies}")
+    for index, row in filtered_df.iterrows():
+        finyear = row['finyear']
+        url = row['mis_url']
+        if use_state_server == True:
+            url = url.replace("mnregaweb4.nic.in", lobj.crawl_ip)
+        headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15;rv:81.0) Gecko/20100101 Firefox/81.0',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'X-MicrosoftAjax': 'Delta=true',
+                'Cache-Control': 'no-cache',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+                'Origin': 'https://mnregaweb4.nic.in',
+                'Connection': 'keep-alive',
+                'Referer': url
+        }
+        #for pobj in lobj.get_all_panchayat_objs(logger):
+        response = get_request_with_retry_timeout(logger, url, cookies=cookies)
+        if response is None:
+            logger.debug(f"response is None for {url}")
+            continue
+        with open("/tmp/z.html", "wb") as f:
+            f.write(response.content)
+        htmlsoup = BeautifulSoup(response.content, 'lxml')
+        view_state  =  htmlsoup.find(id = '__VIEWSTATE').get('value')
+        validation  =  htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+        data = {
+            'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_panch',
+            '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddr_panch',
+            '__EVENTARGUMENT': '',
+            '__LASTFOCUS': '',
+            '__VIEWSTATE': view_state,
+            '__VIEWSTATEGENERATOR': '68012A6D',
+            '__VIEWSTATEENCRYPTED': '',
+            '__EVENTVALIDATION': validation,
+            'ctl00$ContentPlaceHolder1$ddr_panch': '2724007283',
+            'ctl00$ContentPlaceHolder1$ddr_cond': '',
+            'ctl00$ContentPlaceHolder1$lbl_days': '100',
+            'ctl00$ContentPlaceHolder1$rblRegWorker': 'Y',
+            '__ASYNCPOST': 'true',
+            '': ''
+        }
+        response = request_with_retry_timeout(logger, url, data=data,
+                                              headers=headers, cookies=cookies)
+        if response is None:
+            continue
+        with open("/tmp/z1.html", "wb") as f:
+            f.write(response.content)
+        htmlsoup = BeautifulSoup(response.content, 'lxml')
+        body = htmlsoup.find('body')
+        #logger.warning(body.text)
+        array = body.text.split('|')
+        view_state = array[array.index('__VIEWSTATE')+1]
+        validation = array[array.index('__EVENTVALIDATION')+1]
+        data = {
+            'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_cond',
+            'ctl00$ContentPlaceHolder1$ddr_panch': '2724007283',
+            'ctl00$ContentPlaceHolder1$ddr_cond': 'gte',
+            'ctl00$ContentPlaceHolder1$lbl_days': '100',
+            'ctl00$ContentPlaceHolder1$rblRegWorker': 'Y',
+            '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddr_cond',
+            '__EVENTARGUMENT': '',
+            '__LASTFOCUS': '',
+            '__VIEWSTATE': view_state,
+            '__VIEWSTATEGENERATOR': '68012A6D',
+            '__VIEWSTATEENCRYPTED': '',
+            '__EVENTVALIDATION': validation,
+            '__ASYNCPOST': 'true',
+            '': ''
+        }
+        response = request_with_retry_timeout(logger, url, data=data,
+                                              headers=headers, cookies=cookies)
+        if response is None:
+            continue
+        htmlsoup = BeautifulSoup(response.content, 'lxml')
+        body = htmlsoup.find('body')
+        array = body.text.split('|')
+        view_state = array[array.index('__VIEWSTATE')+1]
+        validation = array[array.index('__EVENTVALIDATION')+1]
+        data = {
+            'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$btn_pro',
+            'ctl00$ContentPlaceHolder1$ddr_panch': '2724007283',
+            'ctl00$ContentPlaceHolder1$ddr_cond': 'gte',
+            'ctl00$ContentPlaceHolder1$lbl_days': '0',
+            'ctl00$ContentPlaceHolder1$rblRegWorker': 'N',
+            '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$btn_pro',
+            '__EVENTARGUMENT': '',
+            '__LASTFOCUS': '',
+            '__VIEWSTATE': view_state,
+            '__VIEWSTATEGENERATOR': '68012A6D',
+            '__EVENTVALIDATION': validation,
+            '__VIEWSTATEENCRYPTED': '',
+            '__ASYNCPOST': 'true',
+            '': ''
+        }
+        response = request_with_retry_timeout(logger, url, data=data,
+                                              headers=headers, cookies=cookies)
+        if response is None:
+            continue
 
+        with open("/tmp/z3.html", "wb") as f:
+            f.write(response.content)
+        htmlsoup = BeautifulSoup(response.content, 'lxml')
+        body = htmlsoup.find('body')
+        #logger.warning(body.text)
+        array = body.text.split('|')
+        page_url = array[array.index('pageRedirect')+2]
+        url_prefix = "https://mnregaweb4.nic.in"
+        page_url = url_prefix + page_url
+        panchayat_code = ''
+        logger.info(f"Page url for finyear {finyear} panchayat_code {panchayat_code} is {page_url}")
+
+    return None
