@@ -42,6 +42,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         create_work_payment_report,
                                         get_nic_stat_urls, 
                                         get_ap_worker_register,
+                                        get_worker_stats,
                                         get_worker_register_mis,
                                         get_nic_urls,
                                         update_muster_transactions_v2,
@@ -854,7 +855,14 @@ class NREGABlock(Location):
         if dataframe is not None:
             report_type = "block_rejected_transactions_v2"
             self.save_report(logger, dataframe, report_type)
-        
+    def worker_stats(self, logger):
+        """This will fetch the worker stats"""
+        report_name = "worker_stats"
+        nic_urls_df = self.fetch_report_dataframe(logger, "nic_block_urls")
+        dataframe = get_worker_stats(self, logger, nic_urls_df)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
     def block_rejected_transactions(self, logger):
         """This will fetch all the rejected transactions of the block"""
         report_name = "block_rejected_stats"
