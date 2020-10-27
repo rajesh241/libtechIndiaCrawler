@@ -2275,8 +2275,15 @@ def get_dynamic_work_report_r6_18(lobj, logger):
 def get_worker_stats(lobj, logger, nic_urls_df):
     """This will fetch the worker stats"""
     use_state_server = False
+    df_array = []
+    column_headers = ['srno', 'jobcard', 'head_of_household', 'name',
+                      'total_work_days']
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    all_cols = location_cols + ["finyear"] + column_headers
+    empty_dataframe = pd.DataFrame(columns=all_cols)
     dataframe = None
-    empty_dataframe = None
     logger.info(f"Going to fetch the worker register for {lobj.block_code}")
     logger.debug(f"shape of urls df is {nic_urls_df.shape}")
     report_slug = "household-provided-employment-with-specified-no-of-days"
@@ -2310,100 +2317,123 @@ def get_worker_stats(lobj, logger, nic_urls_df):
                 'Connection': 'keep-alive',
                 'Referer': url
         }
-        #for pobj in lobj.get_all_panchayat_objs(logger):
-        response = get_request_with_retry_timeout(logger, url, cookies=cookies)
-        if response is None:
-            logger.debug(f"response is None for {url}")
-            continue
-        with open("/tmp/z.html", "wb") as f:
-            f.write(response.content)
-        htmlsoup = BeautifulSoup(response.content, 'lxml')
-        view_state  =  htmlsoup.find(id = '__VIEWSTATE').get('value')
-        validation  =  htmlsoup.find(id = '__EVENTVALIDATION').get('value')
-        data = {
-            'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_panch',
-            '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddr_panch',
-            '__EVENTARGUMENT': '',
-            '__LASTFOCUS': '',
-            '__VIEWSTATE': view_state,
-            '__VIEWSTATEGENERATOR': '68012A6D',
-            '__VIEWSTATEENCRYPTED': '',
-            '__EVENTVALIDATION': validation,
-            'ctl00$ContentPlaceHolder1$ddr_panch': '2724007283',
-            'ctl00$ContentPlaceHolder1$ddr_cond': '',
-            'ctl00$ContentPlaceHolder1$lbl_days': '100',
-            'ctl00$ContentPlaceHolder1$rblRegWorker': 'Y',
-            '__ASYNCPOST': 'true',
-            '': ''
-        }
-        response = request_with_retry_timeout(logger, url, data=data,
-                                              headers=headers, cookies=cookies)
-        if response is None:
-            continue
-        with open("/tmp/z1.html", "wb") as f:
-            f.write(response.content)
-        htmlsoup = BeautifulSoup(response.content, 'lxml')
-        body = htmlsoup.find('body')
-        #logger.warning(body.text)
-        array = body.text.split('|')
-        view_state = array[array.index('__VIEWSTATE')+1]
-        validation = array[array.index('__EVENTVALIDATION')+1]
-        data = {
-            'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_cond',
-            'ctl00$ContentPlaceHolder1$ddr_panch': '2724007283',
-            'ctl00$ContentPlaceHolder1$ddr_cond': 'gte',
-            'ctl00$ContentPlaceHolder1$lbl_days': '100',
-            'ctl00$ContentPlaceHolder1$rblRegWorker': 'Y',
-            '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddr_cond',
-            '__EVENTARGUMENT': '',
-            '__LASTFOCUS': '',
-            '__VIEWSTATE': view_state,
-            '__VIEWSTATEGENERATOR': '68012A6D',
-            '__VIEWSTATEENCRYPTED': '',
-            '__EVENTVALIDATION': validation,
-            '__ASYNCPOST': 'true',
-            '': ''
-        }
-        response = request_with_retry_timeout(logger, url, data=data,
-                                              headers=headers, cookies=cookies)
-        if response is None:
-            continue
-        htmlsoup = BeautifulSoup(response.content, 'lxml')
-        body = htmlsoup.find('body')
-        array = body.text.split('|')
-        view_state = array[array.index('__VIEWSTATE')+1]
-        validation = array[array.index('__EVENTVALIDATION')+1]
-        data = {
-            'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$btn_pro',
-            'ctl00$ContentPlaceHolder1$ddr_panch': '2724007283',
-            'ctl00$ContentPlaceHolder1$ddr_cond': 'gte',
-            'ctl00$ContentPlaceHolder1$lbl_days': '0',
-            'ctl00$ContentPlaceHolder1$rblRegWorker': 'N',
-            '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$btn_pro',
-            '__EVENTARGUMENT': '',
-            '__LASTFOCUS': '',
-            '__VIEWSTATE': view_state,
-            '__VIEWSTATEGENERATOR': '68012A6D',
-            '__EVENTVALIDATION': validation,
-            '__VIEWSTATEENCRYPTED': '',
-            '__ASYNCPOST': 'true',
-            '': ''
-        }
-        response = request_with_retry_timeout(logger, url, data=data,
-                                              headers=headers, cookies=cookies)
-        if response is None:
-            continue
+        for pobj in lobj.get_all_panchayat_objs(logger):
+            response = get_request_with_retry_timeout(logger, url, cookies=cookies)
+            if response is None:
+                logger.debug(f"response is None for {url}")
+                continue
+            with open("/tmp/z.html", "wb") as f:
+                f.write(response.content)
+            htmlsoup = BeautifulSoup(response.content, 'lxml')
+            view_state  =  htmlsoup.find(id = '__VIEWSTATE').get('value')
+            validation  =  htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+            data = {
+                'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_panch',
+                '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddr_panch',
+                '__EVENTARGUMENT': '',
+                '__LASTFOCUS': '',
+                '__VIEWSTATE': view_state,
+                '__VIEWSTATEGENERATOR': '68012A6D',
+                '__VIEWSTATEENCRYPTED': '',
+                '__EVENTVALIDATION': validation,
+                'ctl00$ContentPlaceHolder1$ddr_panch': pobj.code,
+                'ctl00$ContentPlaceHolder1$ddr_cond': '',
+                'ctl00$ContentPlaceHolder1$lbl_days': '100',
+                'ctl00$ContentPlaceHolder1$rblRegWorker': 'Y',
+                '__ASYNCPOST': 'true',
+                '': ''
+            }
+            response = request_with_retry_timeout(logger, url, data=data,
+                                                  headers=headers, cookies=cookies)
+            if response is None:
+                continue
+            with open("/tmp/z1.html", "wb") as f:
+                f.write(response.content)
+            htmlsoup = BeautifulSoup(response.content, 'lxml')
+            body = htmlsoup.find('body')
+            #logger.warning(body.text)
+            array = body.text.split('|')
+            view_state = array[array.index('__VIEWSTATE')+1]
+            validation = array[array.index('__EVENTVALIDATION')+1]
+            data = {
+                'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_cond',
+                'ctl00$ContentPlaceHolder1$ddr_panch': pobj.code,
+                'ctl00$ContentPlaceHolder1$ddr_cond': 'gte',
+                'ctl00$ContentPlaceHolder1$lbl_days': '100',
+                'ctl00$ContentPlaceHolder1$rblRegWorker': 'Y',
+                '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddr_cond',
+                '__EVENTARGUMENT': '',
+                '__LASTFOCUS': '',
+                '__VIEWSTATE': view_state,
+                '__VIEWSTATEGENERATOR': '68012A6D',
+                '__VIEWSTATEENCRYPTED': '',
+                '__EVENTVALIDATION': validation,
+                '__ASYNCPOST': 'true',
+                '': ''
+            }
+            response = request_with_retry_timeout(logger, url, data=data,
+                                                  headers=headers, cookies=cookies)
+            if response is None:
+                continue
+            htmlsoup = BeautifulSoup(response.content, 'lxml')
+            body = htmlsoup.find('body')
+            array = body.text.split('|')
+            view_state = array[array.index('__VIEWSTATE')+1]
+            validation = array[array.index('__EVENTVALIDATION')+1]
+            data = {
+                'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$btn_pro',
+                'ctl00$ContentPlaceHolder1$ddr_panch': pobj.code,
+                'ctl00$ContentPlaceHolder1$ddr_cond': 'gte',
+                'ctl00$ContentPlaceHolder1$lbl_days': '0',
+                'ctl00$ContentPlaceHolder1$rblRegWorker': 'N',
+                '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$btn_pro',
+                '__EVENTARGUMENT': '',
+                '__LASTFOCUS': '',
+                '__VIEWSTATE': view_state,
+                '__VIEWSTATEGENERATOR': '68012A6D',
+                '__EVENTVALIDATION': validation,
+                '__VIEWSTATEENCRYPTED': '',
+                '__ASYNCPOST': 'true',
+                '': ''
+            }
+            response = request_with_retry_timeout(logger, url, data=data,
+                                                  headers=headers, cookies=cookies)
+            if response is None:
+                continue
 
-        with open("/tmp/z3.html", "wb") as f:
-            f.write(response.content)
-        htmlsoup = BeautifulSoup(response.content, 'lxml')
-        body = htmlsoup.find('body')
-        #logger.warning(body.text)
-        array = body.text.split('|')
-        page_url = array[array.index('pageRedirect')+2]
-        url_prefix = "https://mnregaweb4.nic.in"
-        page_url = url_prefix + page_url
-        panchayat_code = ''
-        logger.info(f"Page url for finyear {finyear} panchayat_code {panchayat_code} is {page_url}")
-
-    return None
+            with open("/tmp/z3.html", "wb") as f:
+                f.write(response.content)
+            myhtml = response.content
+            htmlsoup = BeautifulSoup(response.content, 'lxml')
+            body = htmlsoup.find('body')
+            #logger.warning(body.text)
+            array = body.text.split('|')
+            page_url = array[array.index('pageRedirect')+2]
+            url_prefix = "https://mnregaweb4.nic.in"
+            page_url = url_prefix + page_url
+            response = get_request_with_retry_timeout(logger, page_url,
+                                                      cookies=cookies)
+            if response is None:
+                continue
+            myhtml = response.content
+            panchayat_code = ''
+            logger.info(f"Page url for finyear {finyear} panchayat_cod {pobj.code} is {page_url}")
+            extract_dict = {}
+            extract_dict['table_id'] = 'ctl00_ContentPlaceHolder1_GridView1'
+            extract_dict['data_start_row'] = 2
+            extract_dict['column_headers'] = column_headers
+            dataframe = get_dataframe_from_html(logger, myhtml,
+                                        mydict=extract_dict)
+            if dataframe is not None:
+                dataframe['finyear'] = finyear
+                dataframe['panchayat_code'] = pobj.panchayat_code
+                dataframe['panchayat_name'] = pobj.panchayat_name
+                dataframe.to_csv("/tmp/z.csv")
+                df_array.append(dataframe)
+            break
+    if len(df_array) == 0:
+        return empty_dataframe
+    dataframe = pd.concat(df_array)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    dataframe = dataframe[all_cols]
+    return dataframe
