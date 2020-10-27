@@ -9,6 +9,13 @@ import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 
+def get_request_with_retry_timeout(logger, url, headers=None, params=None,
+                                  cookies=None, timeout=None, max_retry=5):
+    response = request_with_retry_timeout(logger, url, headers=headers,
+                                          params=params, cookies=cookies,
+                                          timeout=timeout, max_retry=max_retry, 
+                                          method="get")
+    return response
 def request_with_retry_timeout(logger, url, data=None, headers=None, params=None, cookies=None,
                  timeout = 5, max_retry=5, method="post"):
     """This is the wrapper function for request post method."""

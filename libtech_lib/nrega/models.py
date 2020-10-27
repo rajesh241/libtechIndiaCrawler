@@ -857,7 +857,7 @@ class NREGABlock(Location):
             self.save_report(logger, dataframe, report_type)
     def worker_stats(self, logger):
         """This will fetch the worker stats"""
-        report_name = "worker_stats"
+        report_type = "worker_stats"
         nic_urls_df = self.fetch_report_dataframe(logger, "nic_block_urls")
         dataframe = get_worker_stats(self, logger, nic_urls_df)
         if dataframe is not None:
