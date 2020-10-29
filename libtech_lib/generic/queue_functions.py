@@ -357,6 +357,8 @@ def fetch_rejection_details_v2(logger, func_args, thread_name=None):
     current_status_cols = ["final_reference_no", "final_status", "final_rejection_reason", "final_process_date", "final_fto_no"]
     extract_dict['column_headers'] = column_headers
     dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict)
+    if dataframe is None:
+        return None
     parent_reference_no = ''
     row1 = []
     max_index = len(dataframe) - 1
