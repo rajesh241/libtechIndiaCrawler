@@ -178,6 +178,18 @@ def api_get_tag_id(logger, tag_name):
         tag_id = None
     return tag_id
 
+def api_get_locations_by_params(logger, params):
+    """Will get locations by params"""
+    response = fetch_data(logger, LOCATIONURL, params=params)
+    count = response.get("count", 0)
+    child_location_array = []
+    if count > 0:
+        results = response.get('results')
+        for res in results:
+            code = res.get('code')
+            child_location_array.append(code)
+    return child_location_array
+    
 def api_get_tagged_locations(logger, tag_id, scheme=None):
     """This will fetch all the location Codes given a tag id
     """
@@ -198,6 +210,26 @@ def api_get_tagged_locations(logger, tag_id, scheme=None):
             child_location_array.append(code)
     return child_location_array
 
+
+def api_get_tagged_locations_by_tag_name(logger, tag_name, scheme=None):
+    """This will fetch all the location Codes given a tag id
+    """
+    if scheme is None:
+        scheme = 'nrega'
+    params = {
+        'libtech_tag__name' : tag_name,
+        'scheme' : scheme,
+        'limit' : 500
+    }
+    response = fetch_data(logger, LOCATIONURL, params=params)
+    count = response.get("count", 0)
+    child_location_array = []
+    if count > 0:
+        results = response.get('results')
+        for res in results:
+            code = res.get('code')
+            child_location_array.append(code)
+    return child_location_array
 
 def api_get_child_locations(logger, location_code, scheme=None):
     """Given a location code, it will return all the child locations
