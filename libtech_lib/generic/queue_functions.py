@@ -13,6 +13,7 @@ from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                                                 get_urldataframe_from_url,
                                                 get_options_list,
                                                 delete_divs_by_classes,
+                                                get_request_with_retry_timeout,
                                                 request_with_retry_timeout
                                                )
 from libtech_lib.generic.commons import (insert_finyear_in_dataframe,
@@ -286,8 +287,12 @@ def fetch_muster_details(logger, func_args, thread_name=None):
                                       "ContentPlaceHolder1_grdShowRecords"]
     extract_dict['split_cell_array'] = [1]
     logger.debug(f"Currently processing {url} by {thread_name}")
-    dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict,
-                                       cookies=cookies)
+    response = get_request_with_retry_timeout(logger, url, cookies=cookies)
+    if response is None:
+        return None
+    dataframe = get_dataframe_from_html(logger, response.content, mydict=extract_dict)
+    if dataframe is None:
+        return None
     #logger.info(f"extracted dataframe columns {dataframe.columns}")
     columns_to_keep = []
     for column_name in dataframe.columns:
