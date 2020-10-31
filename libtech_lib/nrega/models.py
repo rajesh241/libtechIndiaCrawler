@@ -677,6 +677,8 @@ class NREGABlock(Location):
         is_updated = self.is_report_updated(logger, report_type)
         if is_updated:
             return
+        logger.info("Jobcard Transactions is not updated")
+        input()
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
         df_array = []
@@ -717,6 +719,21 @@ class NREGABlock(Location):
                                        muster_list_df)
         report_type = "muster_list"
         self.save_report(logger, dataframe, report_type)
+
+    def muster_transactions(self, logger):
+        """This will fetch all muster transactions for the panchayat"""
+        logger.info(f"Going to fetch Muster transactions for {self.code}")
+        report_type = "muster_transactions"
+        is_updated = self.is_report_updated(logger, report_type)
+       #if (is_updated) and (not self.force_download):
+       #    return
+        self.muster_list(logger)
+        dataframe = update_muster_transactions(self, logger)
+        report_type = "muster_transactions"
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+
     def dynamic_work_report_r6_18(self, logger):
         """This will fetch the dynamic work report from MIS reports"""
         report_type = "dynamic_work_report_r6_18"

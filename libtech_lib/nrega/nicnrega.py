@@ -558,10 +558,9 @@ def update_muster_transactions(lobj, logger):
     logger.debug(f"Completed muster list is {completed_muster_list}")
     ml_df = lobj.fetch_report_dataframe(logger, "muster_list")
     logger.info(f"length of musters that need to be downloaded is {len(ml_df)}")
-    try:
-        response = requests.get(lobj.panchayat_page_url, timeout=10)
-    except requests.exceptions.Timeout as exp:
-        logger.error(exp)
+    response = get_request_with_retry_timeout(logger, lobj.mis_state_url)
+    if response is None:
+        return
     cookies = response.cookies
     logger.info(f"cookies are {cookies}")
     ##Prepareing to run queue functions
@@ -577,7 +576,7 @@ def update_muster_transactions(lobj, logger):
         if muster_code in completed_muster_list:
             continue
         url = row['muster_url']
-        logger.info(url)
+        url = url.replace(lobj.crawl_ip, "mnregaweb4.nic.in")
         muster_no = row['muster_no']
         finyear = row['finyear']
         block_code = lobj.block_code
