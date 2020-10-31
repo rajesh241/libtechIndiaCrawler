@@ -76,29 +76,19 @@ def main():
     args = args_fetch()
     logger = logger_fetch(args.get('log_level'))
     if args['populate']:
-        logger.info("Populating Crawl Queue")
-        location_code = args.get('locationCode', None)
-        priority = args.get('priority', 100)
-        location_type = args.get('locationType', 'panchayat')
         func_name = args.get('func_name', None)
-        is_not_nic = args.get('notnic', None)
+        is_not_nic = args.get('notnic', False)
         is_nic = not is_not_nic
         location_sample = args.get("location_sample", None)
-        if args['forceDownload']:
-            force_download = True
-        else:
-            force_download = False
-        if location_sample is None:
-            my_sample = LibtechSample(logger,parent_location_code=location_code,sample_type=location_type,
-                                      force_download=force_download)
-        else:
-            my_sample = getattr(samplemodels, location_sample)(logger,
-                                                               force_download=force_download)
-      # elif location_sample == "APITDABlockSample":
-      #     logger.info("I am here")
-      #     my_sample = APITDABlockSample(logger,
-      #                                   force_download=force_download)
-      #     logger.info(my_sample.sample_location_codes)
+        location_type = args.get("locationType", None)
+        location_code = args.get("locationCode",  None)
+        priority = args.get("priority",  100)
+        logger.info(location_code)
+        my_sample = LibtechSample(logger, sample_type=location_type,
+                                  tag_name=location_sample,
+                                  parent_location_code = location_code,
+                                  is_nic = is_nic)
+        logger.info(my_sample.sample_location_codes) 
         my_sample.populate_queue(logger, func_name, priority=priority)
     if args['insert']:
         logger.info("Inserting in Crawl Queue")
@@ -142,6 +132,14 @@ def main():
         df.to_csv('/tmp/stateStatus.csv')
     if args['test']:
         location_sample = args.get("location_sample", None)
+        location_type = args.get("locationType", None)
+        location_code = args.get("locationCode",  None)
+        logger.info(location_code)
+        my_sample = LibtechSample(logger, sample_type=location_type,
+                                  tag_name=location_sample,
+                                  parent_location_code = location_code)
+        logger.info(my_sample.sample_location_codes) 
+        exit(0)
         zipfilename = args.get("zipfilename", "zzz")
         tempDir = args.get("tempDir", "/tmp")
         if location_sample is not None:

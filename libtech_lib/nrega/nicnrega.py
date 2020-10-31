@@ -2246,14 +2246,6 @@ def get_dynamic_work_report_r6_18(lobj, logger):
     #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
     response = session.post(url, headers=headers, data=data, verify=False)
 
-    root_dir = f"/tmp/"
-    if not os.path.exists(root_dir):
-        os.makedirs(root_dir)
-    
-
-    with open(root_dir + f'{block_code}_{finyear}.html','wb') as f:
-        f.write(response.content)
-    print('html_file saved')
     myhtml = response.content
     extract_dict = {}
     column_headers = ["sno","district_name1","block_name1","panchayat_name","work_start_fin_year","work_status","work_code","work_name","master_work_category_name","work_category_name","work_type","agency_name","sanction_amount_in_lakh","total_amount_paid_since_inception_in_lakh","total_mandays","no_of_units","is_secure","is_convergence","work_started_date","work_physically_completed_date"]
@@ -2269,7 +2261,6 @@ def get_dynamic_work_report_r6_18(lobj, logger):
                      "district_name", "block_code", "block_name", "finyear"]
     all_cols = location_cols + column_headers
     dataframe = dataframe[all_cols]
-    dataframe.to_csv("/tmp/dwr.csv")
     return dataframe
 
 def get_worker_stats(lobj, logger, nic_urls_df):
@@ -2322,8 +2313,6 @@ def get_worker_stats(lobj, logger, nic_urls_df):
             if response is None:
                 logger.debug(f"response is None for {url}")
                 continue
-            with open("/tmp/z.html", "wb") as f:
-                f.write(response.content)
             htmlsoup = BeautifulSoup(response.content, 'lxml')
             view_state  =  htmlsoup.find(id = '__VIEWSTATE').get('value')
             validation  =  htmlsoup.find(id = '__EVENTVALIDATION').get('value')
@@ -2347,8 +2336,6 @@ def get_worker_stats(lobj, logger, nic_urls_df):
                                                   headers=headers, cookies=cookies)
             if response is None:
                 continue
-            with open("/tmp/z1.html", "wb") as f:
-                f.write(response.content)
             htmlsoup = BeautifulSoup(response.content, 'lxml')
             body = htmlsoup.find('body')
             #logger.warning(body.text)
@@ -2401,8 +2388,6 @@ def get_worker_stats(lobj, logger, nic_urls_df):
             if response is None:
                 continue
 
-            with open("/tmp/z3.html", "wb") as f:
-                f.write(response.content)
             myhtml = response.content
             htmlsoup = BeautifulSoup(response.content, 'lxml')
             body = htmlsoup.find('body')
@@ -2428,9 +2413,7 @@ def get_worker_stats(lobj, logger, nic_urls_df):
                 dataframe['finyear'] = finyear
                 dataframe['panchayat_code'] = pobj.panchayat_code
                 dataframe['panchayat_name'] = pobj.panchayat_name
-                dataframe.to_csv("/tmp/z.csv")
                 df_array.append(dataframe)
-            break
     if len(df_array) == 0:
         return empty_dataframe
     dataframe = pd.concat(df_array)
