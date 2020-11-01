@@ -2419,3 +2419,20 @@ def get_worker_stats(lobj, logger, nic_urls_df):
     dataframe = insert_location_details(logger, lobj, dataframe)
     dataframe = dataframe[all_cols]
     return dataframe
+
+def get_nic_locations(lobj, logger):
+    """Will fetch all nic locations"""
+    objs = lobj.get_all_panchayat_objs(logger)
+    csv_array = []
+    for obj in objs:
+        row = [obj.code, obj.name]
+        csv_array.append(row)
+    dataframe = pd.DataFrame(csv_array, columns=["panchayat_code",
+                                                 "panchayat_name"])
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    dataframe = dataframe[location_cols]
+    return dataframe
+

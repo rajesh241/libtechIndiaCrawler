@@ -48,6 +48,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         update_muster_transactions_v2,
                                         get_nrega_locations,
                                         get_dynamic_work_report_r6_18,
+                                        get_nic_locations,
                                         get_jobcard_stats
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
@@ -641,6 +642,12 @@ class NREGABlock(Location):
             pobj_array.append(NREGAPanchayat(logger, panchayat_code))
 
         return pobj_array
+
+    def nic_locations(self, logger):
+        report_type = "nic_locations"
+        dataframe = get_nic_locations(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
     def nic_block_urls(self, logger):
         report_type = "nic_block_urls"
         dataframe = get_nic_block_urls(self, logger)
