@@ -641,11 +641,11 @@ def parse_save_insidene(logger, func_args, thread_name=None):
         logger.info(response.status_code)
         if response.status_code == 200:
             mysoup = BeautifulSoup(response.content, "lxml")
-            post_div = mysoup.find("div", attrs={"class" : "td-post-content"})
+            post_div = mysoup.find("div", attrs={"class" : "single-post-content"})
         if post_div is not None:
             class_array = ["code-block", "google-auto-placed",
                            "addtoany_share_save_container",
-                           "jp-relatedposts"]
+                           "jp-relatedposts", "ykaov"]
             post_div = delete_divs_by_classes(logger, post_div, class_array)
             #code_div = post_div.find("div", attrs={"class" : "code-block"})
             strong_p = post_div.findAll("strong")
