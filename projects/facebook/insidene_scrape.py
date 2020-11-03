@@ -114,6 +114,38 @@ def get_total_pages(logger, mysoup):
 
 def scrape_posts(logger, mysoup):
     posts = {}
+    i = 0
+    articles = mysoup.findAll("article")
+    for article in articles:
+        i = i + 1
+        title = ""
+        mylink = ""
+        post_content = ""
+        post_date = ""
+        h2 = article.find("h2")
+        if h2 is not None:
+            title = h2.text.lstrip().rstrip()
+            a = h2.find("a")
+            if a is not None:
+                mylink = a["href"].lstrip().rstrip()
+        post_data_div = article.find("div", attrs={"class" : "post-summary"})
+        if post_data_div is not None:
+            post_content = post_data_div.text.lstrip().rstrip().rstrip("!-->\u2026")
+        time_elem = article.find("time")
+        if time_elem is not None:
+            post_date = time_elem.text.lstrip().rstrip()
+        d = {}
+        d['post_title'] = title
+        d['post_link'] = mylink
+        d['post_date'] = post_date
+        d['post_content'] = post_content
+        posts[i] = d
+        
+    return posts
+
+
+def scrape_posts1(logger, mysoup):
+    posts = {}
     content_divs = mysoup.findAll("div", attrs={"class" : "td_module_10"})
     i = 0
     for content_div in content_divs:
@@ -179,11 +211,16 @@ def scrape_ne(logger, category):
         mysoup = BeautifulSoup(myhtml, "lxml")
         total_pages = get_total_pages(logger, mysoup)
     logger.info(f"Total pages is {total_pages}")
-    for i in range(1, int(total_pages)+1):
+    found_404 = False
+    i = 0
+    while(found_404 == False):
+        i = i + 1
         logger.info(i)
         page_posts = {}
         url = f"{base_url}page/{i}/"
         r = requests.get(url, headers=headers, cookies=cookies)
+        if r.status_code == 404:
+            found_404 = True
         if r.status_code == 200:
             mysoup = BeautifulSoup(r.content, "lxml")
             page_posts = scrape_posts(logger, mysoup)
