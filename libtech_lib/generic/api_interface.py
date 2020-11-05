@@ -32,6 +32,8 @@ TAGURL = '%s/api/public/tag/' % (BASEURL)
 REPORTURL = '%s/api/public/report/' % (BASEURL)
 GETREPORTURL = "%s/api/getReport/" % (BASEURL)
 TASKQUEUEURL = '%s/api/public/queue/' % (BASEURL)
+BUNDLEURL = '%s/api/public/bundle/' % (BASEURL)
+
 
 def get_authentication_token():
     """This function will get the authentication token based on the username
@@ -401,3 +403,15 @@ def create_update_report(logger, location_id, report_type, data,
                              data=json.dumps(patch_data))
         logger.info(f"Patch status {res.status_code} and response {res.content}")
     return report_url
+
+def api_create_bundle(logger, data=None):
+    """Create Bundle"""
+    headers = get_authentication_header()
+    url = "http://backend.libtech.in:8080/api/public/bundle/"
+    r = requests.post(url, headers=headers, data=json.dumps(data))
+    if r.status_code == 201:
+        result = r.json()
+        url = result["bundle_url"]
+        return url
+    return None
+

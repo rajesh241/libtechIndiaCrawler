@@ -1,10 +1,12 @@
 import datetime
 import os
 import shutil
+from slugify import slugify
 from libtech_lib.nrega.models import Location
 from libtech_lib.nrega import models
 from libtech_lib.generic.api_interface import (create_task,
-                                              api_get_locations_by_params 
+                                              api_get_locations_by_params,
+                                              api_create_bundle
                                               )
 from libtech_lib.generic.commons import download_save_file
 from libtech_lib.generic.aws import upload_s3
@@ -88,9 +90,30 @@ class LibtechSample():
                 lobj = Location(logger, location_code=one_sample_code)
                 current_location_type = lobj.location_type
             self.sample_location_codes = child_location_codes
-    def create_bundle(self, logger, report_types, download_dir=None, zip_file_name=None, save_to_s3=True, only_csv=False):
-        """This would create the zip bundle of all the reports"""
-        return None 
+    def create_bundle(self, logger, report_types, filename=None,
+                      report_format="both", title=None):
+        today_str_date = datetime.datetime.today().strftime('%d%B%Y')
+        if title is None:
+            if self.tag_name is not None:
+                title = f"{self.tag_name}_{today_str_date}"
+            else:
+                title = f"{self.parent_location_code}_{today_str_date}"
+        if filename is None:
+            filename = slugify(title)
+        data = {
+                'title' : title,
+                'location_type' : self.sample_type,
+                'report_types' : report_types,
+                'filename' : filename,
+                'report_format' : report_format
+        }
+        if self.tag_name is not None:
+            data["libtech_tags"] = self.tag_name
+        else:
+            data["location_code"] = self.parent_location_code
+
+        url = api_create_bundle(logger, data=data)
+        return url
          
         
 class APITDABlockSample(LibtechSample):
