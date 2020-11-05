@@ -407,8 +407,7 @@ def create_update_report(logger, location_id, report_type, data,
 def api_create_bundle(logger, data=None):
     """Create Bundle"""
     headers = get_authentication_header()
-    url = "http://backend.libtech.in:8080/api/public/bundle/"
-    r = requests.post(url, headers=headers, data=json.dumps(data))
+    r = requests.post(BUNDLEURL, headers=headers, data=json.dumps(data))
     if r.status_code == 201:
         result = r.json()
         url = result["bundle_url"]
