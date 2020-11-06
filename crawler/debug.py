@@ -33,6 +33,8 @@ def args_fetch():
                         required=False, action='store_const', const=1)
     parser.add_argument('-p', '--populate', help='Populate Queue',
                         required=False, action='store_const', const=1)
+    parser.add_argument('-cb', '--createBundle', help='Create Bundle',
+                        required=False, action='store_const', const=1)
     parser.add_argument('-v', '--verify', help='Verify if the state IP is working',
                         required=False, action='store_const', const=1)
     parser.add_argument('-notnic', '--notnic', help='Not an NIC',
@@ -42,6 +44,8 @@ def args_fetch():
                         help='Location type that needs tobe instantiated', required=False)
     parser.add_argument('-fn', '--func_name', help='Name of the function', required=False)
     parser.add_argument('-pr', '--priority', help='Priority of the download', required=False)
+    parser.add_argument('-rt', '--reportTypes', help='Comma sepearted value for report Types', required=False)
+    parser.add_argument('-bt', '--bundleTitle', help='Bundle Title', required=False)
     parser.add_argument('-sn', '--sample_name', help='Name of the function', required=False)
     parser.add_argument('-ls', '--location_sample', help='Location Sample Name', required=False)
     parser.add_argument('-zf', '--zipfilename', help='Zip File name', required=False)
@@ -75,6 +79,20 @@ def main():
     """Main Module of this program"""
     args = args_fetch()
     logger = logger_fetch(args.get('log_level'))
+    if args["createBundle"]:
+        location_sample = args.get("location_sample", None)
+        location_type = args.get("locationType", None)
+        location_code = args.get("locationCode",  None)
+        report_types = args.get("reportTypes",  None)
+        filename = args.get("zipfilename",  None)
+        bundle_title = args.get("bundleTitle",  None)
+        my_sample = LibtechSample(logger, sample_type=location_type,
+                                  tag_name=location_sample,
+                                  parent_location_code = location_code)
+        url = my_sample.create_bundle(logger, report_types, filename=filename,
+                               title=bundle_title)
+        logger.info(url)
+
     if args['populate']:
         func_name = args.get('func_name', None)
         is_not_nic = args.get('notnic', False)
