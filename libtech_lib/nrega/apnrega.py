@@ -952,3 +952,391 @@ def fetch_R24_43_report(logger, block_code,cookies=None):
                         'jc_not_distributed_photoNotMatching','jc_not_distributed_migrated']
     dataframe = dataframe[:-1]
     return dataframe
+
+
+def get_ap_cm_dashboard_employment_r26_1(lobj, logger):
+
+    logger.info(f"Downloading CM Dashboard employment report for {lobj.block_name}")
+
+    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    with requests.Session() as session:
+        response = session.get(url)
+        cookies = session.cookies
+
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+
+    ap_block_code = district_code + block_code
+
+    logger.info(ap_block_code)
+    dataframe = fetch_ap_26_1(logger, ap_block_code,cookies=cookies)
+
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        colnames = ['sno','state_code','state_name','district_code','district_name','block_code','block_name','panchayat_name',
+                    'approved_laborBudget','target_personDays_during_month', 'pd_acheived_during','percent_acheived_during',
+                    'target_personDays_upto_month','pd_acheived_upto','percent_acheived_upto','overall_acheivement_%']
+
+        dataframe = dataframe[colnames]
+
+        return dataframe
+
+def fetch_ap_26_1(logger,block_code,cookies=None):
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en;q=0.5',
+        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=CMdashBoardTotalEmp&id=03&JOB_No=03&type=null&listType=&var=null',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+    }
+
+    params = (
+        ('requestType', 'CMDashBoardRH'),
+        ('actionVal', 'CMdashBoardTotalEmp'),
+        ('id', block_code),
+        ('JOB_No', block_code),
+        ('type', 'null'),
+        ('listType', ''),
+        ('var', 'null'),
+    )
+
+    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+    
+    dataframe = pd.read_html(response.content)[0]
+    
+    dataframe = dataframe[:-7]
+    
+    dataframe.columns = ['sno','panchayat_name','approved_laborBudget','target_personDays_during_month',
+                        'pd_acheived_during','percent_acheived_during',
+                        'target_personDays_upto_month','pd_acheived_upto','percent_acheived_upto','overall_acheivement_%']
+    
+    return dataframe
+
+def get_ap_approved_labour_budget_r13_18(lobj, logger):
+
+    logger.info(f"Downloading approved labour budget report for {lobj.block_name}")
+
+    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    with requests.Session() as session:
+        response = session.get(url)
+        cookies = session.cookies
+
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+
+    ap_block_code = district_code + block_code
+
+    logger.info(ap_block_code)
+    dataframe = fetch_ap_R13_18(logger, ap_block_code,cookies=cookies)
+
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        colnames = ['sno','state_code','state_name','district_code','district_name','block_code','block_name','panchayat_name','month_name','cumulative_no_of_households','cumulative_persondays_lakhs','amount_at_248rs_lakhs']
+        dataframe = dataframe[colnames]
+
+    return dataframe
+
+def fetch_ap_R13_18(logger,block_code,cookies=None):
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en;q=0.5',
+        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=LandDevelopmentRH&actionVal=LabourBudget&id=03&type=&type1=&type2=&year=&month=&Linktype=&selecteddate=&ctype=-1%20&subtype=&id1=&program=-1&design1=&design2=&reportCode=null&finYear=&category=&rep_type=&isItda=-1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+    }
+
+    params = (
+        ('requestType', 'LandDevelopmentRH'),
+        ('actionVal', 'LabourBudget'),
+        ('id', block_code),
+        ('type', ''),
+        ('type1', ''),
+        ('type2', ''),
+        ('year', ''),
+        ('month', ''),
+        ('Linktype', ''),
+        ('selecteddate', ''),
+        ('ctype', '-1 '),
+        ('subtype', ''),
+        ('id1', ''),
+        ('program', '-1'),
+        ('design1', ''),
+        ('design2', ''),
+        ('reportCode', 'null'),
+        ('finYear', ''),
+        ('category', ''),
+        ('rep_type', ''),
+        ('isItda', '-1'),
+    )
+
+    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+
+    dataframe = pd.read_html(response.content)[-1]
+
+    dataframe.columns = ['sno','panchayat_name','month_name','cumulative_no_of_households','cumulative_persondays_lakhs','amount_at_248rs_lakhs']
+    
+    return dataframe
+
+
+def get_ap_cm_dashboard_total_expenditure_r26_2(lobj, logger):
+
+    logger.info(f"Downloading CM Dashboard total expenditure report for {lobj.block_name}")
+
+    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    with requests.Session() as session:
+        response = session.get(url)
+        cookies = session.cookies
+
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+
+    ap_block_code = district_code + block_code
+
+    logger.info(ap_block_code)
+    dataframe = fetch_ap_R26_2(logger, ap_block_code,cookies=cookies)
+
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        colnames = ['sno','state_code','state_name','district_code','district_name','block_code','block_name','panchayat_name',
+                    'year_target_wage_rs_in_lakhs','year_target_material_rs_in_lakhs','year_target_total_rs_in_lakhs',
+                    'target_upto_the_month_wage_rs_in_lakhs','target_upto_the_month_material_rs_in_lakhs',
+                    'target_upto_the_month_total_rs_in_lakhs', 'expenditure_wage_rs_in_lakhs','expenditure_material_rs_in_lakhs',
+                    'expenditure_contingent_rs_in_lakhs','expenditure_total_rs_in_lakhs','balance_material_entitlement_rs_in_lakhs',
+                    'percent_achievement_year', 'percent_achievement_upto_the_month']
+
+        dataframe = dataframe[colnames]
+
+    return dataframe
+
+def fetch_ap_R26_2(logger,block_code,cookies=None):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en;q=0.5',
+        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=TotalExpenditure&id=03&JOB_No=03&type=&listType=&var=null',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+    }
+
+    params = (
+        ('requestType', 'CMDashBoardRH'),
+        ('actionVal', 'TotalExpenditure'),
+        ('id', block_code),
+        ('JOB_No', block_code),
+        ('type', ''),
+        ('listType', ''),
+        ('var', 'null'),
+    )
+
+    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+
+    dataframe = pd.read_html(response.content)[0]
+
+    dataframe = dataframe[:-7]
+
+    dataframe.columns = ['sno', 'panchayat_name','year_target_wage_rs_in_lakhs','year_target_material_rs_in_lakhs',
+                         'year_target_total_rs_in_lakhs','target_upto_the_month_wage_rs_in_lakhs','target_upto_the_month_material_rs_in_lakhs',
+                          'target_upto_the_month_total_rs_in_lakhs', 'expenditure_wage_rs_in_lakhs','expenditure_material_rs_in_lakhs',
+                         'expenditure_contingent_rs_in_lakhs','expenditure_total_rs_in_lakhs','balance_material_entitlement_rs_in_lakhs',
+                          'percent_achievement_year', 'percent_achievement_upto_the_month']
+    
+
+    return dataframe
+
+
+def get_ap_cm_dashboard_avg_days_worked_r26_3(lobj, logger):
+
+    logger.info(f"Downloading CM Dashboard average days worked report for {lobj.block_name}")
+
+    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    with requests.Session() as session:
+        response = session.get(url)
+        cookies = session.cookies
+
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+
+    ap_block_code = district_code + block_code
+
+    logger.info(ap_block_code)
+    dataframe = fetch_ap_R26_3(logger, ap_block_code,cookies=cookies)
+
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        colnames = ['sno','state_code','state_name','district_code','district_name','block_code','block_name','panchayat_name', 'hh_worked','person_days','avg_employment_per_hh']
+
+        dataframe = dataframe[colnames]
+
+    return dataframe
+
+def fetch_ap_R26_3(logger,block_code,cookies=None):
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en;q=0.5',
+        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=CMdashBoardAvgDaysWorked&id=03&JOB_No=03&type=null&listType=&var=null',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+    }
+
+    params = (
+        ('requestType', 'CMDashBoardRH'),
+        ('actionVal', 'CMdashBoardAvgDaysWorked'),
+        ('id', block_code),
+        ('JOB_No', block_code),
+        ('type', 'null'),
+        ('listType', ''),
+        ('var', 'null'),
+    )
+
+    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+
+    dataframe = pd.read_html(response.content)[0]
+
+    dataframe = dataframe[:-6]
+
+    dataframe.columns = ['sno','panchayat_name','hh_worked','person_days','avg_employment_per_hh']
+    
+    return dataframe
+
+
+def get_ap_cm_dashboard_avg_wage_report_r26_5(lobj, logger):
+
+    logger.info(f"Downloading CM Dashboard average wage report for {lobj.block_name}")
+
+    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    with requests.Session() as session:
+        response = session.get(url)
+        cookies = session.cookies
+
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+
+    ap_block_code = district_code + block_code
+
+    logger.info(ap_block_code)
+    dataframe = fetch_ap_R26_5(logger, ap_block_code,cookies=cookies)
+
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        colnames = ['sno','state_code','state_name','district_code','district_name','block_code','block_name', 
+                    'panchayat_name', 'month_wise_wage_per_day','wage_expenditure_rs_in_lakhs', 'person_days_in_lakhs',
+                    'avg_wage_per_day_rs']
+        dataframe = dataframe[colnames]
+
+    return dataframe
+
+def fetch_ap_R26_5(logger,block_code,cookies=None):
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en;q=0.5',
+        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=CMdashBoardAvgWageRate&id=03&JOB_No=03&type=&listType=&var=null',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0',
+    }
+
+    params = (
+        ('requestType', 'CMDashBoardRH'),
+        ('actionVal', 'CMdashBoardAvgWageRate'),
+        ('id', block_code),
+        ('JOB_No', block_code),
+        ('type', ''),
+        ('listType', ''),
+        ('var', 'null'),
+    )
+
+    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+    
+    dataframe = pd.read_html(response.content)[0]
+    
+    colnames = ['sno', 'panchayat_name', 'month_wise_wage_per_day','wage_expenditure_rs_in_lakhs', 'person_days_in_lakhs',
+               'avg_wage_per_day_rs']
+    
+    dataframe.columns = colnames
+    
+    dataframe = dataframe[:-6]
+
+    return dataframe
+
+def get_ap_grama_sachivalayam_report_r29_1(lobj, logger,fromDate='01/04/2020', toDate='10/10/2020'):
+
+    logger.info(f"Downloading Grama sachivalayam report for {lobj.block_name}")
+
+    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    with requests.Session() as session:
+        response = session.get(url)
+        cookies = session.cookies
+
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+
+    ap_block_code = district_code + block_code
+
+    logger.info(ap_block_code)
+    dataframe = fetch_ap_r29_1(logger, ap_block_code,fromDate = fromDate, toDate=toDate,cookies=cookies)
+
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        colnames = ['sno','state_code','state_name','district_code','district_name','block_code','block_name', 
+                    'panchayat_name','jcs_created','wageseekers_created','jcs_issued','wageseekers_issued','fromDate','toDate']
+        dataframe = dataframe[colnames]
+
+    return dataframe
+
+
+def fetch_ap_r29_1(logger,block_code,fromDate = None,toDate = None,cookies = None):
+
+
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en;q=0.5',
+        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=HorticultureRH&actionVal=jobcardCreation&id=03&type=ALL&type1=&dept=&fromDate=01/04/2020&toDate=10/10/2020&Rtype=&reportGroup=&fto=Visakhapatnam&LinkType=-1&rtype=&reptype=&date=&program=&type2=&type3=',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0',
+    }
+
+    params = (
+        ('requestType', 'HorticultureRH'),
+        ('actionVal', 'jobcardCreation'),
+        ('id', block_code),
+        ('type', 'ALL'),
+        ('type1', ''),
+        ('dept', ''),
+        ('fromDate', fromDate),
+        ('toDate', toDate),
+        ('Rtype', ''),
+        ('reportGroup', ''),
+        ('fto', 'Ananthagiri'),
+        ('LinkType', '-1'),
+        ('rtype', ''),
+        ('reptype', ''),
+        ('date', ''),
+        ('program', ''),
+        ('type2', ''),
+        ('type3', ''),
+    )
+
+    response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+
+    dataframe = pd.read_html(response.content)[0]
+    
+    dataframe.columns = ['sno','panchayat_name','jcs_created','wageseekers_created','jcs_issued','wageseekers_issued']
+    
+    dataframe = dataframe[:-2]
+    
+    dataframe['fromDate'] = fromDate
+    
+    dataframe['toDate'] = toDate
+        
+    return dataframe
