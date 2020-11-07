@@ -27,7 +27,8 @@ from libtech_lib.generic.commons import  (get_current_finyear,
 from libtech_lib.generic.api_interface import api_get_report_url, api_get_report_dataframe
 from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                                                 get_dataframe_from_url,
-                                                request_with_retry_timeout
+                                                request_with_retry_timeout,
+                                                get_request_with_retry_timeout
                                                 )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 
@@ -817,4 +818,60 @@ def get_ap_employment_generation_r2_2(lobj, logger):
 
     logger.info(f"Downloading employment generation for {lobj.block_name}")
 
-    return None
+    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    with requests.Session() as session:
+        response = session.get(url)
+        cookies = session.cookies
+
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+
+    ap_block_code = district_code + block_code
+
+    logger.info(ap_block_code)
+    dataframe = fetch_ap_r2_2(logger, ap_block_code,cookies=cookies)
+
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+
+    return dataframe
+
+def fetch_ap_r2_2(logger,block_code,cookies=None):
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en;q=0.5',
+        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=EmpGenRep&id=03&type=',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0',
+    }
+
+    params = (
+        ('requestType', 'NewReportsRH'),
+        ('actionVal', 'EmpGenRep'),
+        ('id', block_code),
+        ('type', ''),
+    )
+
+    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+
+    if response is None:
+        return None
+
+    df = pd.read_html(response.content)[0]
+
+    string = df.iloc[-2,0]
+
+    fin_year = re.findall(r'[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]',string)[0]
+
+    col_names = ["sno", "gp_name", "registered_households", "num_applicants", "employment_sc", "employment_st", "employment_other", "employment_total", "iay", "women", "others"]
+
+    df.columns = col_names
+
+    df['fin_year'] = fin_year
+    
+    df = df[:-4]
+
+    return df

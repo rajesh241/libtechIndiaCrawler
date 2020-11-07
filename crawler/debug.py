@@ -45,6 +45,7 @@ def args_fetch():
     parser.add_argument('-fn', '--func_name', help='Name of the function', required=False)
     parser.add_argument('-pr', '--priority', help='Priority of the download', required=False)
     parser.add_argument('-rt', '--reportTypes', help='Comma sepearted value for report Types', required=False)
+    parser.add_argument('-rf', '--reportFormat', help='Format of the output can be csv excel or both', required=False)
     parser.add_argument('-bt', '--bundleTitle', help='Bundle Title', required=False)
     parser.add_argument('-sn', '--sample_name', help='Name of the function', required=False)
     parser.add_argument('-ls', '--location_sample', help='Location Sample Name', required=False)
@@ -84,13 +85,15 @@ def main():
         location_type = args.get("locationType", None)
         location_code = args.get("locationCode",  None)
         report_types = args.get("reportTypes",  None)
+        report_format = args.get("reportFormat",  'both')
+
         filename = args.get("zipfilename",  None)
         bundle_title = args.get("bundleTitle",  None)
         my_sample = LibtechSample(logger, sample_type=location_type,
                                   tag_name=location_sample,
                                   parent_location_code = location_code)
         url = my_sample.create_bundle(logger, report_types, filename=filename,
-                               title=bundle_title)
+                               title=bundle_title, report_format=report_format)
         logger.info(url)
 
     if args['populate']:
