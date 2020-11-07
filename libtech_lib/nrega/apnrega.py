@@ -833,6 +833,10 @@ def get_ap_employment_generation_r2_2(lobj, logger):
 
     if dataframe is not None:
         dataframe = insert_location_details(logger, lobj, dataframe)
+        colnames = ['sno','state_code','state_name','district_code','district_name','block_code','block_name','panchayat_name',
+                     'registered_households', 'num_applicants','employment_sc', 'employment_st', 'employment_other',
+                     'employment_total', 'iay', 'women', 'others', 'fin_year']
+        dataframe = dataframe[colnames]
 
     return dataframe
 
@@ -866,7 +870,7 @@ def fetch_ap_r2_2(logger,block_code,cookies=None):
 
     fin_year = re.findall(r'[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]',string)[0]
 
-    col_names = ["sno", "gp_name", "registered_households", "num_applicants", "employment_sc", "employment_st", "employment_other", "employment_total", "iay", "women", "others"]
+    col_names = ["sno", "panchayat_name", "registered_households", "num_applicants", "employment_sc", "employment_st", "employment_other", "employment_total", "iay", "women", "others"]
 
     df.columns = col_names
 
@@ -875,3 +879,76 @@ def fetch_ap_r2_2(logger,block_code,cookies=None):
     df = df[:-4]
 
     return df
+
+
+def get_ap_jobcard_updation_report_r24_43(lobj, logger):
+
+    logger.info(f"Downloading jobcard updation report for {lobj.block_name}")
+
+    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    with requests.Session() as session:
+        response = session.get(url)
+        cookies = session.cookies
+
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+
+    ap_block_code = district_code + block_code
+
+    logger.info(ap_block_code)
+    dataframe = fetch_R24_43_report(logger, ap_block_code,cookies=cookies)
+
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        colnames = ['sno','state_code','state_name','district_code','district_name','block_code','block_name','panchayat_name',
+                    'jcs_printed', 'jcs_distributed','jc_not_distributed_nameInOtherJC', 'jc_not_distributed_double',
+                    'jc_not_distributed_death', 'jc_not_distributed_photoNotMatching','jc_not_distributed_migrated']
+
+        dataframe = dataframe[colnames]
+        
+    return dataframe
+
+def fetch_R24_43_report(logger, block_code,cookies=None):
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en;q=0.5',
+        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=LandDevelopmentNewRH&actionVal=jobcardsUpdation&id=03&type=&type1=&type2=&year=&month=&Linktype=&selecteddate=&ctype=-1%20&subtype=&id1=&program=-1&design1=&design2=&reportCode=null&finYear=&category=&rep_type=&isItda=-1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0',
+    }
+
+    params = (
+        ('requestType', 'LandDevelopmentNewRH'),
+        ('actionVal', 'jobcardsUpdation'),
+        ('id', block_code),
+        ('type', ''),
+        ('type1', ''),
+        ('type2', ''),
+        ('year', ''),
+        ('month', ''),
+        ('Linktype', ''),
+        ('selecteddate', ''),
+        ('ctype', '-1 '),
+        ('subtype', ''),
+        ('id1', ''),
+        ('program', '-1'),
+        ('design1', ''),
+        ('design2', ''),
+        ('reportCode', 'null'),
+        ('finYear', ''),
+        ('category', ''),
+        ('rep_type', ''),
+        ('isItda', '-1'),
+    )
+
+    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+
+    dataframe = pd.read_html(response.content)[-1]
+    dataframe.columns = ['sno', 'panchayat_name', 'jcs_printed', 'jcs_distributed', 'jc_not_distributed_nameInOtherJC',
+                        'jc_not_distributed_double','jc_not_distributed_death',
+                        'jc_not_distributed_photoNotMatching','jc_not_distributed_migrated']
+    dataframe = dataframe[:-1]
+    return dataframe
