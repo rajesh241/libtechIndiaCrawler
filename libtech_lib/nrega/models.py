@@ -59,7 +59,13 @@ from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_nefms_report_r14_37,
                                        get_ap_rejected_transactions,
                                        get_ap_employment_generation_r2_2,
-                                       get_ap_jobcard_updation_report_r24_43
+                                       get_ap_jobcard_updation_report_r24_43,
+                                       get_ap_approved_labour_budget_r13_18,
+                                       get_ap_cm_dashboard_employment_r26_1,
+                                       get_ap_cm_dashboard_total_expenditure_r26_2,
+                                       get_ap_cm_dashboard_avg_days_worked_r26_3,
+                                       get_ap_cm_dashboard_avg_wage_report_r26_5,
+                                       get_ap_grama_sachivalayam_report_r29_1
                                       )
 from libtech_lib.generic.aws import days_since_modified_s3
 AP_STATE_CODE = "02"
@@ -539,8 +545,47 @@ class APBlock(Location):
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
 
+    def ap_approved_labour_budget_r13_18(self, logger):
 
+        report_type = 'ap_approved_labour_budget_r13_18'
+        dataframe = get_ap_approved_labour_budget_r13_18(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
 
+    def ap_cm_dashboard_employment_r26_1(self, logger):
+
+        report_type = 'ap_cm_dashboard_employment_r26_1'
+        dataframe = get_ap_cm_dashboard_employment_r26_1(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+    def ap_cm_dashboard_total_expenditure_r26_2(self, logger):
+
+        report_type = 'ap_cm_dashboard_total_expenditure_r26_2'
+        dataframe = get_ap_cm_dashboard_total_expenditure_r26_2(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)   
+
+    def ap_cm_dashboard_avg_days_worked_r26_3(self, logger):
+
+        report_type = 'ap_cm_dashboard_avg_days_worked_r26_3'
+        dataframe = get_ap_cm_dashboard_avg_days_worked_r26_3(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)       
+
+    def ap_cm_dashboard_avg_wage_report_r26_5(self, logger):
+
+        report_type = 'ap_cm_dashboard_avg_wage_report_r26_5'
+        dataframe = get_ap_cm_dashboard_avg_wage_report_r26_5(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)        
+
+    def ap_grama_sachivalayam_report_r29_1(self, logger):
+
+        report_type = 'ap_grama_sachivalayam_report_r29_1'
+        dataframe = get_ap_grama_sachivalayam_report_r29_1(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)                                                
 
 
 class NREGAState(Location):
