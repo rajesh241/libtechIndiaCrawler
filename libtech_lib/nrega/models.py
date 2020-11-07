@@ -57,7 +57,8 @@ from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_labour_report_r3_17,
                                        get_ap_suspended_payments_r14_5,
                                        get_ap_nefms_report_r14_37,
-                                       get_ap_rejected_transactions
+                                       get_ap_rejected_transactions,
+                                       get_ap_employment_generation_r2_2
                                       )
 from libtech_lib.generic.aws import days_since_modified_s3
 AP_STATE_CODE = "02"
@@ -522,6 +523,18 @@ class APBlock(Location):
         report_type = "ap_rejected_transactions"
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
+
+    def ap_employment_generation_r2_2(self, logger):
+
+        report_type = "ap_employment_generation_r2_2"
+        dataframe = get_ap_employment_generation_r2_2(self, logger) # this gives a csv file
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+        
+
+
+
+
 
 class NREGAState(Location):
     """This is the District class for NREGA"""

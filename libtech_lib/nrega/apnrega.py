@@ -812,3 +812,9 @@ def get_ap_rejected_transactions1(lobj, logger):
     with open("/tmp/a.html", "wb") as f:
         f.write(myhtml)
 
+
+def get_ap_employment_generation_r2_2(lobj, logger):
+
+    logger.info(f"Downloading employment generation for {lobj.block_name}")
+
+    return None
