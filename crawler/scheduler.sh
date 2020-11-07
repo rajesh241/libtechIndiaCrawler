@@ -26,4 +26,4 @@ else
   fi
 fi
 # 28800 corresponds to roughly 8 hours
-pgrep -f "$cmd" || $cmd &> /tmp/$4.log
+pgrep -f "$cmd" || $cmd &> /tmp/$4
