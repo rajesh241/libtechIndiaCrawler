@@ -2436,3 +2436,50 @@ def get_nic_locations(lobj, logger):
     dataframe = dataframe[location_cols]
     return dataframe
 
+def get_fto_list(lobj, logger, rej_stat_df):
+    """This will fetch the fto list for the block"""
+    logger.info(f"Fetching fto list for {lobj.block_name}")
+    filtered_df = rej_stat_df[rej_stat_df['block_code'] == int(lobj.block_code)]
+    start_fin_year = get_default_start_fin_year()
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    filtered_df = filtered_df[filtered_df['finyear'] >= int(start_fin_year)]
+    filtered_df = rej_stat_df[rej_stat_df['block_code'] == int(lobj.block_code)]
+    start_fin_year = get_default_start_fin_year()
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    filtered_df = filtered_df[filtered_df['finyear'] >= int(start_fin_year)]
+    column_headers = ["srno", "fto_no", "fto_url", "financial_institution",
+                      "second_signatory_date", "5", "6", "7", "8", "9", "10",
+                      "11", "12"]
+    extract_dict = {}
+    extract_dict["pattern"] = "Financial Institution"
+    extract_dict['column_headers'] = column_headers
+    extract_dict['extract_url_array'] = [1]
+    extract_dict['url_prefix'] = "http://mnregaweb4.nic.in/netnrega/FTO/"
+    df_array = []
+    for index, row in filtered_df.iterrows():
+        url = row.get("second_singnatory_fto_url", None)
+        finyear = row.get("finyear", None)
+        fin_agency = row.get("fin_agency", None)
+        logger.info(url)
+        response = get_request_with_retry_timeout(logger, url)
+        if response is None:
+            continue
+        myhtml = response.content
+        dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+        if dataframe is None:
+            continue
+        dataframe["finyear"] = finyear
+        dataframe["fin_agency"] = fin_agency
+        df_array.append(dataframe)
+    if (len(df_array)) == 0:
+        return None
+    dataframe = pd.concat(df_array)
+    other_cols = ["finyear", "fin_agency", "fto_no", "fto_url",
+                  "financial_institution", "second_signatory_date"]
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name"]
+    all_cols = location_cols + other_cols
+    dataframe = dataframe[all_cols]
+    return dataframe
+

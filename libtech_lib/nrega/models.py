@@ -44,6 +44,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_ap_worker_register,
                                         get_worker_stats,
                                         get_worker_register_mis,
+                                        get_fto_list,
                                         get_nic_urls,
                                         update_muster_transactions_v2,
                                         get_nrega_locations,
@@ -744,6 +745,19 @@ class NREGABlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type, health,
                                  remarks)
+    def fto_list(self, logger):
+        """This will fetch the FTO List for each block"""
+        report_type = "fto_list"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
+        report_name = "block_rejected_stats"
+        india_obj = Location(logger, '0')
+        rej_stat_df = india_obj.fetch_report_dataframe(logger, report_name)
+        dataframe = get_fto_list(self, logger, rej_stat_df)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
     def jobcard_transactions(self, logger):
         report_type = "jobcard_transactions"
         is_updated = self.is_report_updated(logger, report_type)
