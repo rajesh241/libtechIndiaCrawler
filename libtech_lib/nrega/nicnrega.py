@@ -1907,7 +1907,7 @@ def get_nic_r4_1(lobj, logger, url_df, finyear):
     if dataframe is not None:
         dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
-        
+
 def get_location_list_from_dict(mydict):
     """"Getting location list from dict"""
     columns = ["state_code", "state_name", "district_code", "district_name", "block_code", "block_name", "panchayat_code", "panchayat_name"]
@@ -2485,3 +2485,131 @@ def get_fto_list(lobj, logger, rej_stat_df):
 
 def get_fto_transactions(lobj, logger, finyear, fto_list_df):
     logger.info(f"goign to fetch fto transactions {lobj.name}")
+
+
+def get_nic_r14_5_urls(lobj, logger, report_type=None, url_text=None,
+                      url_prefix=None):
+    """This function will get the Urls at the block level"""
+    state_pattern = f"state_code={lobj.state_code}"
+    logger.info(f"Getting URLs from MIS Reports for {report_type} and pattern{url_text}")
+    current_df = lobj.fetch_report_dataframe(logger, report_type)
+    filtered_df = None
+   #if current_df is not None:
+   #  logger.info(f"Shape of current df is {current_df.shape}")
+   #  current_finyear = get_current_finyear()
+   #  filtered_df = current_df[current_df['finyear'] != current_finyear]
+   #  logger.info(f"Shape of filtered df is {filtered_df.shape}")
+
+    csv_array = []
+    column_headers = ["state_code", "district_code", "block_code", "state_name",
+                      "district_name", "block_name", "finyear", "url"]
+    start_finyear = get_default_start_fin_year()
+    end_finyear = get_current_finyear()
+    for finyear in range(int(start_finyear), int(end_finyear)+1):
+        logger.info(f"Downloading for FinYear {finyear}")
+        filename = f"{NREGA_DATA_DIR}/misReport_{finyear}.html"
+        logger.info(filename)
+        with open(filename, "rb") as infile:
+            myhtml = infile.read()
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        elem = mysoup.find("a", href=re.compile(url_text))
+        if elem is not None:
+            base_href = elem["href"]
+        logger.info(base_href)
+        res = requests.get(base_href)
+        myhtml = None
+        if res.status_code == 200:
+            myhtml = res.content
+        if myhtml is not None:
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            elems = mysoup.find_all("a", href=re.compile(url_text))
+            for elem in elems:
+                logger.info(elem)
+                state_href = elem["href"]
+                logger.info(f"State URL is {state_href}")
+                if state_pattern not in state_href:
+                    continue
+                url = url_prefix + state_href
+                response = requests.get(url)
+                logger.info(url)
+                dist_html = None
+                if response.status_code == 200:
+                    dist_html = response.content
+                if dist_html is not None:
+                    dist_soup = BeautifulSoup(dist_html, "lxml")
+                    elems = dist_soup.find_all("a", href=re.compile(url_text))
+                    for elem1 in elems:
+                        dist_url = url_prefix + elem1["href"]
+                        block_res = requests.get(dist_url)
+                        if block_res.status_code == 200:
+                            block_html = block_res.content
+                            block_soup = BeautifulSoup(block_html, "lxml")
+                            belems = block_soup.find_all("a", href=re.compile(url_text))
+                            for belem in belems:
+                                block_url = url_prefix + belem["href"]
+                                #logger.info(dist_url)
+                                parsed = urlparse.urlparse(block_url)
+                                params_dict = parse_qs(parsed.query)
+                                #logger.info(params_dict)
+                                state_name = params_dict.get("state_name", [''])[0]
+                                state_code = params_dict.get("state_code", [""])[0]
+                                district_name = params_dict.get("district_name",
+                                                                [""])[0]
+                                district_code = params_dict.get("district_code",
+                                                                [""])[0]
+                                block_name = params_dict.get("block_name",
+                                                                [""])[0]
+                                block_code = params_dict.get("block_code",
+                                                                [""])[0]
+                                row = [state_code, district_code, block_code, state_name,
+                                       district_name, block_name, finyear, block_url]
+                                logger.info(row)
+                                csv_array.append(row)
+
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    if filtered_df is not None:
+        dataframe = pd.concat([filtered_df, dataframe])
+    return dataframe
+
+
+def get_nic_r14_5(lobj, logger, url_df, finyear):
+    '''Will Download NIC4_1 MIS report'''
+    if url_df is None:
+        return None
+    logger.info(f"Shape of url_df is {url_df.shape}")
+    filtered_df = url_df[url_df['block_code']==int(lobj.block_code)]
+    filtered_df = filtered_df[filtered_df['finyear']==int(finyear)]
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    df_array = []
+    for index, row in filtered_df.iterrows():
+        url = row.get('url')
+        finyear = row.get('finyear')
+        logger.info(url)
+        extract_dict = {}
+        column_headers = ['S.No', 'location','Payment Between 0-8 Days-Total Transactions', '0_8_txns_urls',
+                    'Payment Between 0-8 Days-Amount Involved','Payment Between 9-15 Days-Total Transactions','9_15_txns_urls',
+                    'Payment Between 9-15 Days-Amount Involved','Payment Between 16-30 Days-Total Transactions','16_30_txns_urls',
+                    'Payment Between 16-30 Days-Amount Involved','Payment Between 31-60 Days-Total Transactions','31_60_txns_urls',
+                    'Payment Between 31-60 Days-Amount Involved','Payment Between 61-90 Days-Total Transactions','61_90_txns_urls',
+                    'Payment Between 61-90 Days-Amount Involved','Delayed Payment more than 90 Days-Total Transactions','more_than_90_txns_urls',
+                    'Delayed Payment more than 90 Days-Amount Involved','Total Delayed Payment-Total Transactions',
+                    'Total Delayed Payment-Amount Involved','Total Payment For Financial Year-Total Transactions',
+                    'Total Payment For Financial Year-Amount Involved']
+        extract_dict['pattern'] = "Total Transactions"
+        extract_dict['extract_url_array'] = [2,4,6,8,10,12]
+        extract_dict['url_prefix'] = 'http://mnregaweb4.nic.in/netnrega/'
+        extract_dict['column_headers'] = column_headers
+        extract_dict['data_start_row'] = 4
+        logger.info(url)
+        response = requests.get(url)
+        if response.status_code == 200:
+            myhtml = response.content
+            dataframe = get_dataframe_from_html(logger, myhtml,
+                                                mydict=extract_dict)
+            dataframe['finyear'] = finyear
+            df_array.append(dataframe)
+    dataframe = pd.concat(df_array)
+    dataframe = dataframe[dataframe.location != 'Total'].reset_index(drop=True)
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe

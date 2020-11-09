@@ -51,7 +51,9 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_nrega_locations,
                                         get_dynamic_work_report_r6_18,
                                         get_nic_locations,
-                                        get_jobcard_stats
+                                        get_jobcard_stats,
+                                        get_nic_r14_5_urls,
+                                        get_nic_r14_5
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions,
@@ -619,8 +621,8 @@ class NREGAState(Location):
         """This will fetch MIS URLs based on pattern"""
         report_type = 'nic_r14_5_urls'
         url_text = 'delayed_payment.aspx'
-        url_prefix = "http://mnregaweb4.nic.in/netnrega/state_html/"
-        dataframe = get_nic_r4_1_urls(self, logger, report_type=report_type,
+        url_prefix = "http://mnregaweb4.nic.in/netnrega/"
+        dataframe = get_nic_r14_5_urls(self, logger, report_type=report_type,
                                  url_text=url_text, url_prefix=url_prefix)
         self.save_report(logger, dataframe, report_type)
 
@@ -867,6 +869,29 @@ class NREGABlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type,
                                  finyear=finyear)
+
+    def nic_r14_5(self, logger):
+        '''Download MIS NIC 4_1 report'''
+        report_type = "nic_r14_5"
+        state_obj = Location(logger, self.state_code)
+        report_name = "nic_r14_5_urls"
+        url_df = state_obj.fetch_report_dataframe(logger, report_name)
+        if url_df is None:
+            state_obj.nic_r14_5_urls(logger)
+            url_df = state_obj.fetch_report_dataframe(logger, report_name)
+        start_fin_year = get_default_start_fin_year()
+        end_fin_year = get_current_finyear()
+        df_array = []
+        for finyear in range(start_fin_year, end_fin_year+1):
+            finyear = str(finyear)
+            dataframe = get_nic_r14_5(self, logger, url_df, finyear)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:    
+            dataframe = pd.concat(df_array).reset_index(drop=True)
+            self.save_report(logger, dataframe, report_type)
+                            
+                        
     def jobcard_stats(self, logger):
         '''
         Get jobcard stats based on S4.15
