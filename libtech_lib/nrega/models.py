@@ -45,6 +45,7 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         get_worker_stats,
                                         get_worker_register_mis,
                                         get_fto_list,
+                                        get_fto_transactions,
                                         get_nic_urls,
                                         update_muster_transactions_v2,
                                         get_nrega_locations,
@@ -757,6 +758,23 @@ class NREGABlock(Location):
         dataframe = get_fto_list(self, logger, rej_stat_df)
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
+    
+    def fto_transactions(self, logger):
+        report_type = "fto_transactions"
+        start_fin_year = get_default_start_fin_year()
+        end_fin_year = get_current_finyear()
+        report_name = "fto_list"
+        fto_list_df = self.fetch_report_dataframe(logger, report_name)
+        for finyear in range(start_fin_year, end_fin_year+1):
+            finyear = str(finyear)
+            is_updated = self.is_report_updated(logger, report_type,
+                                                finyear=finyear)
+            if is_updated:
+                return
+            dataframe = get_fto_transactions(self, logger, finyear, fto_list_df)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type,
+                                 finyear=finyear)
 
     def jobcard_transactions(self, logger):
         report_type = "jobcard_transactions"

@@ -2483,3 +2483,5 @@ def get_fto_list(lobj, logger, rej_stat_df):
     dataframe = dataframe[all_cols]
     return dataframe
 
+def get_fto_transactions(lobj, logger, finyear, fto_list_df):
+    logger.info(f"goign to fetch fto transactions {lobj.name}")
