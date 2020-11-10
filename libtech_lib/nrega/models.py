@@ -777,6 +777,7 @@ class NREGABlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type,
                                  finyear=finyear)
+            break
 
     def jobcard_transactions(self, logger):
         report_type = "jobcard_transactions"

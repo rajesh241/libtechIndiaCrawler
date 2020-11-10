@@ -2483,8 +2483,6 @@ def get_fto_list(lobj, logger, rej_stat_df):
     dataframe = dataframe[all_cols]
     return dataframe
 
-def get_fto_transactions(lobj, logger, finyear, fto_list_df):
-    logger.info(f"goign to fetch fto transactions {lobj.name}")
 
 
 def get_nic_r14_5_urls(lobj, logger, report_type=None, url_text=None,
@@ -2612,4 +2610,66 @@ def get_nic_r14_5(lobj, logger, url_df, finyear):
     dataframe = dataframe[dataframe.location != 'Total'].reset_index(drop=True)
     if dataframe is not None:
         dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe
+
+def get_fto_transactions(lobj, logger, finyear, fto_list_df):
+    logger.info(f"goign to fetch fto transactions {lobj.name}")
+    worker_df= lobj.fetch_report_dataframe(logger, "worker_register")
+    worker_df_cols = ["state_code", "state_name", "district_code", "district_name", "block_code", "block_name", "panchayat_code", "panchayat_name", "village_name", "caste", "head_of_household", "jobcard"]
+    worker_df = worker_df[worker_df_cols]
+    worker_df = worker_df.drop_duplicates()
+    filtered_df = fto_list_df[fto_list_df['block_code'] == int(lobj.block_code)]
+    filtered_df = fto_list_df[filtered_df['finyear'] == int(finyear)]
+    logger.debug(f"shape of filtered_df is {filtered_df.shape}")
+    job_list = [];
+    column_headers = ["srno", "block", "job_card_no_panch", "reference_no",
+                      "transaction_date", "fto_applicant_name", "wagelist_no",
+                      "primary_account_holder", "bank_code", "ifsc_code",
+                      "fto_amount_to_be_credit", "fto_credited_amount",
+                      "fto_status", "processed_date",
+                      "bank_to_coop_processed_date", "utr_no",
+                      "rejection_reason", "favor_in_apb_transaction",
+                      "bank_iin_in_apb_transaction"]
+    extract_dict = {}
+    extract_dict["pattern"] = "Reference No."
+    extract_dict["column_headers"] = column_headers
+
+    for index, row in filtered_df.iterrows():
+        func_name = "fetch_fto_transactions"
+        func_args = [];
+        url = row.get("fto_url", None)
+        if url is None:
+            continue
+        field_dict = {}
+        field_dict["fin_agency"] = row.get("fin_agency", "")
+        field_dict["fto_no"] = row.get("fto_no", "")
+        field_dict["financial_institution"] = row.get("financial_institution", "")
+        field_dict["second_signatory_date"] = row.get("second_signatory_date", "")
+        field_dict["finyear"] = finyear
+        field_dict["fto_url"] = url
+        func_args = [lobj, url, extract_dict, field_dict] 
+        job_dict = {
+            'func_name' : func_name,
+            'func_args' : func_args
+        }
+        job_list.append(job_dict)
+    #dataframe = libtech_queue_manager(logger, job_list)
+    dataframe = libtech_queue_manager(logger, job_list)
+    if dataframe is None:
+        return None
+    dataframe = pd.merge(dataframe, worker_df, how='left',
+                         on=['jobcard'])
+    fto_columns = ["fto_no", "finyear", "second_signatory_date", "fin_agency",
+                   "financial_institution", "fto_url"]
+    column_headers = ["job_card_no_panch", "reference_no",
+                      "transaction_date", "fto_applicant_name", "wagelist_no",
+                      "primary_account_holder", "bank_code", "ifsc_code",
+                      "fto_amount_to_be_credit", "fto_credited_amount",
+                      "fto_status", "processed_date",
+                      "bank_to_coop_processed_date", "utr_no",
+                      "rejection_reason", "favor_in_apb_transaction",
+                      "bank_iin_in_apb_transaction"]
+    all_cols = worker_df_cols + fto_columns + column_headers
+    dataframe = dataframe[all_cols]
+        
     return dataframe

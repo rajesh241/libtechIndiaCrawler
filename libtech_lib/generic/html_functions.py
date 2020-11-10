@@ -175,7 +175,6 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
     mysoup = BeautifulSoup(myhtml, "lxml")
     mysoup = BeautifulSoup(myhtml, "html5lib")
     tables = mysoup.findAll('table')
-    logger.debug(f"Number of tables found is {len(tables)}")
     matched_tables = []
     #Match the table agains the specified pattern
     if table_id_array is None:

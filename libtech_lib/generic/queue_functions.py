@@ -25,6 +25,38 @@ from libtech_lib.generic.commons import (insert_finyear_in_dataframe,
                                          get_fto_finyear,
                                          get_full_finyear
                                         )
+
+def fetch_fto_transactions(logger, func_args, thread_name=None):
+    """Fetch FTo Transactions"""
+    lobj = func_args[0]
+    url = func_args[1]
+    extract_dict = func_args[2]
+    field_dict = func_args[3]
+    response = get_request_with_retry_timeout(logger, url)
+    if response is None:
+        return None
+    dataframe = get_dataframe_from_html(logger, response.content, mydict=extract_dict)
+    if dataframe is None:
+        return None
+    rows_to_delete = []
+    for index, row in dataframe.iterrows():
+        sr_no = row.get("srno", "")
+        if (sr_no is None) or (not sr_no.isdigit()):
+            rows_to_delete.append(index)
+        jobcard_panch = row.get("job_card_no_panch", "")
+        try:
+            panch = re.search(r'\((.*?)\)', jobcard_panch).group(1)
+        except:
+            panch = ''
+        jobcard = jobcard_panch.replace(f"({panch})", "").lstrip().rstrip()
+        dataframe.loc[index, 'jobcard'] = jobcard
+        
+    dataframe = dataframe.drop(rows_to_delete)
+
+    for key, value in field_dict.items():
+        dataframe[key] = value;
+    return dataframe
+
 def download_muster_for_work_code(logger, func_args, thread_name=None):
     """Download musters as per new muster.aspx"""
     lobj = func_args[0]
@@ -674,3 +706,4 @@ def parse_save_insidene(logger, func_args, thread_name=None):
         post_data['post_content'] = post_content
         with open(outfile, 'w', encoding='utf8') as json_file:
             json.dump(post_data, json_file, indent=4, ensure_ascii=False)
+
