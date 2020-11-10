@@ -2620,6 +2620,7 @@ def get_fto_transactions(lobj, logger, finyear, fto_list_df):
     worker_df = worker_df.drop_duplicates()
     filtered_df = fto_list_df[fto_list_df['block_code'] == int(lobj.block_code)]
     filtered_df = fto_list_df[filtered_df['finyear'] == int(finyear)]
+    filtered_df = filtered_df.fillna('')
     logger.debug(f"shape of filtered_df is {filtered_df.shape}")
     job_list = [];
     column_headers = ["srno", "block", "job_card_no_panch", "reference_no",
@@ -2639,6 +2640,8 @@ def get_fto_transactions(lobj, logger, finyear, fto_list_df):
         func_args = [];
         url = row.get("fto_url", None)
         if url is None:
+            continue
+        if ( (url == "") or ("http" not in url)):
             continue
         field_dict = {}
         field_dict["fin_agency"] = row.get("fin_agency", "")
