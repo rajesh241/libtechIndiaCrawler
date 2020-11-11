@@ -772,7 +772,7 @@ class NREGABlock(Location):
             is_updated = self.is_report_updated(logger, report_type,
                                                 finyear=finyear)
             if is_updated:
-                return
+                continue
             dataframe = get_fto_transactions(self, logger, finyear, fto_list_df)
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type,
