@@ -20,9 +20,9 @@ else
   echo "Variable is not empty"
   myTime=`ps -o etimes= -p "$myPID"`
   echo $myTime
-  if [ $myTime -gt 28800 ]
+  if [ $myTime -gt 43200 ]
     then 
-      echo "Time is about 3 hours"
+      echo "Time is about 12 hours"
       kill -9 $myPID
   fi
 fi
