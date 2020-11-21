@@ -16,6 +16,7 @@ from libtech_lib.generic.api_interface import (get_location_dict,
                                                create_update_report,
                                                api_get_report_dataframe,
                                                api_get_report_urls,
+                                               api_get_report_last_updated,
                                                api_get_child_locations,
                                                api_get_child_location_ids,
                                                api_update_crawl_accuracy
@@ -41,12 +42,18 @@ from libtech_lib.nrega.nicnrega import (get_jobcard_register,
                                         create_work_payment_report,
                                         get_nic_stat_urls, 
                                         get_ap_worker_register,
+                                        get_worker_stats,
                                         get_worker_register_mis,
+                                        get_fto_list,
+                                        get_fto_transactions,
                                         get_nic_urls,
                                         update_muster_transactions_v2,
                                         get_nrega_locations,
                                         get_dynamic_work_report_r6_18,
-                                        get_jobcard_stats
+                                        get_nic_locations,
+                                        get_jobcard_stats,
+                                        get_nic_r14_5_urls,
+                                        get_nic_r14_5
                                        )
 from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_muster_transactions,
@@ -54,7 +61,15 @@ from libtech_lib.nrega.apnrega import (get_ap_jobcard_register,
                                        get_ap_labour_report_r3_17,
                                        get_ap_suspended_payments_r14_5,
                                        get_ap_nefms_report_r14_37,
-                                       get_ap_rejected_transactions
+                                       get_ap_rejected_transactions,
+                                       get_ap_employment_generation_r2_2,
+                                       get_ap_jobcard_updation_report_r24_43,
+                                       get_ap_approved_labour_budget_r13_18,
+                                       get_ap_cm_dashboard_employment_r26_1,
+                                       get_ap_cm_dashboard_total_expenditure_r26_2,
+                                       get_ap_cm_dashboard_avg_days_worked_r26_3,
+                                       get_ap_cm_dashboard_avg_wage_report_r26_5,
+                                       get_ap_grama_sachivalayam_report_r29_1
                                       )
 from libtech_lib.generic.aws import days_since_modified_s3
 AP_STATE_CODE = "02"
@@ -132,10 +147,15 @@ class Location():
         """Checks if report is updated"""
         if self.force_download:
             return False
-        filename = self.get_report_filepath(logger, report_type, finyear=finyear)
-        logger.debug(f"report name is {filename}")
-        days_diff = days_since_modified_s3(logger, filename)
-        logger.debug(f"days diff is {days_diff}")
+        try:
+            last_updated = api_get_report_last_updated(logger, self.code,
+                                                       report_type,
+                                                       finyear=finyear)
+            
+            time_diff = datetime.datetime.now(datetime.timezone.utc) - last_updated
+            days_diff = time_diff.days
+        except:
+            days_diff = None
         if days_diff is None:
             return False
         threshold = REPORT_THRESHOLD_DICT.get(report_type,
@@ -283,15 +303,17 @@ class NREGAPanchayat(Location):
         is_updated = self.is_report_updated(logger, report_type)
         #if (is_updated) and (not self.force_download):
         if (is_updated):
-            return
+            dataframe = self.fetch_report_dataframe(logger, report_type)
+            return dataframe
         logger.info(f"Going to fetch Jobcard Transactions for {self.code}")
-        self.jobcard_register(logger)
-        self.worker_register(logger)
+        #self.jobcard_register(logger)
+        #self.worker_register(logger)
         report_type = "jobcard_register"
         jobcard_register_df = self.fetch_report_dataframe(logger, report_type)
         dataframe = get_jobcard_transactions(self, logger, jobcard_register_df)
         report_type = "jobcard_transactions"
         self.save_report(logger, dataframe, report_type)
+        return dataframe
     def muster_list_v2(self, logger):
         report_type = "muster_list"
         my_location = NREGABlock(logger, self.block_code)
@@ -513,6 +535,63 @@ class APBlock(Location):
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
 
+    def ap_employment_generation_r2_2(self, logger):
+
+        report_type = "ap_employment_generation_r2_2"
+        dataframe = get_ap_employment_generation_r2_2(self, logger) # this gives a csv file
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+    def ap_jobcard_updation_report_r24_43(self, logger):
+
+        report_type = 'ap_jobcard_updation_report_r24_43'
+        dataframe = get_ap_jobcard_updation_report_r24_43(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+    def ap_approved_labour_budget_r13_18(self, logger):
+
+        report_type = 'ap_approved_labour_budget_r13_18'
+        dataframe = get_ap_approved_labour_budget_r13_18(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+    def ap_cm_dashboard_employment_r26_1(self, logger):
+
+        report_type = 'ap_cm_dashboard_employment_r26_1'
+        dataframe = get_ap_cm_dashboard_employment_r26_1(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+    def ap_cm_dashboard_total_expenditure_r26_2(self, logger):
+
+        report_type = 'ap_cm_dashboard_total_expenditure_r26_2'
+        dataframe = get_ap_cm_dashboard_total_expenditure_r26_2(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)   
+
+    def ap_cm_dashboard_avg_days_worked_r26_3(self, logger):
+
+        report_type = 'ap_cm_dashboard_avg_days_worked_r26_3'
+        dataframe = get_ap_cm_dashboard_avg_days_worked_r26_3(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)       
+
+    def ap_cm_dashboard_avg_wage_report_r26_5(self, logger):
+
+        report_type = 'ap_cm_dashboard_avg_wage_report_r26_5'
+        dataframe = get_ap_cm_dashboard_avg_wage_report_r26_5(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)        
+
+    def ap_grama_sachivalayam_report_r29_1(self, logger):
+
+        report_type = 'ap_grama_sachivalayam_report_r29_1'
+        dataframe = get_ap_grama_sachivalayam_report_r29_1(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)                                                
+
+
 class NREGAState(Location):
     """This is the District class for NREGA"""
     def __init__(self, logger, location_code, force_download=False, sample_name="on_demand"):
@@ -542,8 +621,8 @@ class NREGAState(Location):
         """This will fetch MIS URLs based on pattern"""
         report_type = 'nic_r14_5_urls'
         url_text = 'delayed_payment.aspx'
-        url_prefix = "http://mnregaweb4.nic.in/netnrega/state_html/"
-        dataframe = get_nic_r4_1_urls(self, logger, report_type=report_type,
+        url_prefix = "http://mnregaweb4.nic.in/netnrega/"
+        dataframe = get_nic_r14_5_urls(self, logger, report_type=report_type,
                                  url_text=url_text, url_prefix=url_prefix)
         self.save_report(logger, dataframe, report_type)
 
@@ -632,6 +711,12 @@ class NREGABlock(Location):
             pobj_array.append(NREGAPanchayat(logger, panchayat_code))
 
         return pobj_array
+
+    def nic_locations(self, logger):
+        report_type = "nic_locations"
+        dataframe = get_nic_locations(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
     def nic_block_urls(self, logger):
         report_type = "nic_block_urls"
         dataframe = get_nic_block_urls(self, logger)
@@ -663,7 +748,98 @@ class NREGABlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type, health,
                                  remarks)
+    def fto_list(self, logger):
+        """This will fetch the FTO List for each block"""
+        report_type = "fto_list"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
+        report_name = "block_rejected_stats"
+        india_obj = Location(logger, '0')
+        rej_stat_df = india_obj.fetch_report_dataframe(logger, report_name)
+        dataframe = get_fto_list(self, logger, rej_stat_df)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
     
+    def fto_transactions(self, logger):
+        report_type = "fto_transactions"
+        start_fin_year = get_default_start_fin_year()
+        end_fin_year = get_current_finyear()
+        report_name = "fto_list"
+        fto_list_df = self.fetch_report_dataframe(logger, report_name)
+        for finyear in range(start_fin_year, end_fin_year+1):
+            finyear = str(finyear)
+            is_updated = self.is_report_updated(logger, report_type,
+                                                finyear=finyear)
+            if is_updated:
+                continue
+            dataframe = get_fto_transactions(self, logger, finyear, fto_list_df)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type,
+                                 finyear=finyear)
+
+    def jobcard_transactions(self, logger):
+        report_type = "jobcard_transactions"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
+        logger.info("Jobcard Transactions is not updated")
+        input()
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        count = 0
+        remarks = ''
+        health = 'green'
+        for each_panchayat_code in panchayat_array:
+            logger.debug(f"Currently processing {each_panchayat_code}")
+            count = count + 1
+            my_location = NREGAPanchayat(logger, each_panchayat_code)
+            dataframe = my_location.jobcard_transactions(logger)
+            if dataframe is not None:
+                logger.info(f"Processed {count} {my_location.code}")
+                df_array.append(dataframe)
+            else:
+                health = "red"
+                remarks = remarks + "unable to download for " + each_panchayat_code
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type, health,
+                                 remarks)
+    
+    def muster_list(self, logger):
+        """This will fetch all jobcard transactions for the panchayat"""
+        logger.info(f"Going to fetch Muster list for {self.code}")
+        report_type = "muster_list"
+        is_updated = self.is_report_updated(logger, report_type)
+        #if (is_updated) and (not self.force_download):
+        if (is_updated):
+            return
+        self.jobcard_transactions(logger)
+        report_type = "jobcard_transactions"
+        jobcard_transaction_df = self.fetch_report_dataframe(logger, report_type)
+        report_type = "muster_list"
+        muster_list_df = self.fetch_report_dataframe(logger, report_type)
+        dataframe = update_muster_list(self, logger, jobcard_transaction_df,
+                                       muster_list_df)
+        report_type = "muster_list"
+        self.save_report(logger, dataframe, report_type)
+
+    def muster_transactions(self, logger):
+        """This will fetch all muster transactions for the panchayat"""
+        logger.info(f"Going to fetch Muster transactions for {self.code}")
+        report_type = "muster_transactions"
+        is_updated = self.is_report_updated(logger, report_type)
+       #if (is_updated) and (not self.force_download):
+       #    return
+        self.muster_list(logger)
+        dataframe = update_muster_transactions(self, logger)
+        report_type = "muster_transactions"
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+
     def dynamic_work_report_r6_18(self, logger):
         """This will fetch the dynamic work report from MIS reports"""
         report_type = "dynamic_work_report_r6_18"
@@ -693,6 +869,29 @@ class NREGABlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type,
                                  finyear=finyear)
+
+    def nic_r14_5(self, logger):
+        '''Download MIS NIC 4_1 report'''
+        report_type = "nic_r14_5"
+        state_obj = Location(logger, self.state_code)
+        report_name = "nic_r14_5_urls"
+        url_df = state_obj.fetch_report_dataframe(logger, report_name)
+        if url_df is None:
+            state_obj.nic_r14_5_urls(logger)
+            url_df = state_obj.fetch_report_dataframe(logger, report_name)
+        start_fin_year = get_default_start_fin_year()
+        end_fin_year = get_current_finyear()
+        df_array = []
+        for finyear in range(start_fin_year, end_fin_year+1):
+            finyear = str(finyear)
+            dataframe = get_nic_r14_5(self, logger, url_df, finyear)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:    
+            dataframe = pd.concat(df_array).reset_index(drop=True)
+            self.save_report(logger, dataframe, report_type)
+                            
+                        
     def jobcard_stats(self, logger):
         '''
         Get jobcard stats based on S4.15
@@ -802,7 +1001,14 @@ class NREGABlock(Location):
         if dataframe is not None:
             report_type = "block_rejected_transactions_v2"
             self.save_report(logger, dataframe, report_type)
-        
+    def worker_stats(self, logger):
+        """This will fetch the worker stats"""
+        report_type = "worker_stats"
+        nic_urls_df = self.fetch_report_dataframe(logger, "nic_block_urls")
+        dataframe = get_worker_stats(self, logger, nic_urls_df)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
     def block_rejected_transactions(self, logger):
         """This will fetch all the rejected transactions of the block"""
         report_name = "block_rejected_stats"

@@ -13,6 +13,7 @@ from libtech_lib.generic.html_functions import (get_dataframe_from_html,
                                                 get_urldataframe_from_url,
                                                 get_options_list,
                                                 delete_divs_by_classes,
+                                                get_request_with_retry_timeout,
                                                 request_with_retry_timeout
                                                )
 from libtech_lib.generic.commons import (insert_finyear_in_dataframe,
@@ -24,6 +25,38 @@ from libtech_lib.generic.commons import (insert_finyear_in_dataframe,
                                          get_fto_finyear,
                                          get_full_finyear
                                         )
+
+def fetch_fto_transactions(logger, func_args, thread_name=None):
+    """Fetch FTo Transactions"""
+    lobj = func_args[0]
+    url = func_args[1]
+    extract_dict = func_args[2]
+    field_dict = func_args[3]
+    response = get_request_with_retry_timeout(logger, url)
+    if response is None:
+        return None
+    dataframe = get_dataframe_from_html(logger, response.content, mydict=extract_dict)
+    if dataframe is None:
+        return None
+    rows_to_delete = []
+    for index, row in dataframe.iterrows():
+        sr_no = row.get("srno", "")
+        if (sr_no is None) or (not sr_no.isdigit()):
+            rows_to_delete.append(index)
+        jobcard_panch = row.get("job_card_no_panch", "")
+        try:
+            panch = re.search(r'\((.*?)\)', jobcard_panch).group(1)
+        except:
+            panch = ''
+        jobcard = jobcard_panch.replace(f"({panch})", "").lstrip().rstrip()
+        dataframe.loc[index, 'jobcard'] = jobcard
+        
+    dataframe = dataframe.drop(rows_to_delete)
+
+    for key, value in field_dict.items():
+        dataframe[key] = value;
+    return dataframe
+
 def download_muster_for_work_code(logger, func_args, thread_name=None):
     """Download musters as per new muster.aspx"""
     lobj = func_args[0]
@@ -286,8 +319,12 @@ def fetch_muster_details(logger, func_args, thread_name=None):
                                       "ContentPlaceHolder1_grdShowRecords"]
     extract_dict['split_cell_array'] = [1]
     logger.debug(f"Currently processing {url} by {thread_name}")
-    dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict,
-                                       cookies=cookies)
+    response = get_request_with_retry_timeout(logger, url, cookies=cookies)
+    if response is None:
+        return None
+    dataframe = get_dataframe_from_html(logger, response.content, mydict=extract_dict)
+    if dataframe is None:
+        return None
     #logger.info(f"extracted dataframe columns {dataframe.columns}")
     columns_to_keep = []
     for column_name in dataframe.columns:
@@ -357,6 +394,8 @@ def fetch_rejection_details_v2(logger, func_args, thread_name=None):
     current_status_cols = ["final_reference_no", "final_status", "final_rejection_reason", "final_process_date", "final_fto_no"]
     extract_dict['column_headers'] = column_headers
     dataframe = get_dataframe_from_url(logger, url, mydict=extract_dict)
+    if dataframe is None:
+        return None
     parent_reference_no = ''
     row1 = []
     max_index = len(dataframe) - 1
@@ -429,7 +468,11 @@ def fetch_jobcard_details(logger, func_args, thread_name=None):
     lobj = func_args[0]
     url = func_args[1]
     cookies = func_args[2]
-    response = requests.get(url, cookies=cookies)
+    response = request_with_retry_timeout(logger, url, method="get",
+                                          cookies=cookies)
+    #response = requests.get(url, cookies=cookies)
+    if response is None:
+        return None
     logger.debug(f"Fetch data for {lobj.code} with {thread_name}")
     dataframe = None
     if response.status_code == 200:
@@ -630,11 +673,11 @@ def parse_save_insidene(logger, func_args, thread_name=None):
         logger.info(response.status_code)
         if response.status_code == 200:
             mysoup = BeautifulSoup(response.content, "lxml")
-            post_div = mysoup.find("div", attrs={"class" : "td-post-content"})
+            post_div = mysoup.find("div", attrs={"class" : "single-post-content"})
         if post_div is not None:
             class_array = ["code-block", "google-auto-placed",
                            "addtoany_share_save_container",
-                           "jp-relatedposts"]
+                           "jp-relatedposts", "ykaov"]
             post_div = delete_divs_by_classes(logger, post_div, class_array)
             #code_div = post_div.find("div", attrs={"class" : "code-block"})
             strong_p = post_div.findAll("strong")
@@ -663,3 +706,4 @@ def parse_save_insidene(logger, func_args, thread_name=None):
         post_data['post_content'] = post_content
         with open(outfile, 'w', encoding='utf8') as json_file:
             json.dump(post_data, json_file, indent=4, ensure_ascii=False)
+

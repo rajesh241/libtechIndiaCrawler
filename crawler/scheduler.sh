@@ -7,11 +7,10 @@ source bin/activate
 #export PYTHONPATH="${PYTHONPATH}:/home/crawler/repo/libtechIndiaCrawler/"
 export PYTHONPATH="${PYTHONPATH}:$HOME/repo/libtechIndiaCrawler/"
 echo 
-cmd="python $DIR/crawl_manager.py -e -pn $1"
+cmd="python $DIR/debug.py -p -lt $1 -ls $2 -fn $3"
 #echo $cmd
 #$cmd
 myPID=$(pgrep -f "$cmd")
-sleep $2
 echo $myPID
 if [ -z "$myPID" ]
 then
@@ -20,11 +19,11 @@ else
   echo "Variable is not empty"
   myTime=`ps -o etimes= -p "$myPID"`
   echo $myTime
-  if [ $myTime -gt 43200 ]
+  if [ $myTime -gt 28800 ]
     then 
-      echo "Time is about 12 hours"
+      echo "Time is about 3 hours"
       kill -9 $myPID
   fi
 fi
 # 28800 corresponds to roughly 8 hours
-pgrep -f "$cmd" || $cmd &> /tmp/$1.log
+pgrep -f "$cmd" || $cmd &> /tmp/$4

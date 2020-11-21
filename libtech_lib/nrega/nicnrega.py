@@ -36,7 +36,8 @@ from libtech_lib.generic.html_functions import ( get_dataframe_from_html,
                                                  find_url_containing_text,
                                                  find_urls_containing_text,
                                                  get_options_list,
-                                                 request_with_retry_timeout
+                                                 request_with_retry_timeout,
+                                                 get_request_with_retry_timeout
                                                )
 from libtech_lib.generic.libtech_queue import libtech_queue_manager
 mis_url = "https://mnregaweb4.nic.in"
@@ -185,7 +186,7 @@ def get_jobcard_register_mis(lobj, logger, nic_urls_df):
                      "district_name", "block_code", "block_name",
                      "panchayat_code", "panchayat_name"]
     all_cols = location_cols + column_headers
-    dataframe = pd.DataFrame(columns=all_cols)
+    empty_dataframe = pd.DataFrame(columns=all_cols)
     logger.debug(f"In download jobcard register for {lobj.panchayat_code}")
     logger.debug(f"Shape of df is {nic_urls_df.shape}")
     finyear = get_current_finyear()
@@ -202,14 +203,19 @@ def get_jobcard_register_mis(lobj, logger, nic_urls_df):
     logger.debug(lobj.mis_state_url)
     logger.debug(f"session cookies {cookies}")
     myhtml = None
+    url = None
+    
     for index, row in filtered_df.iterrows():
         url = row.get("mis_url")
         logger.debug(f"Url is {url}")
         response = request_with_retry_timeout(logger, url, cookies=cookies,
                                               method="get")
         break
+    if url is None:
+        return empty_dataframe
     if response is None:
-        return dataframe
+        logger.debug("Returning from here")
+        return empty_dataframe
     myhtml = response.content
     jobcard_prefix = f"{lobj.state_short_code}-"
     extract_dict = {}
@@ -223,7 +229,7 @@ def get_jobcard_register_mis(lobj, logger, nic_urls_df):
         dataframe = insert_location_details(logger, lobj, dataframe)
         dataframe = dataframe[all_cols]
         return dataframe
-    return dataframe
+    return empty_dataframe
 
 def get_worker_register_mis(lobj, logger, nic_urls_df):
     """This will download the worker registe based on nic_urls and df"""
@@ -390,10 +396,11 @@ def re_extract_village_name(in_s):
 def get_jobcard_transactions(lobj, logger, jobcards_dataframe):
     """ Given a list of jobciard urls this function will fetch all jobcard
     transactions"""
-    logger.info(f"we are going to fetch muster list")
-    logger.info(f"panchayat page url is {lobj.panchayat_page_url}")
+    logger.info(f"we are going to Jobcard Transactions")
+    logger.info(f"state page url is {lobj.mis_state_url}")
     job_list = []
-    response = requests.get(lobj.panchayat_page_url)
+    #response = requests.get(lobj.panchayat_page_url)
+    response = requests.get(lobj.mis_state_url)
     cookies = response.cookies
     ###Below is the worker function that needs to be called
     func_name = "fetch_jobcard_details"
@@ -418,6 +425,7 @@ def get_jobcard_transactions(lobj, logger, jobcards_dataframe):
     logger.debug(f"transactions columns {transactions_columns}")
     dataframe = insert_location_details(logger, lobj, dataframe)
     dataframe['muster_code'] = dataframe.apply(lambda row: str(row['block_code'])+"_"+str(row['finyear'])+"_"+str(row['muster_no']), axis=1)
+    #dataframe['muster_code'] = ''
     location_cols = ["state_code", "state_name", "district_code",
                      "district_name", "block_code", "block_name",
                      "panchayat_code", "panchayat_name"]
@@ -449,7 +457,7 @@ def update_muster_list(lobj, logger, jobcard_transactions_df,
     col_list = ['muster_no', 'muster_url', 'finyear', 'date_from', 'date_to', 'work_name', 'work_code', 'block_code']
     work_url_array = filtered_df.work_name_url.unique()
     logger.info(f"Number of unique work urls is {len(work_url_array)}")
-    response = requests.get(lobj.panchayat_page_url)
+    response = request_with_retry_timeout(logger, lobj.mis_state_url, method="get")
     cookies = response.cookies
     job_list = []
     func_name = "fetch_muster_urls"
@@ -550,10 +558,9 @@ def update_muster_transactions(lobj, logger):
     logger.debug(f"Completed muster list is {completed_muster_list}")
     ml_df = lobj.fetch_report_dataframe(logger, "muster_list")
     logger.info(f"length of musters that need to be downloaded is {len(ml_df)}")
-    try:
-        response = requests.get(lobj.panchayat_page_url, timeout=10)
-    except requests.exceptions.Timeout as exp:
-        logger.error(exp)
+    response = get_request_with_retry_timeout(logger, lobj.mis_state_url)
+    if response is None:
+        return
     cookies = response.cookies
     logger.info(f"cookies are {cookies}")
     ##Prepareing to run queue functions
@@ -569,7 +576,7 @@ def update_muster_transactions(lobj, logger):
         if muster_code in completed_muster_list:
             continue
         url = row['muster_url']
-        logger.info(url)
+        url = url.replace(lobj.crawl_ip, "mnregaweb4.nic.in")
         muster_no = row['muster_no']
         finyear = row['finyear']
         block_code = lobj.block_code
@@ -1900,7 +1907,7 @@ def get_nic_r4_1(lobj, logger, url_df, finyear):
     if dataframe is not None:
         dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
-        
+
 def get_location_list_from_dict(mydict):
     """"Getting location list from dict"""
     columns = ["state_code", "state_name", "district_code", "district_name", "block_code", "block_name", "panchayat_code", "panchayat_name"]
@@ -2238,14 +2245,6 @@ def get_dynamic_work_report_r6_18(lobj, logger):
     #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
     response = session.post(url, headers=headers, data=data, verify=False)
 
-    root_dir = f"/tmp/"
-    if not os.path.exists(root_dir):
-        os.makedirs(root_dir)
-    
-
-    with open(root_dir + f'{block_code}_{finyear}.html','wb') as f:
-        f.write(response.content)
-    print('html_file saved')
     myhtml = response.content
     extract_dict = {}
     column_headers = ["sno","district_name1","block_name1","panchayat_name","work_start_fin_year","work_status","work_code","work_name","master_work_category_name","work_category_name","work_type","agency_name","sanction_amount_in_lakh","total_amount_paid_since_inception_in_lakh","total_mandays","no_of_units","is_secure","is_convergence","work_started_date","work_physically_completed_date"]
@@ -2261,7 +2260,419 @@ def get_dynamic_work_report_r6_18(lobj, logger):
                      "district_name", "block_code", "block_name", "finyear"]
     all_cols = location_cols + column_headers
     dataframe = dataframe[all_cols]
-    dataframe.to_csv("/tmp/dwr.csv")
+    return dataframe
+
+def get_worker_stats(lobj, logger, nic_urls_df):
+    """This will fetch the worker stats"""
+    use_state_server = False
+    df_array = []
+    column_headers = ['srno', 'jobcard', 'head_of_household', 'name',
+                      'total_work_days']
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    all_cols = location_cols + ["finyear"] + column_headers
+    empty_dataframe = pd.DataFrame(columns=all_cols)
+    dataframe = None
+    logger.info(f"Going to fetch the worker register for {lobj.block_code}")
+    logger.debug(f"shape of urls df is {nic_urls_df.shape}")
+    report_slug = "household-provided-employment-with-specified-no-of-days"
+    filtered_df = nic_urls_df[nic_urls_df["report_slug"] == report_slug]
+    logger.debug(f"shape of urls df is {filtered_df.shape}")
+    logger.debug(f"Mis state URL {lobj.mis_state_url}")
+    if (use_state_server == True):
+        url = lobj.mis_state_url.replace("mnregaweb4.nic.in", lobj.crawl_ip)
+        response = get_request_with_retry_timeout(logger, lobj.mis_state_url)
+    else:
+        response = get_request_with_retry_timeout(logger, lobj.mis_state_url)
+        
+    if response is None:
+        logger.debug(f"response is noe for {lobj.mis_state_url}")
+        return empty_dataframe
+    cookies = response.cookies
+    logger.debug(f"Cookies are {cookies}")
+    for index, row in filtered_df.iterrows():
+        finyear = row['finyear']
+        url = row['mis_url']
+        if use_state_server == True:
+            url = url.replace("mnregaweb4.nic.in", lobj.crawl_ip)
+        headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15;rv:81.0) Gecko/20100101 Firefox/81.0',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'X-MicrosoftAjax': 'Delta=true',
+                'Cache-Control': 'no-cache',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+                'Origin': 'https://mnregaweb4.nic.in',
+                'Connection': 'keep-alive',
+                'Referer': url
+        }
+        for pobj in lobj.get_all_panchayat_objs(logger):
+            response = get_request_with_retry_timeout(logger, url, cookies=cookies)
+            if response is None:
+                logger.debug(f"response is None for {url}")
+                continue
+            htmlsoup = BeautifulSoup(response.content, 'lxml')
+            view_state  =  htmlsoup.find(id = '__VIEWSTATE').get('value')
+            validation  =  htmlsoup.find(id = '__EVENTVALIDATION').get('value')
+            data = {
+                'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_panch',
+                '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddr_panch',
+                '__EVENTARGUMENT': '',
+                '__LASTFOCUS': '',
+                '__VIEWSTATE': view_state,
+                '__VIEWSTATEGENERATOR': '68012A6D',
+                '__VIEWSTATEENCRYPTED': '',
+                '__EVENTVALIDATION': validation,
+                'ctl00$ContentPlaceHolder1$ddr_panch': pobj.code,
+                'ctl00$ContentPlaceHolder1$ddr_cond': '',
+                'ctl00$ContentPlaceHolder1$lbl_days': '100',
+                'ctl00$ContentPlaceHolder1$rblRegWorker': 'Y',
+                '__ASYNCPOST': 'true',
+                '': ''
+            }
+            response = request_with_retry_timeout(logger, url, data=data,
+                                                  headers=headers, cookies=cookies)
+            if response is None:
+                continue
+            htmlsoup = BeautifulSoup(response.content, 'lxml')
+            body = htmlsoup.find('body')
+            #logger.warning(body.text)
+            array = body.text.split('|')
+            view_state = array[array.index('__VIEWSTATE')+1]
+            validation = array[array.index('__EVENTVALIDATION')+1]
+            data = {
+                'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$ddr_cond',
+                'ctl00$ContentPlaceHolder1$ddr_panch': pobj.code,
+                'ctl00$ContentPlaceHolder1$ddr_cond': 'gte',
+                'ctl00$ContentPlaceHolder1$lbl_days': '100',
+                'ctl00$ContentPlaceHolder1$rblRegWorker': 'Y',
+                '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$ddr_cond',
+                '__EVENTARGUMENT': '',
+                '__LASTFOCUS': '',
+                '__VIEWSTATE': view_state,
+                '__VIEWSTATEGENERATOR': '68012A6D',
+                '__VIEWSTATEENCRYPTED': '',
+                '__EVENTVALIDATION': validation,
+                '__ASYNCPOST': 'true',
+                '': ''
+            }
+            response = request_with_retry_timeout(logger, url, data=data,
+                                                  headers=headers, cookies=cookies)
+            if response is None:
+                continue
+            htmlsoup = BeautifulSoup(response.content, 'lxml')
+            body = htmlsoup.find('body')
+            array = body.text.split('|')
+            view_state = array[array.index('__VIEWSTATE')+1]
+            validation = array[array.index('__EVENTVALIDATION')+1]
+            data = {
+                'ctl00$ContentPlaceHolder1$ScriptManager1': 'ctl00$ContentPlaceHolder1$UpdatePanel1|ctl00$ContentPlaceHolder1$btn_pro',
+                'ctl00$ContentPlaceHolder1$ddr_panch': pobj.code,
+                'ctl00$ContentPlaceHolder1$ddr_cond': 'gte',
+                'ctl00$ContentPlaceHolder1$lbl_days': '0',
+                'ctl00$ContentPlaceHolder1$rblRegWorker': 'N',
+                '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$btn_pro',
+                '__EVENTARGUMENT': '',
+                '__LASTFOCUS': '',
+                '__VIEWSTATE': view_state,
+                '__VIEWSTATEGENERATOR': '68012A6D',
+                '__EVENTVALIDATION': validation,
+                '__VIEWSTATEENCRYPTED': '',
+                '__ASYNCPOST': 'true',
+                '': ''
+            }
+            response = request_with_retry_timeout(logger, url, data=data,
+                                                  headers=headers, cookies=cookies)
+            if response is None:
+                continue
+
+            myhtml = response.content
+            htmlsoup = BeautifulSoup(response.content, 'lxml')
+            body = htmlsoup.find('body')
+            #logger.warning(body.text)
+            array = body.text.split('|')
+            page_url = array[array.index('pageRedirect')+2]
+            url_prefix = "https://mnregaweb4.nic.in"
+            page_url = url_prefix + page_url
+            response = get_request_with_retry_timeout(logger, page_url,
+                                                      cookies=cookies)
+            if response is None:
+                continue
+            myhtml = response.content
+            panchayat_code = ''
+            logger.info(f"Page url for finyear {finyear} panchayat_cod {pobj.code} is {page_url}")
+            extract_dict = {}
+            extract_dict['table_id'] = 'ctl00_ContentPlaceHolder1_GridView1'
+            extract_dict['data_start_row'] = 2
+            extract_dict['column_headers'] = column_headers
+            dataframe = get_dataframe_from_html(logger, myhtml,
+                                        mydict=extract_dict)
+            if dataframe is not None:
+                dataframe['finyear'] = finyear
+                dataframe['panchayat_code'] = pobj.panchayat_code
+                dataframe['panchayat_name'] = pobj.panchayat_name
+                df_array.append(dataframe)
+    if len(df_array) == 0:
+        return empty_dataframe
+    dataframe = pd.concat(df_array)
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    dataframe = dataframe[all_cols]
+    return dataframe
+
+def get_nic_locations(lobj, logger):
+    """Will fetch all nic locations"""
+    objs = lobj.get_all_panchayat_objs(logger)
+    csv_array = []
+    for obj in objs:
+        row = [obj.code, obj.name]
+        csv_array.append(row)
+    dataframe = pd.DataFrame(csv_array, columns=["panchayat_code",
+                                                 "panchayat_name"])
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_code", "panchayat_name"]
+    dataframe = dataframe[location_cols]
+    return dataframe
+
+def get_fto_list(lobj, logger, rej_stat_df):
+    """This will fetch the fto list for the block"""
+    logger.info(f"Fetching fto list for {lobj.block_name}")
+    filtered_df = rej_stat_df[rej_stat_df['block_code'] == int(lobj.block_code)]
+    start_fin_year = get_default_start_fin_year()
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    filtered_df = filtered_df[filtered_df['finyear'] >= int(start_fin_year)]
+    filtered_df = rej_stat_df[rej_stat_df['block_code'] == int(lobj.block_code)]
+    start_fin_year = get_default_start_fin_year()
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    filtered_df = filtered_df[filtered_df['finyear'] >= int(start_fin_year)]
+    column_headers = ["srno", "fto_no", "fto_url", "financial_institution",
+                      "second_signatory_date", "5", "6", "7", "8", "9", "10",
+                      "11", "12"]
+    extract_dict = {}
+    extract_dict["pattern"] = "Financial Institution"
+    extract_dict['column_headers'] = column_headers
+    extract_dict['extract_url_array'] = [1]
+    extract_dict['url_prefix'] = "http://mnregaweb4.nic.in/netnrega/FTO/"
+    df_array = []
+    for index, row in filtered_df.iterrows():
+        url = row.get("second_singnatory_fto_url", None)
+        finyear = row.get("finyear", None)
+        fin_agency = row.get("fin_agency", None)
+        logger.info(url)
+        response = get_request_with_retry_timeout(logger, url)
+        if response is None:
+            continue
+        myhtml = response.content
+        dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+        if dataframe is None:
+            continue
+        dataframe["finyear"] = finyear
+        dataframe["fin_agency"] = fin_agency
+        df_array.append(dataframe)
+    if (len(df_array)) == 0:
+        return None
+    dataframe = pd.concat(df_array)
+    other_cols = ["finyear", "fin_agency", "fto_no", "fto_url",
+                  "financial_institution", "second_signatory_date"]
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name"]
+    all_cols = location_cols + other_cols
+    dataframe = dataframe[all_cols]
     return dataframe
 
 
+
+def get_nic_r14_5_urls(lobj, logger, report_type=None, url_text=None,
+                      url_prefix=None):
+    """This function will get the Urls at the block level"""
+    state_pattern = f"state_code={lobj.state_code}"
+    logger.info(f"Getting URLs from MIS Reports for {report_type} and pattern{url_text}")
+    current_df = lobj.fetch_report_dataframe(logger, report_type)
+    filtered_df = None
+   #if current_df is not None:
+   #  logger.info(f"Shape of current df is {current_df.shape}")
+   #  current_finyear = get_current_finyear()
+   #  filtered_df = current_df[current_df['finyear'] != current_finyear]
+   #  logger.info(f"Shape of filtered df is {filtered_df.shape}")
+
+    csv_array = []
+    column_headers = ["state_code", "district_code", "block_code", "state_name",
+                      "district_name", "block_name", "finyear", "url"]
+    start_finyear = get_default_start_fin_year()
+    end_finyear = get_current_finyear()
+    for finyear in range(int(start_finyear), int(end_finyear)+1):
+        logger.info(f"Downloading for FinYear {finyear}")
+        filename = f"{NREGA_DATA_DIR}/misReport_{finyear}.html"
+        logger.info(filename)
+        with open(filename, "rb") as infile:
+            myhtml = infile.read()
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        elem = mysoup.find("a", href=re.compile(url_text))
+        if elem is not None:
+            base_href = elem["href"]
+        logger.info(base_href)
+        res = requests.get(base_href)
+        myhtml = None
+        if res.status_code == 200:
+            myhtml = res.content
+        if myhtml is not None:
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            elems = mysoup.find_all("a", href=re.compile(url_text))
+            for elem in elems:
+                logger.info(elem)
+                state_href = elem["href"]
+                logger.info(f"State URL is {state_href}")
+                if state_pattern not in state_href:
+                    continue
+                url = url_prefix + state_href
+                response = requests.get(url)
+                logger.info(url)
+                dist_html = None
+                if response.status_code == 200:
+                    dist_html = response.content
+                if dist_html is not None:
+                    dist_soup = BeautifulSoup(dist_html, "lxml")
+                    elems = dist_soup.find_all("a", href=re.compile(url_text))
+                    for elem1 in elems:
+                        dist_url = url_prefix + elem1["href"]
+                        block_res = requests.get(dist_url)
+                        if block_res.status_code == 200:
+                            block_html = block_res.content
+                            block_soup = BeautifulSoup(block_html, "lxml")
+                            belems = block_soup.find_all("a", href=re.compile(url_text))
+                            for belem in belems:
+                                block_url = url_prefix + belem["href"]
+                                #logger.info(dist_url)
+                                parsed = urlparse.urlparse(block_url)
+                                params_dict = parse_qs(parsed.query)
+                                #logger.info(params_dict)
+                                state_name = params_dict.get("state_name", [''])[0]
+                                state_code = params_dict.get("state_code", [""])[0]
+                                district_name = params_dict.get("district_name",
+                                                                [""])[0]
+                                district_code = params_dict.get("district_code",
+                                                                [""])[0]
+                                block_name = params_dict.get("block_name",
+                                                                [""])[0]
+                                block_code = params_dict.get("block_code",
+                                                                [""])[0]
+                                row = [state_code, district_code, block_code, state_name,
+                                       district_name, block_name, finyear, block_url]
+                                logger.info(row)
+                                csv_array.append(row)
+
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    if filtered_df is not None:
+        dataframe = pd.concat([filtered_df, dataframe])
+    return dataframe
+
+
+def get_nic_r14_5(lobj, logger, url_df, finyear):
+    '''Will Download NIC4_1 MIS report'''
+    if url_df is None:
+        return None
+    logger.info(f"Shape of url_df is {url_df.shape}")
+    filtered_df = url_df[url_df['block_code']==int(lobj.block_code)]
+    filtered_df = filtered_df[filtered_df['finyear']==int(finyear)]
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    df_array = []
+    for index, row in filtered_df.iterrows():
+        url = row.get('url')
+        finyear = row.get('finyear')
+        logger.info(url)
+        extract_dict = {}
+        column_headers = ['S.No', 'location','Payment Between 0-8 Days-Total Transactions', '0_8_txns_urls',
+                    'Payment Between 0-8 Days-Amount Involved','Payment Between 9-15 Days-Total Transactions','9_15_txns_urls',
+                    'Payment Between 9-15 Days-Amount Involved','Payment Between 16-30 Days-Total Transactions','16_30_txns_urls',
+                    'Payment Between 16-30 Days-Amount Involved','Payment Between 31-60 Days-Total Transactions','31_60_txns_urls',
+                    'Payment Between 31-60 Days-Amount Involved','Payment Between 61-90 Days-Total Transactions','61_90_txns_urls',
+                    'Payment Between 61-90 Days-Amount Involved','Delayed Payment more than 90 Days-Total Transactions','more_than_90_txns_urls',
+                    'Delayed Payment more than 90 Days-Amount Involved','Total Delayed Payment-Total Transactions',
+                    'Total Delayed Payment-Amount Involved','Total Payment For Financial Year-Total Transactions',
+                    'Total Payment For Financial Year-Amount Involved']
+        extract_dict['pattern'] = "Total Transactions"
+        extract_dict['extract_url_array'] = [2,4,6,8,10,12]
+        extract_dict['url_prefix'] = 'http://mnregaweb4.nic.in/netnrega/'
+        extract_dict['column_headers'] = column_headers
+        extract_dict['data_start_row'] = 4
+        logger.info(url)
+        response = requests.get(url)
+        if response.status_code == 200:
+            myhtml = response.content
+            dataframe = get_dataframe_from_html(logger, myhtml,
+                                                mydict=extract_dict)
+            dataframe['finyear'] = finyear
+            df_array.append(dataframe)
+    dataframe = pd.concat(df_array)
+    dataframe = dataframe[dataframe.location != 'Total'].reset_index(drop=True)
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe
+
+def get_fto_transactions(lobj, logger, finyear, fto_list_df):
+    logger.info(f"goign to fetch fto transactions {lobj.name}")
+    worker_df= lobj.fetch_report_dataframe(logger, "worker_register")
+    worker_df_cols = ["state_code", "state_name", "district_code", "district_name", "block_code", "block_name", "panchayat_code", "panchayat_name", "village_name", "caste", "head_of_household", "jobcard"]
+    worker_df = worker_df[worker_df_cols]
+    worker_df = worker_df.drop_duplicates()
+    filtered_df = fto_list_df[fto_list_df['block_code'] == int(lobj.block_code)]
+    filtered_df = fto_list_df[filtered_df['finyear'] == int(finyear)]
+    filtered_df = filtered_df.fillna('')
+    logger.debug(f"shape of filtered_df is {filtered_df.shape}")
+    job_list = [];
+    column_headers = ["srno", "block", "job_card_no_panch", "reference_no",
+                      "transaction_date", "fto_applicant_name", "wagelist_no",
+                      "primary_account_holder", "bank_code", "ifsc_code",
+                      "fto_amount_to_be_credit", "fto_credited_amount",
+                      "fto_status", "processed_date",
+                      "bank_to_coop_processed_date", "utr_no",
+                      "rejection_reason", "favor_in_apb_transaction",
+                      "bank_iin_in_apb_transaction"]
+    extract_dict = {}
+    extract_dict["pattern"] = "Reference No."
+    extract_dict["column_headers"] = column_headers
+
+    for index, row in filtered_df.iterrows():
+        func_name = "fetch_fto_transactions"
+        func_args = [];
+        url = row.get("fto_url", None)
+        if url is None:
+            continue
+        if ( (url == "") or ("http" not in url)):
+            continue
+        field_dict = {}
+        field_dict["fin_agency"] = row.get("fin_agency", "")
+        field_dict["fto_no"] = row.get("fto_no", "")
+        field_dict["financial_institution"] = row.get("financial_institution", "")
+        field_dict["second_signatory_date"] = row.get("second_signatory_date", "")
+        field_dict["finyear"] = finyear
+        field_dict["fto_url"] = url
+        func_args = [lobj, url, extract_dict, field_dict] 
+        job_dict = {
+            'func_name' : func_name,
+            'func_args' : func_args
+        }
+        job_list.append(job_dict)
+    #dataframe = libtech_queue_manager(logger, job_list)
+    dataframe = libtech_queue_manager(logger, job_list)
+    if dataframe is None:
+        return None
+    dataframe = pd.merge(dataframe, worker_df, how='left',
+                         on=['jobcard'])
+    fto_columns = ["fto_no", "finyear", "second_signatory_date", "fin_agency",
+                   "financial_institution", "fto_url"]
+    column_headers = ["job_card_no_panch", "reference_no",
+                      "transaction_date", "fto_applicant_name", "wagelist_no",
+                      "primary_account_holder", "bank_code", "ifsc_code",
+                      "fto_amount_to_be_credit", "fto_credited_amount",
+                      "fto_status", "processed_date",
+                      "bank_to_coop_processed_date", "utr_no",
+                      "rejection_reason", "favor_in_apb_transaction",
+                      "bank_iin_in_apb_transaction"]
+    all_cols = worker_df_cols + fto_columns + column_headers
+    dataframe = dataframe[all_cols]
+        
+    return dataframe

@@ -33,6 +33,8 @@ def args_fetch():
                         required=False, action='store_const', const=1)
     parser.add_argument('-p', '--populate', help='Populate Queue',
                         required=False, action='store_const', const=1)
+    parser.add_argument('-cb', '--createBundle', help='Create Bundle',
+                        required=False, action='store_const', const=1)
     parser.add_argument('-v', '--verify', help='Verify if the state IP is working',
                         required=False, action='store_const', const=1)
     parser.add_argument('-notnic', '--notnic', help='Not an NIC',
@@ -42,6 +44,9 @@ def args_fetch():
                         help='Location type that needs tobe instantiated', required=False)
     parser.add_argument('-fn', '--func_name', help='Name of the function', required=False)
     parser.add_argument('-pr', '--priority', help='Priority of the download', required=False)
+    parser.add_argument('-rt', '--reportTypes', help='Comma sepearted value for report Types', required=False)
+    parser.add_argument('-rf', '--reportFormat', help='Format of the output can be csv excel or both', required=False)
+    parser.add_argument('-bt', '--bundleTitle', help='Bundle Title', required=False)
     parser.add_argument('-sn', '--sample_name', help='Name of the function', required=False)
     parser.add_argument('-ls', '--location_sample', help='Location Sample Name', required=False)
     parser.add_argument('-zf', '--zipfilename', help='Zip File name', required=False)
@@ -75,30 +80,36 @@ def main():
     """Main Module of this program"""
     args = args_fetch()
     logger = logger_fetch(args.get('log_level'))
+    if args["createBundle"]:
+        location_sample = args.get("location_sample", None)
+        location_type = args.get("locationType", None)
+        location_code = args.get("locationCode",  None)
+        report_types = args.get("reportTypes",  None)
+        report_format = args.get("reportFormat",  'both')
+
+        filename = args.get("zipfilename",  None)
+        bundle_title = args.get("bundleTitle",  None)
+        my_sample = LibtechSample(logger, sample_type=location_type,
+                                  tag_name=location_sample,
+                                  parent_location_code = location_code)
+        url = my_sample.create_bundle(logger, report_types, filename=filename,
+                               title=bundle_title, report_format=report_format)
+        logger.info(url)
+
     if args['populate']:
-        logger.info("Populating Crawl Queue")
-        location_code = args.get('locationCode', None)
-        priority = args.get('priority', 100)
-        location_type = args.get('locationType', 'panchayat')
         func_name = args.get('func_name', None)
-        is_not_nic = args.get('notnic', None)
+        is_not_nic = args.get('notnic', False)
         is_nic = not is_not_nic
         location_sample = args.get("location_sample", None)
-        if args['forceDownload']:
-            force_download = True
-        else:
-            force_download = False
-        if location_sample is None:
-            my_sample = LibtechSample(logger,parent_location_code=location_code,sample_type=location_type,
-                                      force_download=force_download)
-        else:
-            my_sample = getattr(samplemodels, location_sample)(logger,
-                                                               force_download=force_download)
-      # elif location_sample == "APITDABlockSample":
-      #     logger.info("I am here")
-      #     my_sample = APITDABlockSample(logger,
-      #                                   force_download=force_download)
-      #     logger.info(my_sample.sample_location_codes)
+        location_type = args.get("locationType", None)
+        location_code = args.get("locationCode",  None)
+        priority = args.get("priority",  100)
+        logger.info(location_code)
+        my_sample = LibtechSample(logger, sample_type=location_type,
+                                  tag_name=location_sample,
+                                  parent_location_code = location_code,
+                                  is_nic = is_nic)
+        logger.info(my_sample.sample_location_codes) 
         my_sample.populate_queue(logger, func_name, priority=priority)
     if args['insert']:
         logger.info("Inserting in Crawl Queue")
@@ -142,6 +153,14 @@ def main():
         df.to_csv('/tmp/stateStatus.csv')
     if args['test']:
         location_sample = args.get("location_sample", None)
+        location_type = args.get("locationType", None)
+        location_code = args.get("locationCode",  None)
+        logger.info(location_code)
+        my_sample = LibtechSample(logger, sample_type=location_type,
+                                  tag_name=location_sample,
+                                  parent_location_code = location_code)
+        logger.info(my_sample.sample_location_codes) 
+        exit(0)
         zipfilename = args.get("zipfilename", "zzz")
         tempDir = args.get("tempDir", "/tmp")
         if location_sample is not None:

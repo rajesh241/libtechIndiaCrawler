@@ -1,23 +1,28 @@
 import datetime
 import os
 import shutil
+from slugify import slugify
 from libtech_lib.nrega.models import Location
 from libtech_lib.nrega import models
-from libtech_lib.generic.api_interface import (create_task
+from libtech_lib.generic.api_interface import (create_task,
+                                              api_get_locations_by_params,
+                                              api_create_bundle
                                               )
 from libtech_lib.generic.commons import download_save_file
 from libtech_lib.generic.aws import upload_s3
 class LibtechSample():
     """This is the base Location Class"""
-    def __init__(self, logger, parent_location_code=None, sample_type="block", force_download='false',
+    def __init__(self, logger, tag_name=None, parent_location_code=None, sample_type="block", force_download='false',
                  scheme='nrega', name="on_demand", is_nic=True):
         self.parent_location_code = parent_location_code
         self.sample_type = sample_type
         self.name = name
         self.scheme = scheme
         self.is_nic = is_nic
+        self.tag_name = tag_name
         self.force_download = force_download
         self.location_class = self.get_location_class(logger)
+        self.get_sample_locations(logger) 
     def get_location_class(self, logger):
         """This fuction will return the location class based on
         location_type"""
@@ -46,7 +51,6 @@ class LibtechSample():
     def populate_queue(self, logger, report_type, finyear=None, priority=None):
         """This function will populate the Queue"""
         logger.info("Populating queue")
-        self.get_all_locations(logger)
         for each_code in self.sample_location_codes:
             logger.info(each_code)
             data = {
@@ -63,55 +67,53 @@ class LibtechSample():
         self.get_sample_locations(logger)
     def get_sample_locations(self, logger):
         """This function will populate the Queue"""
-        sample_location_codes = [self.parent_location_code]
-        lobj = Location(logger, location_code=self.parent_location_code)
-        current_location_type = lobj.location_type
-        while (current_location_type != self.sample_type):
-            child_location_codes = []
-            for each_code in sample_location_codes:
-                lobj = Location(logger, location_code=each_code)
-                location_array = lobj.get_child_locations(logger) 
-                child_location_codes.extend(location_array)
-            sample_location_codes = child_location_codes
-            one_sample_code = sample_location_codes[0]
-            lobj = Location(logger, location_code=one_sample_code)
-            current_location_type = lobj.location_type
-        logger.info(f"Total samples selected is {len(sample_location_codes)}")
-        sample_location_codes.append(self.parent_location_code)
-        self.sample_location_codes = sample_location_codes
-        self.all_location_codes = sample_location_codes 
-    def create_bundle(self, logger, report_types, download_dir=None, zip_file_name=None, save_to_s3=True, only_csv=False):
-        """This would create the zip bundle of all the reports"""
-        report_urls = []
-        for each_code in self.all_location_codes:
-            lobj = Location(logger, location_code=each_code)
-            logger.info(f"Currently processing {each_code}")
-            for report_type in report_types:
-                urls = lobj.fetch_report_urls(lobj, report_type)
-                report_urls = report_urls + urls
-        logger.info(report_urls)
-        if download_dir is None:
-            current_timestamp = str(datetime.datetime.now().timestamp())
-            download_dir = f"/tmp/{current_timestamp}"
-        if zip_file_name is None:
-            zip_file_name = f"/tmp/{current_timestamp}"
-        for url in report_urls:
-            if only_csv == True:
-                if url.endswith('.csv'):
-                    download_save_file(logger, url, dest_folder=download_dir)
-            else:
-                download_save_file(logger, url, dest_folder=download_dir)
-        shutil.make_archive(zip_file_name, 'zip', download_dir)
-        if save_to_s3 == True:
-            with open(f"{zip_file_name}.zip", "rb") as f:
-                filedata = f.read()
-            content_type = 'binary/octet-stream'
-            filename = zip_file_name.split('/')[-1].replace(" ", "_")
-            filename = f"temp_archives/{filename}.zip"
-            file_url = upload_s3(logger, filename, filedata, content_type=content_type)
-            return file_url
+        if self.tag_name is not None:
+            params = { "libtech_tag__name" : self.tag_name,
+                       "location_type" : self.sample_type,
+                       "scheme" : "nrega",
+                       "limit" : 10000
+                     }
+            self.sample_location_codes = api_get_locations_by_params(logger, params)
         else:
-            return f"{zip_file_name}.zip"
+            sample_location_codes = [self.parent_location_code]
+            child_location_codes = [self.parent_location_code]
+            lobj = Location(logger, location_code=self.parent_location_code)
+            current_location_type = lobj.location_type
+            while (current_location_type != self.sample_type):
+                child_location_codes = []
+                for each_code in sample_location_codes:
+                    lobj = Location(logger, location_code=each_code)
+                    location_array = lobj.get_child_locations(logger) 
+                    child_location_codes.extend(location_array)
+                sample_location_codes = child_location_codes
+                one_sample_code = sample_location_codes[0]
+                lobj = Location(logger, location_code=one_sample_code)
+                current_location_type = lobj.location_type
+            self.sample_location_codes = child_location_codes
+    def create_bundle(self, logger, report_types, filename=None,
+                      report_format="both", title=None):
+        today_str_date = datetime.datetime.today().strftime('%d%B%Y')
+        if title is None:
+            if self.tag_name is not None:
+                title = f"{self.tag_name}_{today_str_date}"
+            else:
+                title = f"{self.parent_location_code}_{today_str_date}"
+        if filename is None:
+            filename = slugify(title)
+        data = {
+                'title' : title,
+                'location_type' : self.sample_type,
+                'report_types' : report_types,
+                'filename' : filename,
+                'report_format' : report_format
+        }
+        if self.tag_name is not None:
+            data["libtech_tags"] = self.tag_name
+        else:
+            data["location_code"] = self.parent_location_code
+
+        url = api_create_bundle(logger, data=data)
+        return url
          
         
 class APITDABlockSample(LibtechSample):

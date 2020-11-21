@@ -2,6 +2,7 @@
 for the Django interface"""
 import os
 import datetime
+from dateutil.parser import parse
 from pathlib import Path
 import json
 import requests
@@ -31,6 +32,8 @@ TAGURL = '%s/api/public/tag/' % (BASEURL)
 REPORTURL = '%s/api/public/report/' % (BASEURL)
 GETREPORTURL = "%s/api/getReport/" % (BASEURL)
 TASKQUEUEURL = '%s/api/public/queue/' % (BASEURL)
+BUNDLEURL = '%s/api/public/bundle/' % (BASEURL)
+
 
 def get_authentication_token():
     """This function will get the authentication token based on the username
@@ -79,7 +82,7 @@ def get_task(logger, task_id=None):
       url="%s?id=%s" % (TASKQUEUEURL, str(task_id))
     else:
       #url="%s?is_done=0&status=inQueue&ordering=-priority,updated&limit=1" % (TASKQUEUEURL)
-      url="%s?is_done=0&ordering=-priority,updated&limit=1" % (TASKQUEUEURL)
+      url="%s?is_done=0&in_progress=0&ordering=-priority,updated&limit=1" % (TASKQUEUEURL)
     logger.info(url)
     res = requests.get(url, headers=headers)
     logger.info
@@ -177,6 +180,18 @@ def api_get_tag_id(logger, tag_name):
         tag_id = None
     return tag_id
 
+def api_get_locations_by_params(logger, params):
+    """Will get locations by params"""
+    response = fetch_data(logger, LOCATIONURL, params=params)
+    count = response.get("count", 0)
+    child_location_array = []
+    if count > 0:
+        results = response.get('results')
+        for res in results:
+            code = res.get('code')
+            child_location_array.append(code)
+    return child_location_array
+    
 def api_get_tagged_locations(logger, tag_id, scheme=None):
     """This will fetch all the location Codes given a tag id
     """
@@ -197,6 +212,26 @@ def api_get_tagged_locations(logger, tag_id, scheme=None):
             child_location_array.append(code)
     return child_location_array
 
+
+def api_get_tagged_locations_by_tag_name(logger, tag_name, scheme=None):
+    """This will fetch all the location Codes given a tag id
+    """
+    if scheme is None:
+        scheme = 'nrega'
+    params = {
+        'libtech_tag__name' : tag_name,
+        'scheme' : scheme,
+        'limit' : 500
+    }
+    response = fetch_data(logger, LOCATIONURL, params=params)
+    count = response.get("count", 0)
+    child_location_array = []
+    if count > 0:
+        results = response.get('results')
+        for res in results:
+            code = res.get('code')
+            child_location_array.append(code)
+    return child_location_array
 
 def api_get_child_locations(logger, location_code, scheme=None):
     """Given a location code, it will return all the child locations
@@ -268,6 +303,24 @@ def api_get_report_url(logger, location_id, report_type, finyear=None):
         report_dict = results[0]
         report_url = report_dict.get('report_url', None)
     return report_url
+
+def api_get_report_last_updated(logger, location_code, report_type, finyear=None):
+    """This function will get the report dataframe from the amazon S3"""
+    last_updated = None
+    params = {
+        'location_code' : location_code,
+        'report_type' : report_type
+    }
+    if finyear is not None:
+        params['finyear'] = finyear
+    response = fetch_data(logger, REPORTURL, params=params)
+    results = response.get("results", [])
+    if len(results) > 0:
+        report_dict = results[0]
+        last_updated = report_dict.get('updated', None)
+        last_updated = parse(last_updated) 
+    return last_updated
+
 
 def api_get_report_urls(logger, location_id, report_type, finyear=None):
     """Gets the report urls """
@@ -350,3 +403,14 @@ def create_update_report(logger, location_id, report_type, data,
                              data=json.dumps(patch_data))
         logger.info(f"Patch status {res.status_code} and response {res.content}")
     return report_url
+
+def api_create_bundle(logger, data=None):
+    """Create Bundle"""
+    headers = get_authentication_header()
+    r = requests.post(BUNDLEURL, headers=headers, data=json.dumps(data))
+    if r.status_code == 201:
+        result = r.json()
+        url = result["bundle_url"]
+        return url
+    return None
+

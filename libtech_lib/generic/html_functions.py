@@ -9,6 +9,13 @@ import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 
+def get_request_with_retry_timeout(logger, url, headers=None, params=None,
+                                  cookies=None, timeout=None, max_retry=5):
+    response = request_with_retry_timeout(logger, url, headers=headers,
+                                          params=params, cookies=cookies,
+                                          timeout=timeout, max_retry=max_retry, 
+                                          method="get")
+    return response
 def request_with_retry_timeout(logger, url, data=None, headers=None, params=None, cookies=None,
                  timeout = 5, max_retry=5, method="post"):
     """This is the wrapper function for request post method."""
@@ -117,10 +124,11 @@ def get_urldataframe_from_html(logger, myhtml, mydict=None):
 def get_urldataframe_from_url(logger, url, mydict=None, cookies=None):
     """This will harvest urls from the given url based on extract dict
     parameters"""
-    if cookies is None:
-        response = requests.get(url)
-    else:
-        response = requests.get(url, cookies=cookies)
+   #if cookies is None:
+   #    response = requests.get(url)
+   #else:
+   #    response = requests.get(url, cookies=cookies)
+    response = request_with_retry_timeout(logger, url, cookies=cookies, method="get")
     dataframe = None
     if response.status_code == 200:
         myhtml = response.content
@@ -167,7 +175,6 @@ def get_dataframe_from_html(logger, myhtml, mydict=None):
     mysoup = BeautifulSoup(myhtml, "lxml")
     mysoup = BeautifulSoup(myhtml, "html5lib")
     tables = mysoup.findAll('table')
-    logger.debug(f"Number of tables found is {len(tables)}")
     matched_tables = []
     #Match the table agains the specified pattern
     if table_id_array is None:
