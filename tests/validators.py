@@ -43,12 +43,16 @@ def test_finyear(data, finyear_var):
         return False
 
 
-def block_rejected_transactions_v2_validator(logger, data, report_type):
+def block_rejected_transactions_v2_validator(logger, data, report_type, finyear):
     logger.info(f'Running validator: {report_type}_validator({data.shape})')
-    # Place validating logic here
-    # obj = Rejectedpaymentvalidator(logger, data, report_type)
-    # obj.validate_report()
+    obj = RejectedPaymentReportValidator(logger, data, report_type, finyear)
+    result = obj.validate_report()
+    del obj
+    return result
 
+
+def old_block_rejected_transactions_v2_validator(logger, data, report_type, finyear):
+    logger.info(f'Running validator: {report_type}_validator({data.shape})')
     if test_finyear(data, finyear_var='fto_fin_year') and Test_NaN(data):
         return True
     else:
@@ -57,7 +61,7 @@ def block_rejected_transactions_v2_validator(logger, data, report_type):
     return True
 
 
-def dynamic_work_report_r6_18_validator(logger, data, report_type):
+def dynamic_work_report_r6_18_validator(logger, data, report_type, finyear):
     logger.info(f'Running validator: {report_type}_validator({data.shape})')
     # Place validating logic here
     # obj = Rejectedpaymentvalidator(logger, data, report_type)
@@ -72,102 +76,85 @@ validator_lookup = {
 }
 
 
-class ReportsValidator():
-    def __init__(self, logger=None):
-        pass
+class ReportValidator():
+    def __init__(self, logger, data, report_type, finyear=None):
+        self.logger = logger
+        self.data = data
+        self.report_type = report_type
+        self.finyear = finyear
 
     def __del__(self):
         pass
 
-    def validate_report(self):
+    def test_nan(self, column):
         logger = self.logger
-        logger.info(f'Validating report [{report_type}]')
+        data = self.data
 
-    def nan_test(self, column_name):
-        data
+        result = data[column].isnull().values.any()
+        if result:
+            logger.error(f'Found null value in column[{column}]')
+
+        return result
+
+    def test_empty_values(self, columns):
+        logger = self.logger
+        data = self.data
+
+        for column in columns:
+            if self.test_nan(column):
+                return False  # Fixme
+                # continue
 
         return True
 
-
-class RejectedPaymentValidator():
-    def __init__(self, logger, data, report_type):
-        # super().__init__(False)
-        self.logger = logger_fetch()
-        self.data = data
-        self.report_type = report_type
-
-    def finyear_test(self, finyear):
+    def test_finyear(self, expected_values, column_name):
         logger = self.logger
         data = self.data
-        logger.info('Testing finyear related issue')
-        pass
+        finyear = self.finyear
 
-    def nan_test(self, columns):
-        data = self.data
-        self.url
-        return True
+        logger.info('Running finyear test')
+
+        finyears = data[column_name].unique()
+        unexpected = [year for year in finyears if year not in expected_values]
+
+        if len(unexpected) == 0:
+            return True
+        else:
+            logger.error(f'Found unexpected values for finyear: {unexpected}')
+            return False
+
+
+class RejectedPaymentReportValidator(ReportValidator):
+    def __init__(self, logger, data, report_type, finyear=None):
+        super().__init__(logger, data, report_type, finyear)
 
     def validate_report(self):
         logger = self.logger
         logger.info('Validating Report')
 
-        self.nan_test('finyear')
-        self.nan_test('fto_amount')
-        self.nan_test(columns)
-
-    def test_NaN(self):
-        logger.info()
-        check_variable = [
-            'state_code', 'district_code', 'block_code', 'panchayat_code', 'fto_amount',
-            'state_name', 'district_name', 'block_name', 'panchayat_name', 'village_name',
-            'final_status'
+        columns = [
+            'state_code', 'district_code', 'block_code', 'panchayat_code', 'fto_no',
+            'final_status', 'fto_amount', 'final_rejection_reason', 'fto_amount', 'fto_fin_year'
         ]
-        naFalse = []
-        for eachvar in check_variable:
-            if self.df[eachvar].isnull().values.any():
-                naFalse.append(eachvar)
+        self.test_empty_values(columns)
 
-        if len(naFalse) == 0:
-            return True
-        else:
-            # print(naFalse)
-            return False, naFalse
+        expected_values = [19, 20, 21]
+        self.test_finyear(expected_values, 'fto_fin_year')
 
-    def test_locality(self):
-        check_codes = ['district_code', 'block_code', 'panchayat_code']
-        check_codes = ['panchayat_code']
-        CodeNot_list = []
-        codeNotexist = []
 
-        for eachcode in check_codes:
-            uni_fes_list = self.loc_df[eachcode].unique().tolist()
+class DynamiceReportValidator(ReportValidator):
+    def __init__(self, logger, data, report_type, finyear=None):
+        super().__init__(logger, data, report_type, finyear)
 
-            for eachunique in uni_fes_list:
-                if eachunique not in self.df[eachcode].unique().tolist():
-                    CodeNot_list.append(eachunique)
-                    codeNotexist.append(eachcode)
+    def validate_report(self):
+        logger = self.logger
+        logger.info('Validating Report')
 
-        print(f'Number of panchayat codes is {len(CodeNot_list)}')
-        print(f'{CodeNot_list}')
-        '''
-        if len(CodeNot_list) == 0:
-            return True
-        else:
-            # print(CodeNot_list)
-            # print(codeNotexist)
-            return False, CodeNot_list
-        '''
-        return CodeNot_list
+        columns = [
+            'state_code', 'district_code', 'block_code', 'panchayat_code', 'fto_no',
+            'final_status', 'fto_amount', 'final_rejection_reason', 'fto_amount', 'fto_fin_year'
+        ]
+        self.test_empty_values(columns)
 
-    def test_finyear(self, expected_values=None):
-        if not expected_values:
-            expected_values = [19, 20, 21]
-
-        finyears = self.df.fto_fin_year.unique()
-        unexpected = [year for year in finyears if year not in expected_values]
-        return self.df[self.df.fto_fin_year.isin(unexpected)][['state_name', 'district_name', 'block_name', 'jobcard']]
-
-    def test_finyear():
-        '''
-        This gets printed on jupiter notebook
-        '''
+        expected_values = [19, 20, 21]
+        self.test_finyear(expected_values, 'fto_fin_year')

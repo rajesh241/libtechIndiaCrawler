@@ -191,13 +191,11 @@ class Location():
         # reports_tests.py
         # validate_report()
         logger.info('Validation Begins')
-        logger.info('Args psased:')
-        logger.info(f'report_type[{report_type}] finyear[{finyear}]')
-        logger.info(data)
-        logger.info(data.shape)
-        logger.info(data.columns)
+        logger.debug(data)
+        logger.debug(data.shape)
+        logger.debug(data.columns)
 
-        return validator_lookup[report_type](logger, data, report_type)
+        return validator_lookup[report_type](logger, data, report_type, finyear)
         '''
         if report_type == 'block_rejected_transactions_v2':
             print('Rejected Report')
