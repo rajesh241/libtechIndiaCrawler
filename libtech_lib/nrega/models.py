@@ -83,7 +83,7 @@ from libtech_lib.nrega.apnrega import (
 from libtech_lib.generic.aws import days_since_modified_s3
 
 from tests.validators import validator_lookup
-VALIDATION_OFF = True
+VALIDATION_ON = False
 
 AP_STATE_CODE = "02"
 REPORT_THRESHOLD_DICT = {
@@ -213,10 +213,12 @@ class Location():
         if data is None:
             return
 
-        if self.validate_data(logger, data, report_type, finyear=finyear):
-            # Handle the failed reports
-            logger.info('Validation Ends, now what?')
-            return
+        if VALIDATION_ON:
+            if not self.validate_data(logger, data, report_type, finyear=finyear):
+                # Handle the failed reports
+                logger.info('Validation Ends, now what?')
+                return
+            return  # FIXME
 
         if finyear is None:
             report_filename = f"{self.slug}_{self.code}_{report_type}_{today}.csv"
@@ -1100,13 +1102,13 @@ class NREGABlock(Location):
         report_name = "block_rejected_stats"
         india_obj = Location(logger, '0')
         rej_stat_df = india_obj.fetch_report_dataframe(logger, report_name)
-        if VALIDATION_OFF:  # FIXME Mynk
+        if VALIDATION_ON:  # FIXME Mynk
+            report_type = "block_rejected_transactions_v2"
+            dataframe = self.fetch_report_dataframe(logger, report_type)
+        else:
             dataframe = get_block_rejected_transactions_v2(
                 self, logger, rej_stat_df
             )
-        else:
-            report_type = "block_rejected_transactions_v2"
-            dataframe = self.fetch_report_dataframe(logger, report_type)
         logger.info(dataframe)
         if dataframe is not None:
             report_type = "block_rejected_transactions_v2"
