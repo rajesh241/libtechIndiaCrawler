@@ -82,6 +82,9 @@ from libtech_lib.nrega.apnrega import (
 
 from libtech_lib.generic.aws import days_since_modified_s3
 
+from tests.validators import validator_lookup
+VALIDATION_OFF = True
+
 AP_STATE_CODE = "02"
 REPORT_THRESHOLD_DICT = {
     "jobcard_register": 15,
@@ -184,12 +187,37 @@ class Location():
             return False
         return True
 
+    def validate_data(self, logger, data, report_type, finyear=None):
+        # reports_tests.py
+        # validate_report()
+        logger.info('Validation Begins')
+        logger.info('Args psased:')
+        logger.info(f'report_type[{report_type}] finyear[{finyear}]')
+        logger.info(data)
+        logger.info(data.shape)
+        logger.info(data.columns)
+
+        return validator_lookup[report_type](logger, data, report_type)
+        '''
+        if report_type == 'block_rejected_transactions_v2':
+            print('Rejected Report')
+            # obj = RejectedPaymentValidator(logger)
+            # return obj.nan_tests()
+        return True
+        '''
+
     def save_report(self, logger, data, report_type, health="unknown",
                     finyear=None, remarks=''):
         """Standard function to save report to the location"""
         today = datetime.datetime.now().strftime('%d%m%Y')
         if data is None:
             return
+
+        if self.validate_data(logger, data, report_type, finyear=finyear):
+            # Handle the failed reports
+            logger.info('Validation Ends, now what?')
+            return
+
         if finyear is None:
             report_filename = f"{self.slug}_{self.code}_{report_type}_{today}.csv"
         else:
@@ -1072,8 +1100,14 @@ class NREGABlock(Location):
         report_name = "block_rejected_stats"
         india_obj = Location(logger, '0')
         rej_stat_df = india_obj.fetch_report_dataframe(logger, report_name)
-        dataframe = get_block_rejected_transactions_v2(
-            self, logger, rej_stat_df)
+        if VALIDATION_OFF:  # FIXME Mynk
+            dataframe = get_block_rejected_transactions_v2(
+                self, logger, rej_stat_df
+            )
+        else:
+            report_type = "block_rejected_transactions_v2"
+            dataframe = self.fetch_report_dataframe(logger, report_type)
+        logger.info(dataframe)
         if dataframe is not None:
             report_type = "block_rejected_transactions_v2"
             self.save_report(logger, dataframe, report_type)
