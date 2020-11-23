@@ -6,34 +6,33 @@ import sys
 import os
 
 
-
-
 def Test_NaN(data):
-    check_variable = ['state_code','district_code','block_code', 'panchayat_code', 'fto_no', 'final_status', 
-                      'fto_amount','final_rejection_reason','fto_amount','fto_fin_year'] 
-   
-        
+    check_variable = [
+        'state_code', 'district_code', 'block_code', 'panchayat_code', 'fto_no',
+        'final_status', 'fto_amount', 'final_rejection_reason', 'fto_amount', 'fto_fin_year'
+    ]
+
     naFalse = []
-    
+
     for eachvar in check_variable:
         if data[eachvar].isnull().values.any():
             naFalse.append(eachvar)
-            
-    
+
     if len(naFalse) == 0:
         print(f'NaN test is successful for report')
 
         return True
     else:
-        print(f'NaN test is failed for report. columns with NaN values is/are {naFalse}')
+        print(
+            f'NaN test is failed for report. columns with NaN values is/are {naFalse}')
         return False
 
 
 def test_finyear(data, finyear_var):
-    
+
     expected_values = [19, 20, 21]
     finyears = data[finyear_var].unique()
-            
+
     unexpected = [year for year in finyears if year not in expected_values]
 
     if len(unexpected) == 0:
@@ -41,9 +40,7 @@ def test_finyear(data, finyear_var):
         return True
     else:
         print('fin year is not successful, extra years are'+'f{unexpected}')
-        return False  
-
-
+        return False
 
 
 def block_rejected_transactions_v2_validator(logger, data, report_type):
@@ -51,16 +48,13 @@ def block_rejected_transactions_v2_validator(logger, data, report_type):
     # Place validating logic here
     # obj = Rejectedpaymentvalidator(logger, data, report_type)
     # obj.validate_report()
-    
-        
-    if test_finyear(data, finyear_var = 'fto_fin_year') and Test_NaN(data):
-           return True
-    else:
-           print(" It is failed case")
-           #return False
-    return True
-   
 
+    if test_finyear(data, finyear_var='fto_fin_year') and Test_NaN(data):
+        return True
+    else:
+        print(" It is failed case")
+        # return False
+    return True
 
 
 def dynamic_work_report_r6_18_validator(logger, data, report_type):
