@@ -84,7 +84,7 @@ from libtech_lib.generic.aws import days_since_modified_s3
 
 from tests.validators import validator_lookup
 VALIDATION_ON = True
-VALIDATION_TEST = VALIDATION_ON and True
+VALIDATION_TEST = VALIDATION_ON and False  # Make False before commiting
 
 AP_STATE_CODE = "02"
 REPORT_THRESHOLD_DICT = {
@@ -192,9 +192,9 @@ class Location():
         # reports_tests.py
         # validate_report()
         logger.info('Validation Begins')
-        logger.debug(data)
-        logger.debug(data.shape)
-        logger.debug(data.columns)
+        # logger.debug(data)
+        # logger.debug(data.shape)
+        # logger.debug(data.columns)
 
         return validator_lookup[report_type](logger, data, report_type, finyear)
         '''
@@ -1108,7 +1108,7 @@ class NREGABlock(Location):
             dataframe = get_block_rejected_transactions_v2(
                 self, logger, rej_stat_df
             )
-        logger.info(dataframe)
+        logger.debug(dataframe)
         if dataframe is not None:
             report_type = "block_rejected_transactions_v2"
             self.save_report(logger, dataframe, report_type)

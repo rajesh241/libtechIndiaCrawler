@@ -43,8 +43,8 @@ class ReportValidator():
         logger = self.logger
         data = self.data
 
-        result = data[column].isnull().values.any()
-        assert (result == True), f'Found null value in column[{column}]'
+        result = not (data[column].isnull().values.any())
+        assert result, f'Found null value in column[{column}]'
 
         return result
 
@@ -53,9 +53,8 @@ class ReportValidator():
         data = self.data
 
         for column in columns:
-            if self.test_nan(column):
-                return False  # Fixme
-                # continue
+            if not self.test_nan(column):
+                return False
 
         return True
 
@@ -69,11 +68,9 @@ class ReportValidator():
         finyears = data[column_name].unique()
         unexpected = [year for year in finyears if year not in expected_values]
 
-        if len(unexpected) == 0:
-            return True
-        else:
-            logger.error(f'Found unexpected values for finyear: {unexpected}')
-            return False
+        assert not len(
+            unexpected), f'Found unexpected values for finyear: {unexpected}'
+        return True
 
 
 class RejectedPaymentReportValidator(ReportValidator):
@@ -86,7 +83,7 @@ class RejectedPaymentReportValidator(ReportValidator):
 
         columns = [
             'state_code', 'district_code', 'block_code', 'panchayat_code', 'fto_no',
-            'final_status', 'fto_amount', 'final_rejection_reason', 'fto_amount', 'fto_fin_year'
+            'final_status', 'fto_amount', 'fto_amount', 'fto_fin_year', 'final_rejection_reason'
         ]
         self.test_empty_values(columns)
 
