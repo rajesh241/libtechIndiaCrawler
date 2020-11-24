@@ -83,7 +83,8 @@ from libtech_lib.nrega.apnrega import (
 from libtech_lib.generic.aws import days_since_modified_s3
 
 from tests.validators import validator_lookup
-VALIDATION_ON = False
+VALIDATION_ON = True
+VALIDATION_TEST = VALIDATION_ON and True
 
 AP_STATE_CODE = "02"
 REPORT_THRESHOLD_DICT = {
@@ -1100,7 +1101,7 @@ class NREGABlock(Location):
         report_name = "block_rejected_stats"
         india_obj = Location(logger, '0')
         rej_stat_df = india_obj.fetch_report_dataframe(logger, report_name)
-        if VALIDATION_ON:  # FIXME Mynk
+        if VALIDATION_TEST:  # FIXME Mynk
             report_type = "block_rejected_transactions_v2"
             dataframe = self.fetch_report_dataframe(logger, report_type)
         else:
