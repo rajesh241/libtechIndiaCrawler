@@ -1213,7 +1213,7 @@ def get_nic_stat_urls(lobj, logger, panchayat_code_array):
             '__EVENTTARGET': 'ddl_state',
         }
     
-        response  =  requests.post(url, headers=headers, data=data)
+        response  =  request_with_retry_timeout(logger,url, headers=headers, data=data)
         if response.status_code == 200:
             myhtml = response.content
         else:
@@ -1227,7 +1227,7 @@ def get_nic_stat_urls(lobj, logger, panchayat_code_array):
             data['__VIEWSTATE'] =  view_state
             data['__EVENTVALIDATION'] =  validation
 
-            response  =  requests.post(url, headers=headers, data=data)
+            response  =  request_with_retry_timeout(logger ,url, headers=headers, data=data)
             if response.status_code == 200:
                 myhtml = response.content
             else:
@@ -1240,7 +1240,7 @@ def get_nic_stat_urls(lobj, logger, panchayat_code_array):
                 data['__EVENTTARGET'] = 'ddl_blk'
                 data['__VIEWSTATE'] =  view_state
                 data['__EVENTVALIDATION'] =  validation
-                response  =  requests.post(url,headers=headers, data=data)
+                response  =  request_with_retry_timeout(logger, url,headers=headers, data=data)
                 if response.status_code == 200:
                     myhtml = response.content
                 else:
@@ -1273,7 +1273,7 @@ def get_nic_stat_urls(lobj, logger, panchayat_code_array):
                           'ddl_pan' : location_code_string,
                           'btproceed' : 'View Detail'
                         }
-                        response  =  requests.post(url, headers=headers, data=data)
+                        response  =  request_with_retry_timeout(logger, url, headers=headers, data=data)
                         if response.status_code == 200:
                             myhtml = response.content
                         else:
@@ -2122,7 +2122,7 @@ def get_dynamic_work_report_r6_18(lobj, logger):
       '__ASYNCPOST': 'true',
       '': ''
     }
-    response = session.post(url, headers=headers, data=data, verify=False)
+    response = request_with_retry_timeout(logger,url, headers=headers, data=data, verify=False)
     soup = BeautifulSoup(response.text, 'lxml')
 
     # Update the context
@@ -2157,7 +2157,7 @@ def get_dynamic_work_report_r6_18(lobj, logger):
     }
 
     #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
-    response = session.post(url, headers=headers, data=data, verify=False)
+    response = request_with_retry_timeout(logger,url, headers=headers, data=data, verify=False)
     soup = BeautifulSoup(response.text, 'lxml')
 
     # Update the context
@@ -2176,7 +2176,7 @@ def get_dynamic_work_report_r6_18(lobj, logger):
     data['ctl00$ContentPlaceHolder1$ddl_blk'] = block_code
 
     #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
-    response = session.post(url, headers=headers, data=data, verify=False)
+    response = request_with_retry_timeout(logger, url, headers=headers, data=data, verify=False)
     soup = BeautifulSoup(response.text, 'lxml')
 
 
@@ -2199,7 +2199,7 @@ def get_dynamic_work_report_r6_18(lobj, logger):
 
 
     #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
-    response = session.post(url, headers=headers, data=data, verify=False)
+    response = request_with_retry_timeout(logger, url, headers=headers, data=data, verify=False)
     soup = BeautifulSoup(response.text, 'lxml')
 
 
@@ -2220,7 +2220,7 @@ def get_dynamic_work_report_r6_18(lobj, logger):
     data['ctl00$ContentPlaceHolder1$Ddlwork_status'] = 'ALL'
 
     #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
-    response = session.post(url, headers=headers, data=data, verify=False)
+    response = request_with_retry_timeout(logger,url, headers=headers, data=data, verify=False)
     soup = BeautifulSoup(response.text, 'lxml')
 
 
@@ -2243,7 +2243,7 @@ def get_dynamic_work_report_r6_18(lobj, logger):
     data['ctl00$ContentPlaceHolder1$Button1'] = 'Submit'
 
     #response = session.post('http://mnregaweb4.nic.in/netnrega/dynamic_work_details.aspx', headers=headers, params=params, data=data, verify=False)
-    response = session.post(url, headers=headers, data=data, verify=False)
+    response = request_with_retry_timeout(logger,url, headers=headers, data=data, verify=False)
 
     myhtml = response.content
     extract_dict = {}
@@ -2287,7 +2287,7 @@ def get_worker_stats(lobj, logger, nic_urls_df):
         response = get_request_with_retry_timeout(logger, lobj.mis_state_url)
         
     if response is None:
-        logger.debug(f"response is noe for {lobj.mis_state_url}")
+        logger.debug(f"response is now for {lobj.mis_state_url}")
         return empty_dataframe
     cookies = response.cookies
     logger.debug(f"Cookies are {cookies}")
