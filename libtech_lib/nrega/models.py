@@ -195,8 +195,10 @@ class Location():
         # logger.debug(data)
         # logger.debug(data.shape)
         # logger.debug(data.columns)
-
-        return validator_lookup[report_type](logger, data, report_type, finyear)
+        validator = validator_lookup.get(report_type, None)
+        if validator is None:
+            return True
+        return validator(logger, data, report_type, finyear)
         '''
         if report_type == 'block_rejected_transactions_v2':
             print('Rejected Report')
@@ -209,8 +211,8 @@ class Location():
                     finyear=None, remarks=''):
         """Standard function to save report to the location"""
         today = datetime.datetime.now().strftime('%d%m%Y')
-        if data is None:
-            return
+       #if data is None:
+       #    return
 
         if VALIDATION_ON:
             if not self.validate_data(logger, data, report_type, finyear=finyear):
