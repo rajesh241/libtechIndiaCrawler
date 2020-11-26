@@ -198,7 +198,7 @@ class Location():
         validator = validator_lookup.get(report_type, None)
         if validator is None:
             return True
-        return validator(logger, data, report_type, finyear)
+        return validator(self, logger, data, report_type, finyear)
         '''
         if report_type == 'block_rejected_transactions_v2':
             print('Rejected Report')

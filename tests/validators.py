@@ -4,17 +4,20 @@ import requests
 import pandas as pd
 import sys
 import os
+from libtech_lib.generic.commons import  (get_current_finyear,
+    get_default_start_fin_year,
+    get_current_finyear
+)
 
-
-def block_rejected_transactions_v2_validator(logger, data, report_type, finyear):
+def block_rejected_transactions_v2_validator(lobj, logger, data, report_type, finyear):
     logger.info(f'Running validator: {report_type}_validator({data.shape})')
-    obj = RejectedPaymentReportValidator(logger, data, report_type, finyear)
+    obj = RejectedPaymentReportValidator(lobj, logger, data, report_type, finyear)
     result = obj.validate_report()
     del obj
     return result
 
 
-def dynamic_work_report_r6_18_validator(logger, data, report_type, finyear):
+def dynamic_work_report_r6_18_validator(lobj, logger, data, report_type, finyear):
     logger.info(f'Running validator: {report_type}_validator({data.shape})')
     # Place validating logic here
     # obj = Rejectedpaymentvalidator(logger, data, report_type)
@@ -30,11 +33,12 @@ validator_lookup = {
 
 
 class ReportValidator():
-    def __init__(self, logger, data, report_type, finyear=None):
+    def __init__(self, lobj, logger, data, report_type, finyear=None):
         self.logger = logger
         self.data = data
         self.report_type = report_type
         self.finyear = finyear
+        self.lobj = lobj
 
     def __del__(self):
         pass
@@ -78,28 +82,38 @@ class ReportValidator():
 
   
 class RejectedPaymentReportValidator(ReportValidator):
-    def __init__(self, logger, data, report_type, finyear=None):
-        super().__init__(logger, data, report_type, finyear)
+    def __init__(self, lobj, logger, data, report_type, finyear=None):
+        super().__init__(lobj, logger, data, report_type, finyear)
 
     def validate_report(self):
         logger = self.logger
-        logger.info('Validating Report')
+        logger.debug(f"location type {self.lobj.location_type}")
+        logger.debug(f"is NIC {self.lobj.is_nic}")
+        logger.debug(f"panchayats for blocks {self.lobj.get_all_panchayats(logger)}")
+        logger.debug('Validating Report')
 
+        start_finyear = get_default_start_fin_year()
+        end_finyear = get_current_finyear()
+        expected_values = []
+        for finyear in range(start_finyear, end_finyear+1):
+            expected_values.append(finyear)
+        if self.finyear is not None:
+            expected_values = [finyear]
+        logger.debug(expected_values)
         columns = [
             'state_code', 'district_code', 'block_code', 'panchayat_code', 'fto_no',
             'final_status', 'fto_amount', 'fto_amount', 'fto_fin_year', 'final_rejection_reason'
         ]
         self.test_empty_values(columns)
-
-        expected_values = [19, 20, 21]
+        #expected_values = [19, 20, 21]
         self.test_finyear(expected_values, 'fto_fin_year')
         self.test_empty_df()
         return True
 
 
 class DynamiceReportValidator(ReportValidator):
-    def __init__(self, logger, data, report_type, finyear=None):
-        super().__init__(logger, data, report_type, finyear)
+    def __init__(self, lobj, logger, data, report_type, finyear=None):
+        super().__init__(lobj, logger, data, report_type, finyear)
 
     def validate_report(self):
         logger = self.logger
