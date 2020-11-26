@@ -70,10 +70,10 @@ class ReportValidator():
             unexpected), f'Found unexpected values for finyear: {unexpected}'
         return True 
     
-     def test_empty_df():
+    def test_empty_df(self):
          logger = self.logger
          data = self.data
-         assert data.shape[0] != 0,  f'It is a empty dataframe with {df.shape}'
+         assert data.shape[0] != 0,  f'It is a empty dataframe with {data.shape}'
          return True
 
   
@@ -93,6 +93,8 @@ class RejectedPaymentReportValidator(ReportValidator):
 
         expected_values = [19, 20, 21]
         self.test_finyear(expected_values, 'fto_fin_year')
+        self.test_empty_df()
+        return True
 
 
 class DynamiceReportValidator(ReportValidator):
