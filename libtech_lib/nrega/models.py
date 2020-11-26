@@ -956,7 +956,7 @@ class NREGABlock(Location):
     def nic_r4_1(self, logger):
         '''Download MIS NIC 4_1 report'''
         report_type = "nic_r4_1"
-        state_obj = Location(logger, self.state_code)
+        state_obj = NREGAState(logger, self.state_code)
         report_name = "nic_r4_1_urls"
         url_df = state_obj.fetch_report_dataframe(logger, report_name)
         if url_df is None:
@@ -974,7 +974,7 @@ class NREGABlock(Location):
     def nic_r14_5(self, logger):
         '''Download MIS NIC 4_1 report'''
         report_type = "nic_r14_5"
-        state_obj = Location(logger, self.state_code)
+        state_obj = NREGAState(logger, self.state_code)
         report_name = "nic_r14_5_urls"
         url_df = state_obj.fetch_report_dataframe(logger, report_name)
         if url_df is None:
