@@ -42,10 +42,8 @@ class ReportValidator():
     def test_nan(self, column):
         logger = self.logger
         data = self.data
-
-        result = not (data[column].isnull().values.any())
-        assert result, f'Found null value in column[{column}]'
-
+        result = data[column].isnull().values.any()
+        assert result != True , f'Found null value in column[{column}]' 
         return result
 
     def test_empty_values(self, columns):
@@ -70,9 +68,15 @@ class ReportValidator():
 
         assert not len(
             unexpected), f'Found unexpected values for finyear: {unexpected}'
-        return True
+        return True 
+    
+     def test_empty_df():
+         logger = self.logger
+         data = self.data
+         assert data.shape[0] != 0,  f'It is a empty dataframe with {df.shape}'
+         return True
 
-
+  
 class RejectedPaymentReportValidator(ReportValidator):
     def __init__(self, logger, data, report_type, finyear=None):
         super().__init__(logger, data, report_type, finyear)
