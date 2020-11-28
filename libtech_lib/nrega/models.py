@@ -238,9 +238,9 @@ class Location():
         filepath = filepath.replace("reportType", report_type)
         filename = f"{filepath}/{report_filename}"
         logger.debug(f"Report will be saved at {filename}")
-        create_update_report(logger, self.id, report_type,
-                             data, filename, finyear=finyear, health=health,
-                             remarks=remarks)
+       #create_update_report(logger, self.id, report_type,
+       #                     data, filename, finyear=finyear, health=health,
+       #                     remarks=remarks)
 
     def fto_status_urls(self, logger):
         """This function will get and save FTO Stat"""
@@ -272,6 +272,7 @@ class APPanchayat(Location):
             self.home_url = "http://www.nrega.ap.gov.in/Nregs/FrontServlet"
         else:
             self.home_url = "http://www.nrega.telangana.gov.in/Nregs/FrontServlet"
+        self.child_location_type = "village"
 
     def worker_register(self, logger):
         """This will fetch the worker register of AP from nic site"""
@@ -315,11 +316,13 @@ class NREGAPanchayat(Location):
         self.code = location_code
         self.force_download = force_download
         self.sample_name = sample_name
+        
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
         self.nic_state_url = f"https://{self.crawl_ip}/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
+        self.child_location_type = "village"
         full_finyear = get_full_finyear(get_current_finyear())
         self.panchayat_page_url = (f"http://{self.crawl_ip}/netnrega/IndexFrame.aspx?"
                                    f"lflag=eng&District_Code={self.state_code}&"
@@ -498,6 +501,7 @@ class APBlock(Location):
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
+        self.child_location_type = "panchayat"
 
     def get_all_panchayats(self, logger):
         """Getting all child Locations, in this case getting all panchayat
@@ -697,6 +701,7 @@ class NREGAState(Location):
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
+        self.child_location_type = "district"
         self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
 
     def nrega_locations(self, logger):
@@ -737,6 +742,7 @@ class NREGADistrict(Location):
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
+        self.child_location_type = "block"
 
     def get_all_blocks(self, logger):
         """Getting all child Locations, in this case getting all panchayat
@@ -790,6 +796,7 @@ class NREGABlock(Location):
                           sample_name=self.sample_name)
         self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         self.mis_block_url = f"https://mnregaweb4.nic.in/netnrega/Progofficer/PoIndexFrame.aspx?flag_debited=S&lflag=eng&District_Code={self.district_code}&district_name={self.district_name}&state_name={self.state_name}&state_Code={self.state_code}&finyear=fullFinYear&check=1&block_name={self.block_name}&Block_Code={self.block_code}"
+        self.child_location_type = "panchayat"
 
     def get_all_panchayats(self, logger):
         """Getting all child Locations, in this case getting all panchayat
