@@ -238,9 +238,9 @@ class Location():
         filepath = filepath.replace("reportType", report_type)
         filename = f"{filepath}/{report_filename}"
         logger.debug(f"Report will be saved at {filename}")
-       #create_update_report(logger, self.id, report_type,
-       #                     data, filename, finyear=finyear, health=health,
-       #                     remarks=remarks)
+        create_update_report(logger, self.id, report_type,
+                             data, filename, finyear=finyear, health=health,
+                             remarks=remarks)
 
     def fto_status_urls(self, logger):
         """This function will get and save FTO Stat"""
