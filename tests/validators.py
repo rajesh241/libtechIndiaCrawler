@@ -82,6 +82,32 @@ class ReportValidator():
          assert data.shape[0] != 0,  f'It is a empty dataframe with {data.shape}'
          return True
 
+    def test_child_locations(self):
+        logger = self.logger
+        dataframe = self.data
+        lobj = self.lobj
+        # We do not check child locations for panchayat as it is lowerst level
+        if (lobj.location_type == "panchayat"):
+            return True
+        child_location_column_name = f"{lobj.child_location_type}_code"
+        if child_location_column_name not in dataframe.columns:
+            message = f"{child_location_column_name} column does not exists"
+            assert False, message
+        unique_child_locations = dataframe[child_location_column_name].unique()
+        expected_child_locations = lobj.get_child_locations(logger)
+        logger.debug(f"expected child {expected_child_locations}")
+        absent_locations = [];
+        for location_code in expected_child_locations:
+            if location_code not in unique_child_locations:
+                absent_locations.append(location_code)
+        if len(absent_locations) > 0:
+            message = f"following locations are not present {absent_locations}"
+            assert False, message
+        return True
+
+
+
+         
   
 class NicBlockUrlsValidator(ReportValidator):
     def __init__(self, lobj, logger, data, report_type, finyear=None):
@@ -92,6 +118,7 @@ class NicBlockUrlsValidator(ReportValidator):
         columns = [
             'state_code', 'district_code', 'block_code', 'panchayat_code']
         self.test_empty_values(columns)
+        self.test_child_locations()
         return True, self.health, self.remarks
 class RejectedPaymentReportValidator(ReportValidator):
     def __init__(self, lobj, logger, data, report_type, finyear=None):
