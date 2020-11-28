@@ -12,7 +12,8 @@ import pandas as pd
 from libtech_lib.generic.commons import (
     get_full_finyear,
     get_default_start_fin_year,
-    get_current_finyear
+    get_current_finyear,
+    underscore_to_titlecase
 )
 
 from libtech_lib.generic.api_interface import (
@@ -81,8 +82,7 @@ from libtech_lib.nrega.apnrega import (
 )
 
 from libtech_lib.generic.aws import days_since_modified_s3
-
-from tests.validators import validator_lookup
+from tests import validators as testvalidators
 VALIDATION_ON = True
 VALIDATION_TEST = VALIDATION_ON and False  # Make False before commiting
 
@@ -191,35 +191,45 @@ class Location():
     def validate_data(self, logger, data, report_type, finyear=None):
         # reports_tests.py
         # validate_report()
-        logger.info('Validation Begins')
-        # logger.debug(data)
-        # logger.debug(data.shape)
-        # logger.debug(data.columns)
-        validator = validator_lookup.get(report_type, None)
-        if validator is None:
-            return True
-        return validator(self, logger, data, report_type, finyear)
-        '''
-        if report_type == 'block_rejected_transactions_v2':
-            print('Rejected Report')
-            # obj = RejectedPaymentValidator(logger)
-            # return obj.nan_tests()
-        return True
-        '''
+        validator_class_name = f"{underscore_to_titlecase(report_type)}Validator"
+        logger.info(f"Validator Name : {underscore_to_titlecase(report_type)}Validator")
+        if hasattr(testvalidators, validator_class_name):
+            logger.debug("validator exists")
+            validator = getattr(testvalidators, validator_class_name)(self, logger, data, report_type, finyear)
+            validator_result, health, remarks = validator.validate_report()
+        else:
+            logger.debug("validator does not exist")
+            validator_result = True
+            health = "unknown"
+            remarks = "Validators do not exists"
+        return validator_result, health, remarks
+       #validator = validator_lookup.get(report_type, None)
+       #if validator is None:
+       #    return True
+       #return validator(self, logger, data, report_type, finyear)
+       #'''
+       #if report_type == 'block_rejected_transactions_v2':
+       #    print('Rejected Report')
+       #    # obj = RejectedPaymentValidator(logger)
+       #    # return obj.nan_tests()
+       #return True
+       #'''
 
-    def save_report(self, logger, data, report_type, health="unknown",
-                    finyear=None, remarks=''):
+    def save_report(self, logger, data, report_type, health1="unknown",
+                    finyear=None, remarks1=''):
         """Standard function to save report to the location"""
         today = datetime.datetime.now().strftime('%d%m%Y')
        #if data is None:
        #    return
 
         if VALIDATION_ON:
-            if not self.validate_data(logger, data, report_type, finyear=finyear):
-                # Handle the failed reports
-                logger.info('Validation Ends, now what?')
-                return
-
+            validator_result, health, remarks = self.validate_data(logger, data, report_type, finyear=finyear)
+        else:
+            validator_result = True
+            health = "unknown"
+            remarks = "System Validation has been Turned off"
+        if (validator_result == False):
+            return
         if finyear is None:
             report_filename = f"{self.slug}_{self.code}_{report_type}_{today}.csv"
         else:

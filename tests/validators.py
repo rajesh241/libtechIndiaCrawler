@@ -39,6 +39,8 @@ class ReportValidator():
         self.report_type = report_type
         self.finyear = finyear
         self.lobj = lobj
+        self.health = "green"
+        self.remarks = ""
 
     def __del__(self):
         pass
@@ -81,6 +83,16 @@ class ReportValidator():
          return True
 
   
+class NicBlockUrlsValidator(ReportValidator):
+    def __init__(self, lobj, logger, data, report_type, finyear=None):
+        super().__init__(lobj, logger, data, report_type, finyear)
+    def validate_report(self):
+        logger = self.logger
+        self.test_empty_df()
+        columns = [
+            'state_code', 'district_code', 'block_code', 'panchayat_code']
+        self.test_empty_values(columns)
+        return True, self.health, self.remarks
 class RejectedPaymentReportValidator(ReportValidator):
     def __init__(self, lobj, logger, data, report_type, finyear=None):
         super().__init__(lobj, logger, data, report_type, finyear)
@@ -108,7 +120,9 @@ class RejectedPaymentReportValidator(ReportValidator):
         #expected_values = [19, 20, 21]
         self.test_finyear(expected_values, 'fto_fin_year')
         self.test_empty_df()
-        return True
+        message = ''
+        health = ''
+        return True, health, message
 
 
 class DynamiceReportValidator(ReportValidator):

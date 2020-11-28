@@ -273,3 +273,27 @@ def is_english(s):
         return False
     else:
         return True
+
+def underscore_to_titlecase(word):
+    if not isinstance(word, str):
+        return word
+    if word.startswith("_"):
+        word = word[1:]
+    words = word.split("_")
+    _words = []
+    for idx, _word in enumerate(words):
+        _words.append(_word.capitalize())
+    return ''.join(_words)
+def underscore_to_camelcase(word):
+    if not isinstance(word, str):
+        return word
+    if word.startswith("_"):
+        word = word[1:]
+    words = word.split("_")
+    _words = []
+    for idx, _word in enumerate(words):
+        if idx == 0:
+            _words.append(_word)
+            continue
+        _words.append(_word.capitalize())
+    return ''.join(_words)
