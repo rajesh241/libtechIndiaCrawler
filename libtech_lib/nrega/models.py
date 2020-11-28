@@ -219,7 +219,6 @@ class Location():
                 # Handle the failed reports
                 logger.info('Validation Ends, now what?')
                 return
-            return  # FIXME
 
         if finyear is None:
             report_filename = f"{self.slug}_{self.code}_{report_type}_{today}.csv"
