@@ -94,11 +94,12 @@ class ReportValidator():
             message = f"{child_location_column_name} column does not exists"
             assert False, message
         unique_child_locations = dataframe[child_location_column_name].unique()
+        logger.debug(f"uniquer child locations {unique_child_locations}")
         expected_child_locations = lobj.get_child_locations(logger)
         logger.debug(f"expected child {expected_child_locations}")
         absent_locations = [];
         for location_code in expected_child_locations:
-            if location_code not in unique_child_locations:
+            if int(location_code) not in unique_child_locations:
                 absent_locations.append(location_code)
         if len(absent_locations) > 0:
             message = f"following locations are not present {absent_locations}"
@@ -120,6 +121,19 @@ class NicBlockUrlsValidator(ReportValidator):
         self.test_empty_values(columns)
         self.test_child_locations()
         return True, self.health, self.remarks
+
+class WorkerRegisterValidator(ReportValidator):
+    def __init__(self, lobj, logger, data, report_type, finyear=None):
+        super().__init__(lobj, logger, data, report_type, finyear)
+    def validate_report(self):
+        logger = self.logger
+        self.test_empty_df()
+        self.test_child_locations()
+        return True, self.health, self.remarks
+
+
+
+
 class RejectedPaymentReportValidator(ReportValidator):
     def __init__(self, lobj, logger, data, report_type, finyear=None):
         super().__init__(lobj, logger, data, report_type, finyear)
