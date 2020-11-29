@@ -93,10 +93,17 @@ class ReportValidator():
         if child_location_column_name not in dataframe.columns:
             message = f"{child_location_column_name} column does not exists"
             assert False, message
-        unique_child_locations = dataframe[child_location_column_name].unique()
+        dataframe = dataframe.astype({child_location_column_name : int})
+        unique_child_locations = dataframe[child_location_column_name].unique().tolist()
+        unique_child_location = unique_child_locations[0]
+        logger.info(f"type of location is {type(unique_child_location)}")
         logger.debug(f"uniquer child locations {unique_child_locations}")
         expected_child_locations = lobj.get_child_locations(logger)
+        for i in range(0,len(expected_child_locations)):
+            expected_child_locations[i] = int(expected_child_locations[i])
         logger.debug(f"expected child {expected_child_locations}")
+        expected_child_location = expected_child_locations[0]
+        logger.info(f"type of expectedlocation is {type(expected_child_location)}")
         absent_locations = [];
         for location_code in expected_child_locations:
             if int(location_code) not in unique_child_locations:
