@@ -80,7 +80,8 @@ class ReportValidator():
          logger = self.logger
          data = self.data
          if data is None:
-             assert True, f"Empty Dataframe"
+             assert False, f"Empty Dataframe"
+             return True
          assert data.shape[0] != 0,  f'It is a empty dataframe with {data.shape}'
          return True
 
