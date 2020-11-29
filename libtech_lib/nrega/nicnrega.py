@@ -268,6 +268,8 @@ def get_worker_register_mis(lobj, logger, nic_urls_df):
                                       'jobcard_verification_date']
     dataframe = None
     dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+    if dataframe is None:
+        return None
     ##Here we need to do some post processing dataframe entries
     to_delete_rows = []
     village_name = ''
