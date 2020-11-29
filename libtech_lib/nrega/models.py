@@ -89,7 +89,7 @@ VALIDATION_TEST = VALIDATION_ON and False  # Make False before commiting
 AP_STATE_CODE = "02"
 REPORT_THRESHOLD_DICT = {
     "jobcard_register": 15,
-    "worker_register": 1,
+    "worker_register": 0,
     "nic_urls": 365,
     "nic_stat_urls": 365
 }
@@ -362,7 +362,7 @@ class NREGAPanchayat(Location):
 
     def worker_register(self, logger):
         """Will Fetch the Jobcard Register"""
-        logger.info(f"Going to fetch Jobcard register for {self.code}")
+        logger.info(f"Going to fetch woker register for {self.code}")
         report_type = "worker_register"
         is_updated = self.is_report_updated(logger, report_type)
         # if (is_updated) and (not self.force_download):
