@@ -188,7 +188,7 @@ class Location():
             return False
         return True
 
-    def validate_data(self, logger, data, report_type, finyear=None):
+    def validate_data(self, logger, data, report_type, finyear):
         # reports_tests.py
         # validate_report()
         validator_class_name = f"{underscore_to_titlecase(report_type)}Validator"
@@ -223,7 +223,7 @@ class Location():
        #    return
 
         if VALIDATION_ON:
-            validator_result, health, remarks = self.validate_data(logger, data, report_type, finyear=finyear)
+            validator_result, health, remarks = self.validate_data(logger, data, report_type, finyear)
         else:
             validator_result = True
             health = "unknown"
@@ -456,7 +456,7 @@ class NREGAPanchayat(Location):
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
 
-    def validate_data(self, logger):
+    def validate_trans_data(self, logger):
         """This function will validate downloaded data with nic stats"""
         self.muster_transactions(logger)
         self.nic_stats(logger)
@@ -1159,7 +1159,7 @@ class NREGABlock(Location):
                 f"Currently Processing panchayat code {each_panchayat_code}")
             my_location = NREGAPanchayat(logger, each_panchayat_code)
             my_location.correct(logger)
-            my_location.validate_data(logger)
+            my_location.validate_trans_data(logger)
             report_type = "muster_transactions"
             muster_transactions_df = my_location.fetch_report_dataframe(
                 logger, report_type)
