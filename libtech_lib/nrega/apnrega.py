@@ -551,7 +551,7 @@ def get_ap_nefms_report_r14_37(lobj, logger):
             ('fileName', location_id),
             ('stype', '-1'),
             ('ptype', '-1'),
-            ('lltype', 'ITDA'),
+            ('lltype', '-1'),
         )
     url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
     # response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
@@ -570,9 +570,10 @@ def get_ap_nefms_report_r14_37(lobj, logger):
     extract_dict['extract_url_array'] = [3, 8]
     extract_dict['url_prefix'] = "http://www.nrega.ap.gov.in"
     dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
-    logger.info(f"the shape of dataframe is {dataframe.shape}")
     if dataframe is None:
         return None
+    logger.info(f"the shape of dataframe is {dataframe.shape}")
+
     #dataframe['tjobcard'] = "~" + dataframe['HouseHold Code']
     dataframe = insert_location_details(logger, lobj, dataframe)
     location_cols = ["state_code", "state_name", "district_code",
@@ -655,7 +656,7 @@ def get_ap_labour_report_r3_17(lobj, logger):
         res = ap_nrega_download_page(logger, url, session=session)
         cookies = session.cookies
         if (not res) or (res.status_code != 200):
-            return none
+            return None
         logger.debug(f"cookies are {cookies}")
 
         response = ap_nrega_download_page(
@@ -663,7 +664,7 @@ def get_ap_labour_report_r3_17(lobj, logger):
             headers=headers, params=params,
             cookies=cookies)
         if (not response) or (response.status_code != 200):
-            return none
+            return None
     myhtml = response.content
     extract_dict = {}
     extract_dict['column_headers'] = column_headers
@@ -708,7 +709,7 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
         res = ap_nrega_download_page(logger, url, session=session)
         cookies = session.cookies
         if (not res) or (res.status_code != 200):
-            return none
+            return None
         logger.debug(f"cookies are {cookies}")
     job_list = []
     extract_dict = {}
@@ -799,7 +800,7 @@ def get_ap_rejected_transactions1(lobj, logger):
         res = ap_nrega_download_page(logger, url, session=session)
         cookies = session.cookies
         if (not res) or (res.status_code != 200):
-            return none
+            return None
         logger.debug(f"cookies are {cookies}")
 
         response = ap_nrega_download_page(
@@ -807,7 +808,7 @@ def get_ap_rejected_transactions1(lobj, logger):
             headers=headers, params=None,
             cookies=cookies)
         if (not response) or (response.status_code != 200):
-            return none
+            return None
     logger.debug("Found HTML!!!")
     myhtml = response.content
     with open("/tmp/a.html", "wb") as f:
