@@ -79,6 +79,8 @@ class ReportValidator():
     def test_empty_df(self):
          logger = self.logger
          data = self.data
+         if data is None:
+             assert True, f"Empty Dataframe"
          assert data.shape[0] != 0,  f'It is a empty dataframe with {data.shape}'
          return True
 
