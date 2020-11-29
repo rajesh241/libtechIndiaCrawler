@@ -39,6 +39,8 @@ class ReportValidator():
         self.report_type = report_type
         self.finyear = finyear
         self.lobj = lobj
+        self.health = "green"
+        self.remarks = ""
 
     def __del__(self):
         pass
@@ -91,8 +93,12 @@ class ReportValidator():
     def test_empty_df(self):
          logger = self.logger
          data = self.data
+         if data is None:
+             assert False, f"Empty Dataframe"
+             return True
          assert data.shape[0] != 0,  f'It is a empty dataframe with {data.shape}'
          return True
+<<<<<<< HEAD
      
     def test_column_exist(self, columns):
         data = self.data
@@ -147,7 +153,68 @@ class ReportValidator():
     
     
        
+=======
+
+    def test_child_locations(self):
+        logger = self.logger
+        dataframe = self.data
+        lobj = self.lobj
+        # We do not check child locations for panchayat as it is lowerst level
+        if (lobj.location_type == "panchayat"):
+            return True
+        child_location_column_name = f"{lobj.child_location_type}_code"
+        if child_location_column_name not in dataframe.columns:
+            message = f"{child_location_column_name} column does not exists"
+            assert False, message
+        dataframe = dataframe.astype({child_location_column_name : int})
+        unique_child_locations = dataframe[child_location_column_name].unique().tolist()
+        unique_child_location = unique_child_locations[0]
+        logger.info(f"type of location is {type(unique_child_location)}")
+        logger.debug(f"uniquer child locations {unique_child_locations}")
+        expected_child_locations = lobj.get_child_locations(logger)
+        for i in range(0,len(expected_child_locations)):
+            expected_child_locations[i] = int(expected_child_locations[i])
+        logger.debug(f"expected child {expected_child_locations}")
+        expected_child_location = expected_child_locations[0]
+        logger.info(f"type of expectedlocation is {type(expected_child_location)}")
+        absent_locations = [];
+        for location_code in expected_child_locations:
+            if int(location_code) not in unique_child_locations:
+                absent_locations.append(location_code)
+        if len(absent_locations) > 0:
+            message = f"following locations are not present {absent_locations}"
+            assert False, message
+        return True
+
+
+
+         
+>>>>>>> cf6c4c57e80996f704444361fae5279ee3b712cc
   
+class NicBlockUrlsValidator(ReportValidator):
+    def __init__(self, lobj, logger, data, report_type, finyear=None):
+        super().__init__(lobj, logger, data, report_type, finyear)
+    def validate_report(self):
+        logger = self.logger
+        self.test_empty_df()
+        columns = [
+            'state_code', 'district_code', 'block_code', 'panchayat_code']
+        self.test_empty_values(columns)
+        self.test_child_locations()
+        return True, self.health, self.remarks
+
+class WorkerRegisterValidator(ReportValidator):
+    def __init__(self, lobj, logger, data, report_type, finyear=None):
+        super().__init__(lobj, logger, data, report_type, finyear)
+    def validate_report(self):
+        logger = self.logger
+        self.test_empty_df()
+        self.test_child_locations()
+        return True, self.health, self.remarks
+
+
+
+
 class RejectedPaymentReportValidator(ReportValidator):
     def __init__(self, lobj, logger, data, report_type, finyear=None):
         super().__init__(lobj, logger, data, report_type, finyear)
@@ -180,7 +247,9 @@ class RejectedPaymentReportValidator(ReportValidator):
         #expected_values = [19, 20, 21]
         self.test_finyear(expected_values, 'fto_fin_year')
         self.test_empty_df()
-        return True
+        message = ''
+        health = ''
+        return True, health, message
 
 
 class DynamiceReportValidator(ReportValidator):

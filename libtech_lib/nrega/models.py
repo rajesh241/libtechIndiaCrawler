@@ -12,7 +12,8 @@ import pandas as pd
 from libtech_lib.generic.commons import (
     get_full_finyear,
     get_default_start_fin_year,
-    get_current_finyear
+    get_current_finyear,
+    underscore_to_titlecase
 )
 
 from libtech_lib.generic.api_interface import (
@@ -81,16 +82,16 @@ from libtech_lib.nrega.apnrega import (
 )
 
 from libtech_lib.generic.aws import days_since_modified_s3
-
-from tests.validators import validator_lookup
+from tests import validators as testvalidators
 VALIDATION_ON = True
 VALIDATION_TEST = VALIDATION_ON and False  # Make False before commiting
 
 AP_STATE_CODE = "02"
 REPORT_THRESHOLD_DICT = {
     "jobcard_register": 15,
-    "worker_register": 1,
+    "worker_register": 0,
     "nic_urls": 365,
+    "nic_block_urls": 30,
     "nic_stat_urls": 365
 }
 DEFAULT_REPORT_THRESHOLD = 20
@@ -188,39 +189,48 @@ class Location():
             return False
         return True
 
-    def validate_data(self, logger, data, report_type, finyear=None):
+    def validate_data(self, logger, data, report_type, finyear):
         # reports_tests.py
         # validate_report()
-        logger.info('Validation Begins')
-        # logger.debug(data)
-        # logger.debug(data.shape)
-        # logger.debug(data.columns)
-        validator = validator_lookup.get(report_type, None)
-        if validator is None:
-            return True
-        return validator(self, logger, data, report_type, finyear)
-        '''
-        if report_type == 'block_rejected_transactions_v2':
-            print('Rejected Report')
-            # obj = RejectedPaymentValidator(logger)
-            # return obj.nan_tests()
-        return True
-        '''
+        validator_class_name = f"{underscore_to_titlecase(report_type)}Validator"
+        logger.info(f"Validator Name : {underscore_to_titlecase(report_type)}Validator")
+        if hasattr(testvalidators, validator_class_name):
+            logger.debug("validator exists")
+            validator = getattr(testvalidators, validator_class_name)(self, logger, data, report_type, finyear)
+            validator_result, health, remarks = validator.validate_report()
+        else:
+            logger.debug("validator does not exist")
+            validator_result = True
+            health = "unknown"
+            remarks = "Validators do not exists"
+        return validator_result, health, remarks
+       #validator = validator_lookup.get(report_type, None)
+       #if validator is None:
+       #    return True
+       #return validator(self, logger, data, report_type, finyear)
+       #'''
+       #if report_type == 'block_rejected_transactions_v2':
+       #    print('Rejected Report')
+       #    # obj = RejectedPaymentValidator(logger)
+       #    # return obj.nan_tests()
+       #return True
+       #'''
 
-    def save_report(self, logger, data, report_type, health="unknown",
-                    finyear=None, remarks=''):
+    def save_report(self, logger, data, report_type, health1="unknown",
+                    finyear=None, remarks1=''):
         """Standard function to save report to the location"""
         today = datetime.datetime.now().strftime('%d%m%Y')
        #if data is None:
        #    return
 
         if VALIDATION_ON:
-            if not self.validate_data(logger, data, report_type, finyear=finyear):
-                # Handle the failed reports
-                logger.info('Validation Ends, now what?')
-                return
-            return  # FIXME
-
+            validator_result, health, remarks = self.validate_data(logger, data, report_type, finyear)
+        else:
+            validator_result = True
+            health = "unknown"
+            remarks = "System Validation has been Turned off"
+        if (validator_result == False):
+            return
         if finyear is None:
             report_filename = f"{self.slug}_{self.code}_{report_type}_{today}.csv"
         else:
@@ -263,6 +273,7 @@ class APPanchayat(Location):
             self.home_url = "http://www.nrega.ap.gov.in/Nregs/FrontServlet"
         else:
             self.home_url = "http://www.nrega.telangana.gov.in/Nregs/FrontServlet"
+        self.child_location_type = "village"
 
     def worker_register(self, logger):
         """This will fetch the worker register of AP from nic site"""
@@ -306,11 +317,13 @@ class NREGAPanchayat(Location):
         self.code = location_code
         self.force_download = force_download
         self.sample_name = sample_name
+        
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
         self.nic_state_url = f"https://{self.crawl_ip}/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
+        self.child_location_type = "village"
         full_finyear = get_full_finyear(get_current_finyear())
         self.panchayat_page_url = (f"http://{self.crawl_ip}/netnrega/IndexFrame.aspx?"
                                    f"lflag=eng&District_Code={self.state_code}&"
@@ -350,7 +363,7 @@ class NREGAPanchayat(Location):
 
     def worker_register(self, logger):
         """Will Fetch the Jobcard Register"""
-        logger.info(f"Going to fetch Jobcard register for {self.code}")
+        logger.info(f"Going to fetch woker register for {self.code}")
         report_type = "worker_register"
         is_updated = self.is_report_updated(logger, report_type)
         # if (is_updated) and (not self.force_download):
@@ -358,7 +371,7 @@ class NREGAPanchayat(Location):
             dataframe = self.fetch_report_dataframe(logger, report_type)
             return dataframe
         my_location = NREGABlock(logger, self.block_code)
-        my_location.nic_urls(logger)
+        my_location.nic_block_urls(logger)
         nic_urls_df = my_location.fetch_report_dataframe(
             logger, "nic_block_urls")
         dataframe = get_worker_register_mis(self, logger, nic_urls_df)
@@ -444,7 +457,7 @@ class NREGAPanchayat(Location):
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
 
-    def validate_data(self, logger):
+    def validate_trans_data(self, logger):
         """This function will validate downloaded data with nic stats"""
         self.muster_transactions(logger)
         self.nic_stats(logger)
@@ -489,6 +502,7 @@ class APBlock(Location):
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
+        self.child_location_type = "panchayat"
 
     def get_all_panchayats(self, logger):
         """Getting all child Locations, in this case getting all panchayat
@@ -688,6 +702,7 @@ class NREGAState(Location):
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
+        self.child_location_type = "district"
         self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
 
     def nrega_locations(self, logger):
@@ -728,6 +743,7 @@ class NREGADistrict(Location):
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
+        self.child_location_type = "block"
 
     def get_all_blocks(self, logger):
         """Getting all child Locations, in this case getting all panchayat
@@ -781,6 +797,7 @@ class NREGABlock(Location):
                           sample_name=self.sample_name)
         self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
         self.mis_block_url = f"https://mnregaweb4.nic.in/netnrega/Progofficer/PoIndexFrame.aspx?flag_debited=S&lflag=eng&District_Code={self.district_code}&district_name={self.district_name}&state_name={self.state_name}&state_Code={self.state_code}&finyear=fullFinYear&check=1&block_name={self.block_name}&Block_Code={self.block_code}"
+        self.child_location_type = "panchayat"
 
     def get_all_panchayats(self, logger):
         """Getting all child Locations, in this case getting all panchayat
@@ -815,6 +832,9 @@ class NREGABlock(Location):
 
     def nic_block_urls(self, logger):
         report_type = "nic_block_urls"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
         dataframe = get_nic_block_urls(self, logger)
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
@@ -1143,7 +1163,7 @@ class NREGABlock(Location):
                 f"Currently Processing panchayat code {each_panchayat_code}")
             my_location = NREGAPanchayat(logger, each_panchayat_code)
             my_location.correct(logger)
-            my_location.validate_data(logger)
+            my_location.validate_trans_data(logger)
             report_type = "muster_transactions"
             muster_transactions_df = my_location.fetch_report_dataframe(
                 logger, report_type)
