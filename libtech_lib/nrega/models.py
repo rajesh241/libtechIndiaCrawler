@@ -91,6 +91,7 @@ REPORT_THRESHOLD_DICT = {
     "jobcard_register": 15,
     "worker_register": 0,
     "nic_urls": 365,
+    "nic_block_urls": 30,
     "nic_stat_urls": 365
 }
 DEFAULT_REPORT_THRESHOLD = 20
@@ -370,7 +371,7 @@ class NREGAPanchayat(Location):
             dataframe = self.fetch_report_dataframe(logger, report_type)
             return dataframe
         my_location = NREGABlock(logger, self.block_code)
-        my_location.nic_urls(logger)
+        my_location.nic_block_urls(logger)
         nic_urls_df = my_location.fetch_report_dataframe(
             logger, "nic_block_urls")
         dataframe = get_worker_register_mis(self, logger, nic_urls_df)
@@ -831,6 +832,9 @@ class NREGABlock(Location):
 
     def nic_block_urls(self, logger):
         report_type = "nic_block_urls"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
         dataframe = get_nic_block_urls(self, logger)
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)

@@ -241,16 +241,16 @@ def get_worker_register_mis(lobj, logger, nic_urls_df):
                               (nic_urls_df["panchayat_code"] == int(lobj.panchayat_code))]
     logger.debug(f"Filtered DF shape is {filtered_df.shape}")
     ##Establish session for request
-    session = requests.Session()
-    session.get(lobj.mis_state_url)
-    logger.debug(lobj.mis_state_url)
-    logger.debug(f"session cookies {session.cookies}")
+    resp = get_request_with_retry_timeout(logger, lobj.mis_state_url)
+    if resp is None:
+        return None
+    cookies = resp.cookies
     myhtml = None
     for index, row in filtered_df.iterrows():
         url = row.get("mis_url")
         logger.debug(f"Url is {url}")
-        response = session.get(url)
-        if response.status_code == 200:
+        response = get_request_with_retry_timeout(logger, url, cookies=cookies)
+        if response is not None:
             myhtml = response.content
         break
     if myhtml is None:
@@ -1393,8 +1393,8 @@ def get_nic_urls(lobj, logger):
         finyear = str(finyear)
         full_finyear = get_full_finyear(finyear)
         base_url = panchayat_page_url.replace("fullFinYear", full_finyear)
-        res = request_with_retry_timeout(logger, base_url)
-        if res.status_code != 200:
+        res = get_request_with_retry_timeout(logger, base_url)
+        if res is None:
             return None
         myhtml = res.content
         mysoup = BeautifulSoup(myhtml, "lxml")
