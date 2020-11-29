@@ -74,12 +74,79 @@ class ReportValidator():
             unexpected), f'Found unexpected values for finyear: {unexpected}'
         return True 
     
+    def test_finyear_exist(self, expected_values, column_name):
+        logger = self.logger
+        data = self.data
+        finyear = self.finyear
+
+        logger.info('Running finyear test')
+
+        finyears = data[column_name].unique()
+        expected = [year for year in expected_values if year not in finyears]
+
+        assert not len(
+            expected), f'Missing finyear are: {expected}'
+        return True        
+    
     def test_empty_df(self):
          logger = self.logger
          data = self.data
          assert data.shape[0] != 0,  f'It is a empty dataframe with {data.shape}'
          return True
+     
+    def test_column_exist(self, columns):
+        data = self.data
+        column_list = data.columns.tolist()
+        
+        for column in columns:
+            not_exist = column not in column_list
+            assert not_exist != True, f'{i} column is not there in the data frame'
+            
+            
+    def test_child_location(self):
+        logger = self.logger
+        data = self.data 
+        lobj = self.lobj  
+        
+        location_type =  lobj.location_type
+        location_list = ['state','district','block','panchayat'] 
+        location_dict = {'state': ['state_code', 'state_name'],
+                 'district': ['district_code','district_name'],
+                 'block': ['block_code','block_name'],
+                 'panchayat': ['panchayat_code','panchayat_name']}
+        try:
+            get_location = location_list[location_list.index(location_type)+1]
+            location_nan = location_dict.get(get_location)
+        except IndexError:
+            print('This is the lowest level') 
+            
+                        
+        #if get_location == 'district':
+         #   ref_df = self.lobj.get_all_districts(logger)
+        #elif get_location == 'block':
+         #   ref_df = self.lobj.get_all_blocks(logger)
+        #elif get_location == 'panchayat':
+           # ref_df = self.lobj.get_all_panchayats(logger)   
 
+        ref_df = self.lobj.get_all_panchayats(logger)              
+        display_name = [self.lobj.display_name]*len(ref_df)           
+        panchayat_dict = dict(zip(pd.Series(ref_df),display_name))         
+        uni_df = data[location_nan[0]].unique().tolist()
+        uni_df = [str(i) for i in uni_df] 
+        missing_loc = [(panchayat, panchayat_dict[panchayat]) for panchayat in ref_df if panchayat not in uni_df]
+        assert len(missing_loc) == 0,  f'these are the missing {location_nan[0]} and ids {missing_loc}'      
+        return True       
+      
+        #logger.info(f'{uni_df}')
+        
+
+       # missing_loc = []
+        #for loc in ref_df:
+          # if loc not in uni_df:
+           #    missing_loc.append(loc)        
+    
+    
+       
   
 class RejectedPaymentReportValidator(ReportValidator):
     def __init__(self, lobj, logger, data, report_type, finyear=None):
@@ -88,6 +155,8 @@ class RejectedPaymentReportValidator(ReportValidator):
     def validate_report(self):
         logger = self.logger
         logger.debug(f"location type {self.lobj.location_type}")
+        logger.info(f'{self.lobj.state_name}-{self.lobj.district_name}-{self.lobj.block_name} {self.lobj.display_name}') 
+        logger.info(f'{self.lobj.location_type}')
         logger.debug(f"is NIC {self.lobj.is_nic}")
         logger.debug(f"panchayats for blocks {self.lobj.get_all_panchayats(logger)}")
         logger.debug('Validating Report')
@@ -104,7 +173,10 @@ class RejectedPaymentReportValidator(ReportValidator):
             'state_code', 'district_code', 'block_code', 'panchayat_code', 'fto_no',
             'final_status', 'fto_amount', 'fto_amount', 'fto_fin_year', 'final_rejection_reason'
         ]
+        #expected_values = [19,-2,22,21]
+        self.test_finyear_exist(expected_values, 'fto_fin_year') 
         self.test_empty_values(columns)
+        self.test_child_location()
         #expected_values = [19, 20, 21]
         self.test_finyear(expected_values, 'fto_fin_year')
         self.test_empty_df()
@@ -127,3 +199,4 @@ class DynamiceReportValidator(ReportValidator):
 
         expected_values = [19, 20, 21]
         self.test_finyear(expected_values, 'fto_fin_year')
+        
