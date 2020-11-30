@@ -98,7 +98,6 @@ class ReportValidator():
              return True
          assert data.shape[0] != 0,  f'It is a empty dataframe with {data.shape}'
          return True
-<<<<<<< HEAD
      
     def test_column_exist(self, columns):
         data = self.data
@@ -153,7 +152,6 @@ class ReportValidator():
     
     
        
-=======
 
     def test_child_locations(self):
         logger = self.logger
@@ -189,7 +187,6 @@ class ReportValidator():
 
 
          
->>>>>>> cf6c4c57e80996f704444361fae5279ee3b712cc
   
 class NicBlockUrlsValidator(ReportValidator):
     def __init__(self, lobj, logger, data, report_type, finyear=None):
