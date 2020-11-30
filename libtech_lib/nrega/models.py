@@ -231,6 +231,8 @@ class Location():
             remarks = "System Validation has been Turned off"
         if (validator_result == False):
             return
+        if (VALIDATION_TEST):
+            return
         if finyear is None:
             report_filename = f"{self.slug}_{self.code}_{report_type}_{today}.csv"
         else:
