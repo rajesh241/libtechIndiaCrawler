@@ -9,6 +9,19 @@ from libtech_lib.generic.commons import  (get_current_finyear,
     get_current_finyear
 )
 
+panchayats_with_no_workers = [
+    2728002102,
+    2728002104,
+    2728002105,
+    2728002101,
+    2728002100,
+    2728002106,
+    2728002108,
+    2728002099,
+    2728002103,
+    2728002107,
+
+]
 def block_rejected_transactions_v2_validator(lobj, logger, data, report_type, finyear):
     logger.info(f'Running validator: {report_type}_validator({data.shape})')
     obj = RejectedPaymentReportValidator(lobj, logger, data, report_type, finyear)
@@ -79,12 +92,23 @@ class ReportValidator():
     def test_empty_df(self):
          logger = self.logger
          data = self.data
+         print("I am in test empty df")
          if data is None:
              assert False, f"Empty Dataframe"
              return True
          assert data.shape[0] != 0,  f'It is a empty dataframe with {data.shape}'
          return True
 
+    def test_location(self):
+        logger = self.logger
+        dataframe = self.data
+        lobj = self.lobj
+        location_column_name = f"{lobj.location_type}_code"
+        dataframe = dataframe.astype({location_column_name : int})
+        unique_locations = dataframe[location_column_name].unique().tolist()
+        if int(lobj.code) not in unique_locations:
+            assert False, "location code not found"
+        return True
     def test_child_locations(self):
         logger = self.logger
         dataframe = self.data
@@ -109,6 +133,8 @@ class ReportValidator():
         logger.info(f"type of expectedlocation is {type(expected_child_location)}")
         absent_locations = [];
         for location_code in expected_child_locations:
+            if int(location_code) in panchayats_with_no_workers:
+                continue
             if int(location_code) not in unique_child_locations:
                 absent_locations.append(location_code)
         if len(absent_locations) > 0:
@@ -136,8 +162,14 @@ class WorkerRegisterValidator(ReportValidator):
     def __init__(self, lobj, logger, data, report_type, finyear=None):
         super().__init__(lobj, logger, data, report_type, finyear)
     def validate_report(self):
-        logger = self.logger
+        if (self.lobj.location_type == "panchayat"):
+            if int(self.lobj.code) in panchayats_with_no_workers:
+                return False, self.health, self.remarks
+            self.test_empty_df()
+            self.test_location()
+            return True, self.health, self.remarks
         self.test_empty_df()
+        logger = self.logger
         self.test_child_locations()
         return True, self.health, self.remarks
 
