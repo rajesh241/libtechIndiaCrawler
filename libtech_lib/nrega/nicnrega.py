@@ -2680,3 +2680,125 @@ def get_fto_transactions(lobj, logger, finyear, fto_list_df):
     dataframe = dataframe[all_cols]
         
     return dataframe
+
+def get_nic_r8_1_5_urls(lobj, logger, report_type=None, url_text=None,
+                      url_prefix=None):
+    """This function will get the Urls at the block level"""
+    state_pattern = f"state_code={lobj.state_code}"
+
+    csv_array = []
+    column_headers = ["state_code", "district_code", "block_code", "state_name",
+                      "district_name", "block_name", "finyear", "url"]
+    start_finyear = get_default_start_fin_year()
+    end_finyear = get_current_finyear()
+    for finyear in range(int(start_finyear), int(end_finyear)+1):
+        logger.info(f"Downloading for FinYear {finyear}")
+        filename = f"{NREGA_DATA_DIR}/misReport_{finyear}.html"
+        logger.info(filename)
+        block_url_text = "rej_transftomusteroll.aspx"
+        with open(filename, "rb") as infile:
+            myhtml = infile.read()
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        elem = mysoup.find("a", href=re.compile(url_text))
+        if elem is not None:
+            base_href = elem["href"]
+        logger.info(base_href)
+        res = requests.get(base_href)
+        myhtml = None
+        if res.status_code == 200:
+            myhtml = res.content
+        if myhtml is not None:
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            elems = mysoup.find_all("a", href=re.compile(url_text))
+            for elem in elems:
+                state_href = elem["href"]
+                if state_pattern not in state_href:
+                    continue
+                url = url_prefix + state_href
+                response = requests.get(url)
+                logger.info(f"url for state {url}")
+                dist_html = None
+                if response.status_code == 200:
+                    dist_html = response.content
+                if dist_html is not None:
+                    dist_soup = BeautifulSoup(dist_html, "lxml")
+                    elems = dist_soup.find_all("a", href=re.compile(url_text))
+                    for elem1 in elems:
+                        dist_url = url_prefix + elem1["href"]
+                        block_res = requests.get(dist_url)
+                        if block_res.status_code == 200:
+                            block_html = block_res.content
+                            block_soup = BeautifulSoup(block_html, "lxml")
+                            belems = block_soup.find_all("a",href=re.compile(block_url_text))
+                            for belem in belems:
+                                block_url = url_prefix + belem["href"]
+                                #logger.info(dist_url)
+                                parsed = urlparse.urlparse(block_url)
+                                params_dict = parse_qs(parsed.query)
+                                #logger.info(params_dict)
+                                state_name = params_dict.get("state_name", [''])[0]
+                                state_code = params_dict.get("state_code", [""])[0]
+                                district_name = params_dict.get("district_name",
+                                                                [""])[0]
+                                district_code = params_dict.get("district_code",
+                                                                [""])[0]
+                                block_name = params_dict.get("block_name",
+                                                                [""])[0]
+                                block_code = params_dict.get("block_code",
+                                                                [""])[0]
+                                row = [state_code, district_code, block_code, state_name,
+                                       district_name, block_name, finyear, block_url]
+                                csv_array.append(row)
+
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    return dataframe
+
+def get_nic_r8_1_5(lobj, logger, url_df):
+    '''get NIC r8_1_5'''
+    worker_df= lobj.fetch_report_dataframe(logger, "worker_register")
+    worker_df_cols = ["state_code", "state_name", "district_code", "district_name", "block_code", "block_name", "panchayat_code", "panchayat_name", "village_name", "caste", "head_of_household", "jobcard"]
+    worker_df = worker_df[worker_df_cols]
+    worker_df = worker_df.drop_duplicates()
+    if url_df is None:
+        return None
+    logger.info(f"Shape of url_df is {url_df.shape}")
+    filtered_df = url_df[url_df['block_code']==int(lobj.block_code)]
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    df_array = []
+    for index, row in filtered_df.iterrows():
+        url = row.get('url')
+        finyear = row.get('finyear')
+        logger.info(url)
+        extract_dict = {}
+        column_headers = ['sr_no', 'jobcard','name', 'work_code', 'muster_no',
+                          'wagelist_no', 'reference_no', 'fto_no',
+                          'rejection_reason']
+        extract_dict['pattern'] = "Reference No"
+        extract_dict['column_headers'] = column_headers
+        extract_dict['data_start_row'] = 2
+        response = requests.get(url)
+        if response.status_code == 200:
+            myhtml = response.content
+            dataframe = get_dataframe_from_html(logger, myhtml,
+                                                mydict=extract_dict)
+            if dataframe is None:
+                continue
+            dataframe['finyear'] = finyear
+            df_array.append(dataframe)
+    if len(df_array) == 0:
+        return None
+    dataframe = pd.concat(df_array)
+    if dataframe is None:
+        return None
+    all_cols = ['name', 'work_code', 'muster_no',
+                'wagelist_no', 'reference_no', 'fto_no',
+                'rejection_reason']
+    dataframe = pd.merge(dataframe, worker_df, how='left',
+                         on=['jobcard'])
+    all_cols = worker_df_cols + all_cols
+    dataframe = dataframe[all_cols]
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+    return dataframe
+
+

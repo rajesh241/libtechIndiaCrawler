@@ -60,6 +60,8 @@ from libtech_lib.nrega.nicnrega import (
     get_nic_locations,
     get_jobcard_stats,
     get_nic_r14_5_urls,
+    get_nic_r8_1_5_urls,
+    get_nic_r8_1_5,
     get_nic_r14_5
 )
 
@@ -731,6 +733,15 @@ class NREGAState(Location):
         dataframe = get_nic_r14_5_urls(self, logger, report_type=report_type,
                                        url_text=url_text, url_prefix=url_prefix)
         self.save_report(logger, dataframe, report_type)
+    def nic_r8_1_5_urls(self, logger):
+        """This will fetch MIS URLs based on pattern"""
+        report_type = 'nic_r8_1_5_urls'
+        url_text = 'rej_trans_track.aspx'
+        url_prefix = "http://mnregaweb4.nic.in/netnrega/"
+        dataframe = get_nic_r8_1_5_urls(self, logger, report_type=report_type,
+                                       url_text=url_text, url_prefix=url_prefix)
+        self.save_report(logger, dataframe, report_type)
+
 
 
 class NREGADistrict(Location):
@@ -881,6 +892,7 @@ class NREGABlock(Location):
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
 
+
     def fto_transactions(self, logger):
         report_type = "fto_transactions"
         start_fin_year = get_default_start_fin_year()
@@ -992,6 +1004,19 @@ class NREGABlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type,
                                  finyear=finyear)
+    def rej_trans_pending_regeneration(self, logger):
+        '''rejected Transactions pending Regeneration'''
+        report_type = "rej_trans_pending_regeneration"
+        state_obj = NREGAState(logger, self.state_code)
+        report_name = "nic_r8_1_5_urls"
+        url_df = state_obj.fetch_report_dataframe(logger, report_name)
+        if url_df is None:
+            state_obj.nic_r14_5_urls(logger)
+            url_df = state_obj.fetch_report_dataframe(logger, report_name)
+        dataframe = get_nic_r8_1_5(self, logger, url_df)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
 
     def nic_r14_5(self, logger):
         '''Download MIS NIC 4_1 report'''
