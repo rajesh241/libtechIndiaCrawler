@@ -89,7 +89,7 @@ VALIDATION_TEST = VALIDATION_ON and False  # Make False before commiting
 AP_STATE_CODE = "02"
 REPORT_THRESHOLD_DICT = {
     "jobcard_register": 15,
-    "worker_register": 0,
+    "worker_register": 7,
     "nic_urls": 365,
     "nic_block_urls": 30,
     "nic_stat_urls": 365
