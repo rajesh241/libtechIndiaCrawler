@@ -241,10 +241,12 @@ def get_worker_register_mis(lobj, logger, nic_urls_df):
                               (nic_urls_df["panchayat_code"] == int(lobj.panchayat_code))]
     logger.debug(f"Filtered DF shape is {filtered_df.shape}")
     ##Establish session for request
+    logger.debug(f"Mis state URL {lobj.mis_state_url}")
     resp = get_request_with_retry_timeout(logger, lobj.mis_state_url)
     if resp is None:
         return None
     cookies = resp.cookies
+    logger.debug(f"cookies {cookies}")
     myhtml = None
     for index, row in filtered_df.iterrows():
         url = row.get("mis_url")
