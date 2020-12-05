@@ -21,6 +21,28 @@ panchayats_with_no_workers = [
     2728002103,
     2728002107,
     2728002071,
+    2729012381,
+    2729012380,
+    2729012379,
+    2729012395,
+    2729012386,
+    2729012398,
+    2729012397,
+    2729012390,
+    2729012393,
+    2729012382,
+    2729012394,
+    2729012396,
+    2729012391,
+    2729012387,
+    2729012378,
+    2729012388,
+    2729012383,
+    2729012392,
+    2729012377,
+    2729012384,
+    2729012385,
+    2729012389,
 
 ]
 def block_rejected_transactions_v2_validator(lobj, logger, data, report_type, finyear):
@@ -268,14 +290,14 @@ class BlockRejectedTransactionsV2Validator(ReportValidator):
             'final_status', 'fto_amount', 'fto_amount', 'fto_fin_year', 'final_rejection_reason'
         ]
         #expected_values = [19,-2,22,21]
-        self.test_finyear_unexpected(expected_finyears, 'fto_fin_year')
-        self.test_empty_values(columns)
-        # self.test_child_location()  # FIXME
-        #expected_values = [19, 20, 21]
-        self.test_finyear_unexpected(expected_finyears, 'fto_fin_year')
-        self.test_empty_df()
-        if not self.test_finyears_exist(expected_finyears, 'fto_fin_year'):
-            return False, self.health, self.remark
+      # self.test_finyear_unexpected(expected_finyears, 'fto_fin_year')
+      # self.test_empty_values(columns)
+      # # self.test_child_location()  # FIXME
+      # #expected_values = [19, 20, 21]
+      # self.test_finyear_unexpected(expected_finyears, 'fto_fin_year')
+      # self.test_empty_df()
+      # if not self.test_finyears_exist(expected_finyears, 'fto_fin_year'):
+      #     return False, self.health, self.remark
         message = ''
         health = ''
         return True, health, message
