@@ -55,7 +55,13 @@ def get_nic_block_urls(lobj, logger):
     csv_array = []
     finyear = get_current_finyear()
     full_finyear = get_full_finyear(finyear)
+    logger.debug(f"mis state url {lobj.mis_state_url}")
     url = lobj.mis_block_url.replace("fullFinYear", full_finyear)
+    res = get_request_with_retry_timeout(logger, lobj.mis_state_url)
+    if res is None:
+        return None
+    cookies = res.cookies
+    logger.debug(f"cookies is {cookies}")
     logger.debug(f"Block page is {url}")
     start_fin_year = get_default_start_fin_year()
     end_fin_year = get_current_finyear()
@@ -68,8 +74,8 @@ def get_nic_block_urls(lobj, logger):
         finyear = str(finyear)
         full_finyear = get_full_finyear(finyear)
         base_url = lobj.mis_block_url.replace("fullFinYear", full_finyear)
-        res = request_with_retry_timeout(logger, base_url,  method="get")
-        if res.status_code != 200:
+        res = get_request_with_retry_timeout(logger, base_url,  cookies=cookies)
+        if res is None:
             return None
         myhtml = res.content
         mysoup = BeautifulSoup(myhtml, "lxml")
@@ -2790,7 +2796,7 @@ def get_nic_r8_1_5(lobj, logger, url_df):
     dataframe = pd.concat(df_array)
     if dataframe is None:
         return None
-    all_cols = ['name', 'work_code', 'muster_no',
+    all_cols = ['finyear', 'name', 'work_code', 'muster_no',
                 'wagelist_no', 'reference_no', 'fto_no',
                 'rejection_reason']
     dataframe = pd.merge(dataframe, worker_df, how='left',

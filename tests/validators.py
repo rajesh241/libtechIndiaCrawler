@@ -251,7 +251,7 @@ class NicBlockUrlsValidator(ReportValidator):
             'state_code', 'district_code', 'block_code', 'panchayat_code']
         self.test_columns_exist(columns)
         self.test_empty_values(columns)
-        self.test_child_locations()
+        #self.test_child_locations()
         return True, self.health, self.remarks
 
 
