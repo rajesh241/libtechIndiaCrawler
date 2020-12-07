@@ -386,7 +386,7 @@ def get_ap_suspended_payments_r14_5(lobj, logger,finyear):
     if dataframe is None:
         return None
     logger.info(f"the shape of dataframe is {dataframe.shape}")
-    dataframe['tjobcard'] = "~" + dataframe['HouseHold Code']
+    dataframe['tjobcard'] = "~" + dataframe['jobcard']
     dataframe['finyear'] = finyear
     logger.info('Added finyear col to the df')
     dataframe = insert_location_details(logger, lobj, dataframe)
