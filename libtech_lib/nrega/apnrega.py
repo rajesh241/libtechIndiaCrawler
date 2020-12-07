@@ -314,7 +314,7 @@ def ap_nrega_download_page(logger, url, session=None, cookies=None, params=None,
             logger.warning(f'Waiting for {timeout} seconds...')
     return res
 
-def get_ap_suspended_payments_r14_5(lobj, logger):
+def get_ap_suspended_payments_r14_5(lobj, logger,finyear):
     """ Will download Suspended Payment information per panchayat"""
     dataframe = None
     logger.info(f"Fetching Suspended Payment Report {lobj.code}")
@@ -323,9 +323,11 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
     block_code = lobj.block_code[-2:]
     panchayat_code = lobj.panchayat_code[8:10]
     location_id = district_code + block_code + panchayat_code
+    finyear = str(finyear)
+    full_finyear = get_full_finyear(finyear)
     lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
-    column_headers = ['S.No.', 'HouseHold Code', 'Worker Code', 'Name',
-                      'Amount', 'From Date', 'To Date']
+    column_headers = ['sno', 'jobcard', 'worker_code', 'name',
+                      'amount', 'from_date', 'to_date']
     logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s location %s" % (district_code,block_code,panchayat_code, location_id))
     url = 'http://www.nrega.ap.gov.in/Nregs/'
     res = ap_nrega_download_page(logger, url)
@@ -359,7 +361,7 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
             ('ytype', ''),
             ('Date2', '-1'),
             ('ltype', ''),
-            ('year', '2019-2020'),
+            ('year', full_finyear),
             ('program', 'ALL'),
             ('fileName', location_id),
             ('stype', ''),
@@ -385,11 +387,13 @@ def get_ap_suspended_payments_r14_5(lobj, logger):
         return None
     logger.info(f"the shape of dataframe is {dataframe.shape}")
     dataframe['tjobcard'] = "~" + dataframe['HouseHold Code']
+    dataframe['finyear'] = finyear
+    logger.info('Added finyear col to the df')
     dataframe = insert_location_details(logger, lobj, dataframe)
     location_cols = ["state_code", "state_name", "district_code",
                      "district_name", "block_code", "block_name",
                      "panchayat_code", "panchayat_name"]
-    cols = location_cols + ["tjobcard"] + column_headers
+    cols = location_cols + ["tjobcard",'finyear'] + column_headers
     dataframe = dataframe[cols]
     return dataframe
 

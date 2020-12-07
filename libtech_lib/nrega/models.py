@@ -575,13 +575,19 @@ class APBlock(Location):
         panchayat_array = self.get_all_panchayats(logger)
         logger.info(panchayat_array)
         df_array = []
-        for each_panchayat_code in panchayat_array:
-            logger.info(
-                f"Currently Processing panchayat code {each_panchayat_code}")
-            my_location = APPanchayat(logger, each_panchayat_code)
-            dataframe = get_ap_suspended_payments_r14_5(my_location, logger)
-            if dataframe is not None:
-                df_array.append(dataframe)
+        start_fin_year = get_default_start_fin_year()
+        end_fin_year = get_current_finyear()
+        for finyear in range(start_fin_year, end_fin_year+1):
+            logger.debug(f"Currently Processing {finyear}")
+            finyear = str(finyear)
+            full_finyear = get_full_finyear(finyear)
+            for each_panchayat_code in panchayat_array:
+                logger.info(
+                    f"Currently Processing panchayat code {each_panchayat_code} and {full_finyear}")
+                my_location = APPanchayat(logger, each_panchayat_code)
+                dataframe = get_ap_suspended_payments_r14_5(my_location, logger,finyear)
+                if dataframe is not None:
+                    df_array.append(dataframe)
         if len(df_array) > 0:
             dataframe = pd.concat(df_array)
             report_type = "ap_suspended_payments_r14_5"
