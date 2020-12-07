@@ -61,6 +61,7 @@ from libtech_lib.nrega.nicnrega import (
     get_jobcard_stats,
     get_nic_r14_5_urls,
     get_nic_r8_1_5_urls,
+    get_nic_r8_1_5_state_urls,
     get_nic_r8_1_5,
     get_nic_r14_5
 )
@@ -260,6 +261,15 @@ class Location():
         dataframe = get_block_rejected_stats(self, logger, fto_status_df)
         report_type = "block_rejected_stats"
         self.save_report(logger, dataframe, report_type)
+    def nic_r8_1_5_state_urls(self, logger):
+        """This will fetch MIS URLs based on pattern"""
+        report_type = 'nic_r8_1_5_state_urls'
+        url_text = 'rej_trans_track.aspx'
+        url_prefix = "http://mnregaweb4.nic.in/netnrega/"
+        dataframe = get_nic_r8_1_5_state_urls(self, logger, report_type=report_type,
+                                       url_text=url_text, url_prefix=url_prefix)
+        self.save_report(logger, dataframe, report_type)
+
 
 
 class APPanchayat(Location):

@@ -2807,4 +2807,32 @@ def get_nic_r8_1_5(lobj, logger, url_df):
         dataframe = insert_location_details(logger, lobj, dataframe)
     return dataframe
 
-
+def get_nic_r8_1_5_state_urls(lobj, logger, report_type=None, url_text=None,
+                      url_prefix=None):
+    """This function will get the Urls at the block level"""
+    logger.info("Download  urls for hte state")
+    csv_array = []
+    
+    column_headers = ["state_code", "finyear", "url"]
+    start_finyear = get_default_start_fin_year()
+    end_finyear = get_current_finyear()
+    state_codes = lobj.get_child_locations(logger)
+    logger.info(state_codes)
+    for state_code in state_codes:
+        for finyear in range(int(start_finyear), int(end_finyear)+1):
+            logger.info(f"Downloading for FinYear {finyear}")
+            filename = f"{NREGA_DATA_DIR}/mis_urls/{state_code}_{finyear}.html"
+            logger.info(filename)
+            block_url_text = "rej_transftomusteroll.aspx"
+            with open(filename, "rb") as infile:
+                myhtml = infile.read()
+            mysoup = BeautifulSoup(myhtml, "lxml")
+            elem = mysoup.find("a", href=re.compile(url_text))
+            if elem is not None:
+                base_href = elem["href"]
+            logger.info(url_prefix+base_href)
+            row = [state_code, finyear, url_prefix+base_href]
+            csv_array.append(row)
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    return dataframe
+ 
