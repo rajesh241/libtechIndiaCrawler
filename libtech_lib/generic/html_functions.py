@@ -17,7 +17,7 @@ def get_request_with_retry_timeout(logger, url, headers=None, params=None,
                                           method="get")
     return response
 def request_with_retry_timeout(logger, url, session=None, data=None, headers=None, params=None, cookies=None,
-                 timeout = 50, max_retry=5, method="post"):
+                 timeout = 300, max_retry=5, method="post"):
     """This is the wrapper function for request post method."""
     retry = 0
     res = None
