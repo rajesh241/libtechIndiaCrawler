@@ -16,8 +16,8 @@ def get_request_with_retry_timeout(logger, url, headers=None, params=None,
                                           timeout=timeout, max_retry=max_retry, 
                                           method="get")
     return response
-def request_with_retry_timeout(logger, url, data=None, headers=None, params=None, cookies=None,
-                 timeout = 5, max_retry=5, method="post"):
+def request_with_retry_timeout(logger, url, session=None, data=None, headers=None, params=None, cookies=None,
+                 timeout = 50, max_retry=5, method="post"):
     """This is the wrapper function for request post method."""
     retry = 0
     res = None
@@ -26,7 +26,10 @@ def request_with_retry_timeout(logger, url, data=None, headers=None, params=None
     while (retry < max_retry):
         try:
             if method == "post":
-                response = requests.post(url, data=data, timeout=timeout, params=params, cookies=cookies, headers=headers)
+                if session:
+                    response = session.post(url, data=data, timeout=timeout, params=params, cookies=cookies, headers=headers)
+                else:
+                    response = requests.post(url, data=data, timeout=timeout, params=params, cookies=cookies, headers=headers)
             else:
                 response = requests.get(url, timeout=timeout, params=params, cookies=cookies, headers=headers)
             if response.status_code == 200:
@@ -35,8 +38,10 @@ def request_with_retry_timeout(logger, url, data=None, headers=None, params=None
                 error = True
         except requests.Timeout:
             # back off and retry
+            logger.info("request timeout error")
             error = True
         except requests.ConnectionError:
+            logger.info("request connection error")
             error = True
         if (error == True):
             retry = retry + 1
