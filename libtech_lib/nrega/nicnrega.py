@@ -2835,4 +2835,39 @@ def get_nic_r8_1_5_state_urls(lobj, logger, report_type=None, url_text=None,
             csv_array.append(row)
     dataframe = pd.DataFrame(csv_array, columns=column_headers)
     return dataframe
- 
+
+def get_rej_trans_pending_regeneration_stats(lobj, logger, url_df):
+    logger.info(f"url df shape {url_df.shape}")
+    column_headers = ["srno", "district", "total_rejected_trans",
+                      "total_rejected_trans_amount", "pending_regeneration",
+                      "pending_regeneration_amount",
+                      "rejected_successful_transaction",
+                      "rejected_successful_transaction_amount",
+                      "rejected_pending_bank_response_transaction",
+                      "rejected_pending_bank_response_transaction_amount"]
+
+    extract_dict = {}                  
+    extract_dict['pattern'] = 'Pending Regeneration'
+    extract_dict['column_headers'] = column_headers
+    extract_dict['data_start_row'] = 2
+    dataframe = None
+    df_array = []
+    for index, row in url_df.iterrows():
+        finyear = row.get("finyear")
+        url = row.get("url")
+        state_code = row.get("state_code")
+        logger.debug(f"{finyear}-{state_code}")
+        res = get_request_with_retry_timeout(logger, url)
+        if res is None:
+            continue
+        myhtml = res.content
+        dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+        if dataframe is not None:
+            dataframe["finyear"] = finyear
+            dataframe["state_code"] = state_code
+            df_array.append(dataframe)
+    if(len(df_array) == 0):
+        return None
+    dataframe = pd.concat(df_array)
+    return dataframe
+

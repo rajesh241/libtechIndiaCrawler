@@ -29,6 +29,7 @@ from libtech_lib.generic.api_interface import (
 
 from libtech_lib.nrega.nicnrega import (
     get_jobcard_register,
+    get_rej_trans_pending_regeneration_stats,
     get_nic_block_urls,
     get_jobcard_register_mis,
     get_worker_register,
@@ -269,6 +270,16 @@ class Location():
         dataframe = get_nic_r8_1_5_state_urls(self, logger, report_type=report_type,
                                        url_text=url_text, url_prefix=url_prefix)
         self.save_report(logger, dataframe, report_type)
+    def rej_trans_pending_regeneration_stats(self, logger):
+        """This will fetch all the rejected transactions of the block"""
+        report_type = "rej_trans_pending_regeneration_stats"
+        report_name = "nic_r8_1_5_state_urls"
+        india_obj = Location(logger, '0')
+        rej_stat_df = india_obj.fetch_report_dataframe(logger, report_name)
+        dataframe = get_rej_trans_pending_regeneration_stats(self, logger, rej_stat_df)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
 
 
 
