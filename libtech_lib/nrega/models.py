@@ -588,7 +588,8 @@ class APBlock(Location):
         df_array = []
         start_fin_year = get_default_start_fin_year()
         end_fin_year = get_current_finyear()
-        for finyear in range(start_fin_year, end_fin_year+1):
+        finyear_list = [17,18,19,20,21]
+        for finyear in finyear_list:
             logger.debug(f"Currently Processing {finyear}")
             finyear = str(finyear)
             full_finyear = get_full_finyear(finyear)
