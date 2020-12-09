@@ -1113,8 +1113,7 @@ class NREGABlock(Location):
         if len(df_array) > 0:
             dataframe = pd.concat(df_array)
             if dataframe is not None:
-                self.save_report(logger, dataframe, report_type, health=health,
-                                 remarks=remarks)
+                self.save_report(logger, dataframe, report_type, remarks=remarks)
 
     def jobcard_register(self, logger):
         """This will fetch jobcard register for each panchayat in the block"""
