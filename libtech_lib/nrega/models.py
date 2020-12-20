@@ -510,8 +510,9 @@ class NREGAPanchayat(Location):
         nic_stat_urls_df = my_location.fetch_report_dataframe(
             logger, report_type)
         dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
-        report_type = "nic_stats"
-        self.save_report(logger, dataframe, report_type)
+        if dataframe is not None:
+            report_type = "nic_stats"
+            self.save_report(logger, dataframe, report_type)
         return dataframe
 
 
