@@ -2770,6 +2770,8 @@ def get_nic_r8_1_5(lobj, logger, url_df):
     logger.info(f"Shape of url_df is {url_df.shape}")
     filtered_df = url_df[url_df['block_code']==int(lobj.block_code)]
     logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    if(len(filtered_df) == 0):
+        raise Exception("No Urls are found for this block")
     df_array = []
     for index, row in filtered_df.iterrows():
         url = row.get('url')
