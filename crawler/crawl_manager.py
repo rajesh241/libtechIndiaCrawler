@@ -83,7 +83,7 @@ def execute_task(logger, task_id=None, process_name=None):
         getattr(my_location, func_name)(logger)
         patch_data['is_error'] = False
         patch_data['is_done'] = True
-        patch_data['in_progress'] = 0
+        patch_data['in_progress'] = False
         patch_data['status'] = 'completed'
     except Exception as e:
         logger.info("I am in exception!!!!")
@@ -91,10 +91,11 @@ def execute_task(logger, task_id=None, process_name=None):
         logger.info(f"error {remarks}")
         patch_data['is_error'] = True
         patch_data['is_done'] = False
-        patch_data['in_progress'] = 0
+        patch_data['in_progress'] = False
         patch_data['status'] = 'error'
         patch_data['priority'] = 20
         patch_data['remarks'] = remarks
+        patch_data['status'] = 'inQueue'
          
     end_time_obj, end_time = get_current_datetime()
     duration = int(((end_time_obj-state_time_obj).total_seconds())/60)
