@@ -96,7 +96,8 @@ REPORT_THRESHOLD_DICT = {
     "worker_register": 7,
     "nic_urls": 365,
     "nic_block_urls": 30,
-    "nic_stat_urls": 365
+    "nic_stat_urls": 7,
+    "nic_stats" : 7
 }
 DEFAULT_REPORT_THRESHOLD = 20
 
@@ -801,8 +802,8 @@ class NREGADistrict(Location):
         logger.debug(f"force download is {self.force_download}")
         is_updated = self.is_report_updated(logger, report_type)
         #logger.info(f"CHecking if nic stat urls is updated{is_updated}")
-        if is_updated:
-            return
+       #if is_updated:
+       #    return
         dataframe_array = []
         block_array = self.get_all_blocks(logger)
         logger.info(block_array)

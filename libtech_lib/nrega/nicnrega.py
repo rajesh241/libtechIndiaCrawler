@@ -1319,7 +1319,7 @@ def get_nic_stats(lobj, logger, nic_stat_urls_df):
                                    int(lobj.code)].reset_index()
     logger.debug(f"length of filtered_df is {len(filtered_df)}")
     if len(filtered_df) != 1:
-        return None
+        raise Exception("No Urls are found for this block")
     stats_url = filtered_df.loc[0, "stats_url"]
     logger.debug(stats_url)
     #res = requests.get(stats_url)
