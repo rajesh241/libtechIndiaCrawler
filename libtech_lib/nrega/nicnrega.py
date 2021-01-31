@@ -15,11 +15,13 @@ import requests
 import pandas as pd
 import numpy as np
 from bs4 import BeautifulSoup
-import django
-DJANGO_SETTINGS = "base.settings"
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", DJANGO_SETTINGS)
-django.setup()
-from nrega import models as djmodels #Importing backend Django Models
+EN_BACKEND = os.environ.get('EN_BACKEND', False)
+if(EN_BACKEND):
+    import django
+    DJANGO_SETTINGS = "base.settings"
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", DJANGO_SETTINGS)
+    django.setup()
+    from nrega import models as djmodels #Importing backend Django Models
 
 from libtech_lib.generic.commons import  (get_current_finyear,
                                           get_current_finmonth,
