@@ -15,6 +15,12 @@ import requests
 import pandas as pd
 import numpy as np
 from bs4 import BeautifulSoup
+import django
+DJANGO_SETTINGS = "base.settings"
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", DJANGO_SETTINGS)
+django.setup()
+from nrega import models as djmodels #Importing backend Django Models
+
 from libtech_lib.generic.commons import  (get_current_finyear,
                                           get_current_finmonth,
                                           get_default_start_fin_year,
@@ -49,7 +55,19 @@ mis_url = "https://mnregaweb4.nic.in"
 #JSON_CONFIG_DIR = CONFIG['json_config_dir']
 NREGA_DATA_DIR = os.environ.get('NREGA_DATA_DIR', None)
 JSON_CONFIG_DIR = os.environ.get('JSON_CONFIG_DIR', None) 
-
+'''
+    #Example Code for accessing Django Models
+    location_db = djmodels.Location.objects.filter(code=lobj.code).first()
+    finyear = str(18);
+    record_no = 'dfgh'
+    defaults = {'record_type' : 'muster'}
+    if location_db is None:
+        return None
+    obj, created = djmodels.Record.objects.update_or_create(
+      location=location_db, finyear=finyear,record_no=record_no,
+      defaults=defaults,
+    ) 
+'''
 def get_nic_block_urls(lobj, logger):
     """Will download NIC Block URLs"""
     csv_array = []
@@ -2445,6 +2463,68 @@ def get_nic_locations(lobj, logger):
                      "panchayat_code", "panchayat_name"]
     dataframe = dataframe[location_cols]
     return dataframe
+
+def populate_fto_list(lobj, logger, rej_stat_df):
+    """This will populate FTo List in DB"""
+    location_db = djmodels.Location.objects.filter(code=lobj.code).first()
+    if location_db is None:
+        return None
+    logger.info(f"Fetching fto list for {lobj.block_name}")
+    filtered_df = rej_stat_df[rej_stat_df['block_code'] == int(lobj.block_code)]
+    start_fin_year = get_default_start_fin_year()
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    filtered_df = filtered_df[filtered_df['finyear'] >= int(start_fin_year)]
+    filtered_df = rej_stat_df[rej_stat_df['block_code'] == int(lobj.block_code)]
+    start_fin_year = get_default_start_fin_year()
+    logger.info(f"Shape of filtered_df is {filtered_df.shape}")
+    filtered_df = filtered_df[filtered_df['finyear'] >= int(start_fin_year)]
+    column_headers = ["srno", "fto_no", "fto_url", "financial_institution",
+                      "second_signatory_date", "5", "6", "7", "8", "9", "10",
+                      "11", "12"]
+    extract_dict = {}
+    extract_dict["pattern"] = "Financial Institution"
+    extract_dict['column_headers'] = column_headers
+    extract_dict['extract_url_array'] = [1]
+    extract_dict['url_prefix'] = "http://mnregaweb4.nic.in/netnrega/FTO/"
+    df_array = []
+    for index, row in filtered_df.iterrows():
+        url = row.get("second_singnatory_fto_url", None)
+        finyear = row.get("finyear", None)
+        fin_agency = row.get("fin_agency", None)
+        logger.info(url)
+        response = get_request_with_retry_timeout(logger, url)
+        if response is None:
+            continue
+        myhtml = response.content
+        dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
+        if dataframe is None:
+            continue
+        dataframe["finyear"] = finyear
+        dataframe["fin_agency"] = fin_agency
+        logger.info(dataframe.columns)
+        for index, frow in dataframe.iterrows():
+            fto_no = frow.get("fto_no", None)
+            fto_url = frow.get("fto_url", None)
+            if fto_no is None:
+                break
+            if "FTO" not in fto_no:
+                break
+            additional_fields = {
+                'financial_institution' : frow.get('financial_institution', ''),
+                'second_signatory_date' : frow.get('second_signatory_date', ''),
+                'fin_agency' : frow.get('fin_agency', '')
+            }
+            defaults = {'record_type' : 'fto',
+                'url' : fto_url,
+                'location_type' : lobj.location_type,
+                'location_code' : lobj.code,
+                'additional_fields' : additional_fields
+            }
+            obj, created = djmodels.Record.objects.update_or_create(
+              location=location_db, finyear=str(int(finyear)),record_no=fto_no,
+              defaults=defaults,
+            ) 
+
 
 def get_fto_list(lobj, logger, rej_stat_df):
     """This will fetch the fto list for the block"""

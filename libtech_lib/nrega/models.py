@@ -53,6 +53,7 @@ from libtech_lib.nrega.nicnrega import (
     get_worker_stats,
     get_worker_register_mis,
     get_fto_list,
+    populate_fto_list,
     get_fto_transactions,
     get_nic_urls,
     update_muster_transactions_v2,
@@ -921,6 +922,14 @@ class NREGABlock(Location):
         dataframe = get_fto_list(self, logger, rej_stat_df)
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
+
+    def fto_list_db(self, logger):
+        """This will fetch the FTO List for each block"""
+        report_name = "block_rejected_stats"
+        india_obj = Location(logger, '0')
+        rej_stat_df = india_obj.fetch_report_dataframe(logger, report_name)
+        dataframe = populate_fto_list(self, logger, rej_stat_df)
+
 
 
     def fto_transactions(self, logger):
