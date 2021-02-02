@@ -6,6 +6,7 @@ throughout the library"""
 #pylint: disable-msg = too-many-statements
 import os
 import logging
+from logging.handlers import RotatingFileHandler
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
 import datetime
@@ -32,6 +33,20 @@ def logger_fetch(level=None):
     logger.addHandler(console_logger)
     return logger
 
+def file_logger_fetch(level=None, filepath=None, name="libLogger", maxBytes=64000):
+    """This will create rotating file log handler"""
+    logger = logging.getLogger(name)
+    if filepath is None:
+        filepath = "/tmp/a.log"
+    if level:
+        numeric_level = getattr(logging, level.upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: %s' % level)
+        logger.setLevel(numeric_level)
+    #logger.setLevel(logging.DEBUG)
+    handler = RotatingFileHandler(filepath, maxBytes=maxBytes, backupCount=10)
+    logger.addHandler(handler)
+    return logger
 def get_current_finmonth():
     """This would return financial month, i.e April =1, march =12"""
     now = datetime.datetime.now()
