@@ -70,6 +70,115 @@ JSON_CONFIG_DIR = os.environ.get('JSON_CONFIG_DIR', None)
       defaults=defaults,
     ) 
 '''
+def get_nic_block_urls_db(lobj, logger):
+    """Will download NIC BLock URLs"""
+    csv_array = []
+    finyear = get_current_finyear()
+    full_finyear = get_full_finyear(finyear)
+    logger.debug(f"mis state url {lobj.mis_state_url}")
+    url = lobj.mis_block_url.replace("fullFinYear", full_finyear)
+    res = get_request_with_retry_timeout(logger, lobj.mis_state_url)
+    if res is None:
+        return None
+    cookies = res.cookies
+    logger.debug(f"cookies is {cookies}")
+    logger.debug(f"Block page is {url}")
+    start_fin_year = get_default_start_fin_year()
+    end_fin_year = get_current_finyear()
+    column_headers = ['finyear', 'report_name', 'report_slug',
+                       'mis_url', 'location_type', 'panchayat_code']
+    mis_url_prefix = f"https://mnregaweb4.nic.in/netnrega/placeHolder1/"
+    mis_url_prefix_panchayat = f"https://mnregaweb4.nic.in/netnrega/placeHolder1/placeHolder2/"
+    for finyear in range(start_fin_year, end_fin_year+1):
+        logger.debug(f"Currently Processing {finyear} for {lobj.code}")
+        finyear = str(finyear)
+        full_finyear = get_full_finyear(finyear)
+        base_url = lobj.mis_block_url.replace("fullFinYear", full_finyear)
+        logger.info(f"base url {base_url}")
+        res = get_request_with_retry_timeout(logger, base_url,  cookies=cookies)
+        if res is None:
+            return None
+        myhtml = res.content
+        mysoup = BeautifulSoup(myhtml, "lxml")
+        links = mysoup.findAll("a")
+        for link in links:
+            href = link.get("href", "")
+            text = link.text
+            mis_url = mis_url_prefix + href
+            location_type = 'block'
+            panchayat_code = ''
+            #row = [finyear, text, slugify(text), mis_url, location_type,
+            #       panchayat_code]
+            #csv_array.append(row)
+            if (finyear == str(get_current_finyear())) and (slugify(text) == "registration-application-register"):
+                response = request_with_retry_timeout(logger, mis_url,
+                                                      method="get")
+                if response is not None:
+                    html = response.content
+                    soup = BeautifulSoup(html, "lxml")
+                    mylinks = soup.findAll("a")
+                    for mylink in mylinks:
+                        href = mylink.get("href", "")
+                        if "panchregpeople.aspx" in href:
+                            mis_url = mis_url_prefix_panchayat + href
+                            location_type = 'panchayat'
+                            parsed = urlparse.urlparse(mis_url)
+                            params_dict = parse_qs(parsed.query)
+                            panchayat_code = params_dict.get('panchayat_code', [''])[0]
+                            row = [finyear, text, slugify(text), mis_url,
+                                   location_type, panchayat_code]
+                            csv_array.append(row)
+            if (finyear == str(get_current_finyear())) and (slugify(text) == "job-card-employment-register"):
+                response = request_with_retry_timeout(logger, mis_url,
+                                                      method="get")
+                if response is not None:
+                    html = response.content
+                    soup = BeautifulSoup(html, "lxml")
+                    mylinks = soup.findAll("a")
+                    for mylink in mylinks:
+                        href = mylink.get("href", "")
+                        if "JobCardReg.aspx" in href:
+                            mis_url = mis_url_prefix_panchayat + href
+                            location_type = 'panchayat'
+                            parsed = urlparse.urlparse(mis_url)
+                            params_dict = parse_qs(parsed.query)
+                            panchayat_code = params_dict.get('Panchayat_code', [''])[0]
+                            row = [finyear, text, slugify(text), mis_url,
+                                   location_type, panchayat_code]
+                            csv_array.append(row)
+    dataframe = pd.DataFrame(csv_array, columns=column_headers)
+    for index, row in dataframe.iterrows():
+        panchayat_code = row.get("panchayat_code", None)
+        if panchayat_code is  None:
+            continue
+        url = row.get("mis_url", None)
+        if url is None:
+            continue
+        report_slug = row.get("report_slug", "")
+        if report_slug == "registration-application-register":
+            record_type = "worker_register"
+        if report_slug == "job-card-employment-register":
+            record_type = "jobcard_register"
+        if record_type is None:
+            continue
+        location_db = djmodels.Location.objects.filter(code=panchayat_code).first()
+        if location_db is None:
+            return
+        additional_fields = {
+            "base_url" : base_url
+        }
+        defaults = {'record_type' : record_type,
+            'url' : url,
+            'location_type' : 'panchayat',
+            'location_code' : panchayat_code,
+            'additional_fields' : additional_fields
+        }
+        obj, created = djmodels.Record.objects.update_or_create(
+          location=location_db, record_no=record_type,
+          defaults=defaults,
+        ) 
+
+    return None
 def get_nic_block_urls(lobj, logger):
     """Will download NIC Block URLs"""
     csv_array = []

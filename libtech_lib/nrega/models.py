@@ -31,6 +31,7 @@ from libtech_lib.nrega.nicnrega import (
     get_jobcard_register,
     get_rej_trans_pending_regeneration_stats,
     get_nic_block_urls,
+    get_nic_block_urls_db,
     get_jobcard_register_mis,
     get_worker_register,
     get_muster_list,
@@ -874,6 +875,8 @@ class NREGABlock(Location):
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
 
+    def nic_block_urls_db(self, logger):
+        dataframe = get_nic_block_urls_db(self, logger)
     def nic_block_urls(self, logger):
         report_type = "nic_block_urls"
         is_updated = self.is_report_updated(logger, report_type)
