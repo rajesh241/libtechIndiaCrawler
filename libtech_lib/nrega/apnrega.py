@@ -200,12 +200,18 @@ def get_ap_jobcard_register(lobj, logger):
     logger.info(f"state url = {lobj.home_url}")
     lobj.home_url = "http://www.mgnregs.ap.gov.in/Nregs/"
     url = f"{lobj.home_url}?requestType=WageSeekersRH&actionVal=JobCardHolder&page=WageSeekersHome&param=JCHI"
+    logger.info(url)
     district_code = lobj.district_code[-2:]
+
     block_code = lobj.block_code[-2:]
     panchayat_code = lobj.panchayat_code[8:10]
     column_headers = ['srno', 'tjobcard', 'jobcard', 'head_of_household',
                       'registraction_date', 'caste', 'no_of_disabled',
                       'no_of_shg_members', 'no_of_males', 'no_of_females']
+    logger.info(district_code)
+    logger.info(block_code)
+    logger.info(panchayat_code  )
+
     if lobj.state_code == "36":
         state_code = "02"
         params = (
