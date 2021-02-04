@@ -43,7 +43,7 @@ def get_ap_muster_transactions(lobj, logger):
     block_code=lobj.block_code[5:]
     panchayat_code=lobj.panchayat_code[8:]
     logger.info(district_code+block_code+panchayat_code)
-    url = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=R1Display&page=Newreportcenter_ajax_eng#'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=R1Display&page=Newreportcenter_ajax_eng#'
     url='http://www.nrega.telangana.gov.in/Nregs/FrontServlet?requestType=Common_engRH&actionVal=musterinfo&page=MusterRolls_eng'
     url2='http://www.nrega.telangana.gov.in/Nregs/FrontServlet?'
     if lobj.state_code == "36":
@@ -52,8 +52,8 @@ def get_ap_muster_transactions(lobj, logger):
         url2='http://www.nrega.telangana.gov.in/Nregs/FrontServlet?'
     else:
         state_code = "01"
-        base_url = "http://www.nrega.ap.gov.in/Nregs/"
-        url2 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=Common_engRH&actionVal=musterinfo&page=MusterRolls_eng'
+        base_url = "http://www.mgnregs.ap.gov.in/Nregs/"
+        url2 = 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=Common_engRH&actionVal=musterinfo&page=MusterRolls_eng'
     logger.info('Fetching URL[%s] for cookies' % url)
     for finyear in range(int(start_fin_year), int(end_fin_year) + 1):
         startYear=int(finyear)-1+2000
@@ -145,10 +145,10 @@ def fetch_ap_jobcard_register_for_village(logger, cookies, district_code, block_
         'Cache-Control': 'max-age=0',
         'Upgrade-Insecure-Requests': '1',
         'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Mobile Safari/537.36',
-        'Origin': 'http://www.nrega.ap.gov.in',
+        'Origin': 'http://www.mgnregs.ap.gov.in',
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,/;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=WageSeekersRH&actionVal=JobCardHolder&param=JCHI&type=-1&Atype=Display&Ajaxid=Village',
+        'Referer': 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=WageSeekersRH&actionVal=JobCardHolder&param=JCHI&type=-1&Atype=Display&Ajaxid=Village',
         'Accept-Language': 'en-US,en;q=0.9',
     }
 
@@ -169,8 +169,8 @@ def fetch_ap_jobcard_register_for_village(logger, cookies, district_code, block_
         'HouseHoldId': '',
         'Go': ''
     }
-    url = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
-    #response = requests.post('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data, verify=False)
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet'
+    #response = requests.post('http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data, verify=False)
     response = request_with_retry_timeout(logger, url, data=data, headers=headers, params=params, cookies=cookies) 
     if response is None:
         return []
@@ -198,6 +198,7 @@ def get_ap_jobcard_register(lobj, logger):
     dataframe = None
     logger.info(f"Fetching Jobcard Register for {lobj.code}")
     logger.info(f"state url = {lobj.home_url}")
+    lobj.home_url = "http://www.mgnregs.ap.gov.in/Nregs/"
     url = f"{lobj.home_url}?requestType=WageSeekersRH&actionVal=JobCardHolder&page=WageSeekersHome&param=JCHI"
     district_code = lobj.district_code[-2:]
     block_code = lobj.block_code[-2:]
@@ -215,7 +216,7 @@ def get_ap_jobcard_register(lobj, logger):
     else:
         state_code = "-1"
         column_headers = column_headers.remove("caste")
-        base_url = "http://www.nrega.ap.gov.in/Nregs/"
+        base_url = "http://www.mgnregs.ap.gov.in/Nregs/"
         params = (
                 ('requestType', 'WageSeekersRH'),
                 ('actionVal', 'JobCardHolder'),
@@ -325,11 +326,11 @@ def get_ap_suspended_payments_r14_5(lobj, logger,finyear):
     location_id = district_code + block_code + panchayat_code
     finyear = str(finyear)
     full_finyear = get_full_finyear(finyear)
-    lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
+    lobj.home_url = "http://www.mgnregs.ap.gov.in/Nregs/"
     column_headers = ['sno', 'jobcard', 'worker_code', 'name',
                       'amount', 'from_date', 'to_date']
     logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s location %s" % (district_code,block_code,panchayat_code, location_id))
-    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/'
     res = ap_nrega_download_page(logger, url)
     if (not res) or (res.status_code != 200):
         return None
@@ -368,8 +369,8 @@ def get_ap_suspended_payments_r14_5(lobj, logger,finyear):
             ('ptype', ''),
             ('lltype', ''),
         )
-    url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
-    # response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
+    url1 = 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet'
+    # response = requests.get('http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
     response = ap_nrega_download_page(logger, url1, headers=headers,
                                       params=params, cookies=cookies)
     if (not response) or (response.status_code != 200):
@@ -406,7 +407,7 @@ def get_ap_not_enrolled_r14_21A(lobj, logger):
     block_code = lobj.block_code[-2:]
     panchayat_code = lobj.panchayat_code[8:10]
     location_id = district_code + block_code
-    lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
+    lobj.home_url = "http://www.mgnregs.ap.gov.in/Nregs/"
     column_headers = [
         'S No',
         'Panchayat Name',
@@ -420,7 +421,7 @@ def get_ap_not_enrolled_r14_21A(lobj, logger):
         'Wage Seekers Identified as NOT ENROLLED - Closing Balance of 19-Jun-2020'
     ]
     logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s location %s" % (district_code,block_code,panchayat_code, location_id))
-    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/'
     res = ap_nrega_download_page(logger, url)
     if (not res) or (res.status_code != 200):
         return None
@@ -460,8 +461,8 @@ def get_ap_not_enrolled_r14_21A(lobj, logger):
             ('lltype', ''),
         )
 
-    url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
-    # response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
+    url1 = 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet'
+    # response = requests.get('http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
     response = ap_nrega_download_page(logger, url1, headers=headers,
                                       params=params, cookies=cookies)
     if (not response) or (response.status_code != 200):
@@ -497,7 +498,7 @@ def get_ap_nefms_report_r14_37(lobj, logger):
     block_code = lobj.block_code[-2:]
     panchayat_code = lobj.panchayat_code[8:10]
     location_id = f'{district_code}~{block_code}~{panchayat_code}'
-    lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
+    lobj.home_url = "http://www.mgnregs.ap.gov.in/Nregs/"
     column_headers = [
         'S.No.',
         'File_Name',
@@ -517,7 +518,7 @@ def get_ap_nefms_report_r14_37(lobj, logger):
         'Release_Pending_Amount'
     ]
     logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s location %s" % (district_code,block_code,panchayat_code, location_id))
-    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/'
     logger.info(f'To Get Cookies, fetching URL[{url}]')
     res = ap_nrega_download_page(logger, url)
     if (not res) or (res.status_code != 200):
@@ -557,8 +558,8 @@ def get_ap_nefms_report_r14_37(lobj, logger):
             ('ptype', '-1'),
             ('lltype', '-1'),
         )
-    url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
-    # response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
+    url1 = 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet'
+    # response = requests.get('http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
     response = ap_nrega_download_page(logger, url1, headers=headers,
                                       params=params, cookies=cookies)
     if (not response) or (response.status_code != 200):
@@ -572,7 +573,7 @@ def get_ap_nefms_report_r14_37(lobj, logger):
     extract_dict['table_id'] = 'sortable'
     extract_dict['data_start_row'] = 3
     extract_dict['extract_url_array'] = [3, 8]
-    extract_dict['url_prefix'] = "http://www.nrega.ap.gov.in"
+    extract_dict['url_prefix'] = "http://www.mgnregs.ap.gov.in"
     dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
     if dataframe is None:
         return None
@@ -598,7 +599,7 @@ def get_ap_labour_report_r3_17(lobj, logger):
     district_code = lobj.district_code[-2:]
     block_code = lobj.block_code[-2:]
     location_id = district_code + block_code
-    lobj.home_url = "http://www.nrega.ap.gov.in/Nregs/"
+    lobj.home_url = "http://www.mgnregs.ap.gov.in/Nregs/"
     date = datetime.strftime(datetime.now() - timedelta(1), '%d/%m/%Y')
     column_headers = [
         'S.No',
@@ -615,7 +616,7 @@ def get_ap_labour_report_r3_17(lobj, logger):
         '% of labour reported over Target'
     ]
     logger.debug("DistrictCode: %s, block_code : %s , location %s" % (district_code, block_code, location_id))
-    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/'
     '''
     Using sesssion below
     res = ap_nrega_download_page(logger, url)
@@ -652,7 +653,7 @@ def get_ap_labour_report_r3_17(lobj, logger):
             ('type2', ''),
             ('type3', ''),
         )
-    url1 = 'http://www.nrega.ap.gov.in/Nregs/FrontServlet'
+    url1 = 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet'
     logger.info('Fetching URL[%s] for cookies' % url)
     cookies = ''
     with requests.session() as session:
@@ -707,7 +708,7 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
         } 
     cookies = None
     params = None
-    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/'
     with requests.session() as session:
         #res = session.get(url)
         res = ap_nrega_download_page(logger, url, session=session)
@@ -795,9 +796,9 @@ def get_ap_rejected_transactions1(lobj, logger):
         } 
     location_id = f'{district_code}~{block_code}~{panchayat_code}'
     logger.info(location_id)
-    baseURL=f"http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=SmartCardreport_engRH&actionVal=NEFMS&id={location_id}&type=&Date=-1&File=&Agency=&listType=&yearMonth=-1&ReportType=&flag=-1&Rtype=-1&Date1=-1&wtype=-1&ytype=-1&Date2=-1&ltype=-1&year=&program=&fileName={location_id}&stype=-1&ptype=-1&lltype=ITDA"
+    baseURL=f"http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=SmartCardreport_engRH&actionVal=NEFMS&id={location_id}&type=&Date=-1&File=&Agency=&listType=&yearMonth=-1&ReportType=&flag=-1&Rtype=-1&Date1=-1&wtype=-1&ytype=-1&Date2=-1&ltype=-1&year=&program=&fileName={location_id}&stype=-1&ptype=-1&lltype=ITDA"
     logger.info(f"AP URL is {baseURL}")
-    url = 'http://www.nrega.ap.gov.in/Nregs/'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/'
     cookies = ''
     with requests.session() as session:
         #res = session.get(url)
@@ -823,7 +824,7 @@ def get_ap_employment_generation_r2_2(lobj, logger):
 
     logger.info(f"Downloading employment generation for {lobj.block_name}")
 
-    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/home.do'
     with requests.Session() as session:
         response = session.get(url)
         cookies = session.cookies
@@ -851,7 +852,7 @@ def fetch_ap_r2_2(logger,block_code,cookies=None):
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-GB,en;q=0.5',
-        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=EmpGenRep&id=03&type=',
+        'Referer': 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=EmpGenRep&id=03&type=',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
         'Cache-Control': 'max-age=0',
@@ -864,7 +865,7 @@ def fetch_ap_r2_2(logger,block_code,cookies=None):
         ('type', ''),
     )
 
-    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+    response = get_request_with_retry_timeout(logger,'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
 
     if response is None:
         return None
@@ -890,7 +891,7 @@ def get_ap_jobcard_updation_report_r24_43(lobj, logger):
 
     logger.info(f"Downloading jobcard updation report for {lobj.block_name}")
 
-    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/home.do'
     with requests.Session() as session:
         response = session.get(url)
         cookies = session.cookies
@@ -919,7 +920,7 @@ def fetch_R24_43_report(logger, block_code,cookies=None):
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-GB,en;q=0.5',
-        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=LandDevelopmentNewRH&actionVal=jobcardsUpdation&id=03&type=&type1=&type2=&year=&month=&Linktype=&selecteddate=&ctype=-1%20&subtype=&id1=&program=-1&design1=&design2=&reportCode=null&finYear=&category=&rep_type=&isItda=-1',
+        'Referer': 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=LandDevelopmentNewRH&actionVal=jobcardsUpdation&id=03&type=&type1=&type2=&year=&month=&Linktype=&selecteddate=&ctype=-1%20&subtype=&id1=&program=-1&design1=&design2=&reportCode=null&finYear=&category=&rep_type=&isItda=-1',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
         'Cache-Control': 'max-age=0',
@@ -949,7 +950,7 @@ def fetch_R24_43_report(logger, block_code,cookies=None):
         ('isItda', '-1'),
     )
 
-    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+    response = get_request_with_retry_timeout(logger,'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
 
     dataframe = pd.read_html(response.content)[-1]
     dataframe.columns = ['sno', 'panchayat_name', 'jcs_printed', 'jcs_distributed', 'jc_not_distributed_nameInOtherJC',
@@ -963,7 +964,7 @@ def get_ap_cm_dashboard_employment_r26_1(lobj, logger):
 
     logger.info(f"Downloading CM Dashboard employment report for {lobj.block_name}")
 
-    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/home.do'
     with requests.Session() as session:
         response = session.get(url)
         cookies = session.cookies
@@ -992,7 +993,7 @@ def fetch_ap_26_1(logger,block_code,cookies=None):
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-GB,en;q=0.5',
-        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=CMdashBoardTotalEmp&id=03&JOB_No=03&type=null&listType=&var=null',
+        'Referer': 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=CMdashBoardTotalEmp&id=03&JOB_No=03&type=null&listType=&var=null',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
     }
@@ -1007,7 +1008,7 @@ def fetch_ap_26_1(logger,block_code,cookies=None):
         ('var', 'null'),
     )
 
-    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+    response = get_request_with_retry_timeout(logger,'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
     
     dataframe = pd.read_html(response.content)[0]
     
@@ -1023,7 +1024,7 @@ def get_ap_approved_labour_budget_r13_18(lobj, logger):
 
     logger.info(f"Downloading approved labour budget report for {lobj.block_name}")
 
-    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/home.do'
     with requests.Session() as session:
         response = session.get(url)
         cookies = session.cookies
@@ -1049,7 +1050,7 @@ def fetch_ap_R13_18(logger,block_code,cookies=None):
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-GB,en;q=0.5',
-        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=LandDevelopmentRH&actionVal=LabourBudget&id=03&type=&type1=&type2=&year=&month=&Linktype=&selecteddate=&ctype=-1%20&subtype=&id1=&program=-1&design1=&design2=&reportCode=null&finYear=&category=&rep_type=&isItda=-1',
+        'Referer': 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=LandDevelopmentRH&actionVal=LabourBudget&id=03&type=&type1=&type2=&year=&month=&Linktype=&selecteddate=&ctype=-1%20&subtype=&id1=&program=-1&design1=&design2=&reportCode=null&finYear=&category=&rep_type=&isItda=-1',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
     }
@@ -1078,7 +1079,7 @@ def fetch_ap_R13_18(logger,block_code,cookies=None):
         ('isItda', '-1'),
     )
 
-    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+    response = get_request_with_retry_timeout(logger,'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
 
     dataframe = pd.read_html(response.content)[-1]
 
@@ -1091,7 +1092,7 @@ def get_ap_cm_dashboard_total_expenditure_r26_2(lobj, logger):
 
     logger.info(f"Downloading CM Dashboard total expenditure report for {lobj.block_name}")
 
-    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/home.do'
     with requests.Session() as session:
         response = session.get(url)
         cookies = session.cookies
@@ -1122,7 +1123,7 @@ def fetch_ap_R26_2(logger,block_code,cookies=None):
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-GB,en;q=0.5',
-        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=TotalExpenditure&id=03&JOB_No=03&type=&listType=&var=null',
+        'Referer': 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=TotalExpenditure&id=03&JOB_No=03&type=&listType=&var=null',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
     }
@@ -1137,7 +1138,7 @@ def fetch_ap_R26_2(logger,block_code,cookies=None):
         ('var', 'null'),
     )
 
-    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+    response = get_request_with_retry_timeout(logger,'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
 
     dataframe = pd.read_html(response.content)[0]
 
@@ -1157,7 +1158,7 @@ def get_ap_cm_dashboard_avg_days_worked_r26_3(lobj, logger):
 
     logger.info(f"Downloading CM Dashboard average days worked report for {lobj.block_name}")
 
-    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/home.do'
     with requests.Session() as session:
         response = session.get(url)
         cookies = session.cookies
@@ -1184,7 +1185,7 @@ def fetch_ap_R26_3(logger,block_code,cookies=None):
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:80.0) Gecko/20100101 Firefox/80.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-GB,en;q=0.5',
-        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=CMdashBoardAvgDaysWorked&id=03&JOB_No=03&type=null&listType=&var=null',
+        'Referer': 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=CMdashBoardAvgDaysWorked&id=03&JOB_No=03&type=null&listType=&var=null',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
     }
@@ -1199,7 +1200,7 @@ def fetch_ap_R26_3(logger,block_code,cookies=None):
         ('var', 'null'),
     )
 
-    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+    response = get_request_with_retry_timeout(logger,'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
 
     dataframe = pd.read_html(response.content)[0]
 
@@ -1214,7 +1215,7 @@ def get_ap_cm_dashboard_avg_wage_report_r26_5(lobj, logger):
 
     logger.info(f"Downloading CM Dashboard average wage report for {lobj.block_name}")
 
-    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/home.do'
     with requests.Session() as session:
         response = session.get(url)
         cookies = session.cookies
@@ -1242,7 +1243,7 @@ def fetch_ap_R26_5(logger,block_code,cookies=None):
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-GB,en;q=0.5',
-        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=CMdashBoardAvgWageRate&id=03&JOB_No=03&type=&listType=&var=null',
+        'Referer': 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=CMDashBoardRH&actionVal=CMdashBoardAvgWageRate&id=03&JOB_No=03&type=&listType=&var=null',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
         'Cache-Control': 'max-age=0',
@@ -1258,7 +1259,7 @@ def fetch_ap_R26_5(logger,block_code,cookies=None):
         ('var', 'null'),
     )
 
-    response = get_request_with_retry_timeout(logger,'http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+    response = get_request_with_retry_timeout(logger,'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
     
     dataframe = pd.read_html(response.content)[0]
     
@@ -1275,7 +1276,7 @@ def get_ap_grama_sachivalayam_report_r29_1(lobj, logger,fromDate='01/04/2020', t
 
     logger.info(f"Downloading Grama sachivalayam report for {lobj.block_name}")
 
-    url = 'http://www.nrega.ap.gov.in/Nregs/home.do'
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/home.do'
     with requests.Session() as session:
         response = session.get(url)
         cookies = session.cookies
@@ -1305,7 +1306,7 @@ def fetch_ap_r29_1(logger,block_code,fromDate = None,toDate = None,cookies = Non
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-GB,en;q=0.5',
-        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=HorticultureRH&actionVal=jobcardCreation&id=03&type=ALL&type1=&dept=&fromDate=01/04/2020&toDate=10/10/2020&Rtype=&reportGroup=&fto=Visakhapatnam&LinkType=-1&rtype=&reptype=&date=&program=&type2=&type3=',
+        'Referer': 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=HorticultureRH&actionVal=jobcardCreation&id=03&type=ALL&type1=&dept=&fromDate=01/04/2020&toDate=10/10/2020&Rtype=&reportGroup=&fto=Visakhapatnam&LinkType=-1&rtype=&reptype=&date=&program=&type2=&type3=',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
         'Cache-Control': 'max-age=0',
@@ -1332,7 +1333,7 @@ def fetch_ap_r29_1(logger,block_code,fromDate = None,toDate = None,cookies = Non
         ('type3', ''),
     )
 
-    response = requests.get('http://www.nrega.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+    response = requests.get('http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
 
     dataframe = pd.read_html(response.content)[0]
     
