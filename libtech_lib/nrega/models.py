@@ -298,7 +298,7 @@ class APPanchayat(Location):
                           force_download=self.force_download,
                           sample_name=self.sample_name)
         if self.state_code == AP_STATE_CODE:
-            self.home_url = "http://www.nrega.ap.gov.in/Nregs/FrontServlet"
+            self.home_url = "http://www.mgnregs.ap.gov.in/Nregs/FrontServlet"
         else:
             self.home_url = "http://www.nrega.telangana.gov.in/Nregs/FrontServlet"
         self.child_location_type = "village"

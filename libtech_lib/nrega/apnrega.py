@@ -198,7 +198,7 @@ def get_ap_jobcard_register(lobj, logger):
     dataframe = None
     logger.info(f"Fetching Jobcard Register for {lobj.code}")
     logger.info(f"state url = {lobj.home_url}")
-    lobj.home_url = "http://www.mgnregs.ap.gov.in/Nregs/"
+    # lobj.home_url = "http://www.mgnregs.ap.gov.in/Nregs/"
     url = f"{lobj.home_url}?requestType=WageSeekersRH&actionVal=JobCardHolder&page=WageSeekersHome&param=JCHI"
     logger.info(url)
     district_code = lobj.district_code[-2:]
