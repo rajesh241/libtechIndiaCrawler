@@ -198,7 +198,6 @@ def get_ap_jobcard_register(lobj, logger):
     dataframe = None
     logger.info(f"Fetching Jobcard Register for {lobj.code}")
     logger.info(f"state url = {lobj.home_url}")
-    # lobj.home_url = "http://www.mgnregs.ap.gov.in/Nregs/"
     url = f"{lobj.home_url}?requestType=WageSeekersRH&actionVal=JobCardHolder&page=WageSeekersHome&param=JCHI"
     logger.info(url)
     district_code = lobj.district_code[-2:]
@@ -469,7 +468,7 @@ def get_ap_not_enrolled_r14_21A(lobj, logger):
 
     url1 = 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet'
     # response = requests.get('http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, verify=False)
-    response = ap_nrega_download_page(logger, url1, headers=headers,
+    response = ap_nrega_download_page(logger, url1, headers=headers,                                            
                                       params=params, cookies=cookies)
     if (not response) or (response.status_code != 200):
         return None
