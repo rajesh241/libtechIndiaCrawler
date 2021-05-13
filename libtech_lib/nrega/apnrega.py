@@ -11,8 +11,11 @@ import time
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
+import os
 from datetime import datetime, timedelta
 
+NREGA_DATA_DIR = os.environ.get('NREGA_DATA_DIR', None)
+print(NREGA_DATA_DIR)
 LOCAL_DOWNLOAD = True
 
 from libtech_lib.generic.commons import  (get_current_finyear,
@@ -191,6 +194,116 @@ def fetch_ap_jobcard_register_for_village(logger, cookies, district_code, block_
     df['village_code'] = village_code
     df['village_name'] = village_name
     return df
+
+def fetch_hh_employment(logger,district_code,block_code,panchayat_code,village_code,finyear,cookies):
+    
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'max-age=0',
+        'Upgrade-Insecure-Requests': '1',
+        'Origin': 'http://www.nrega.ap.gov.in',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'Referer': 'http://www.nrega.ap.gov.in/Nregs/FrontServlet?requestType=WageSeekersRH&actionVal=HHEDetails&type=-1&param=HHE&Atype=Display&Ajaxid=Financial',
+        'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
+    }
+
+    params = (
+        ('requestType', 'WageSeekersRH'),
+        ('actionVal', 'HHEDetails'),
+        ('type', '-1'),
+        ('param', 'HHE'),
+        ('Ajaxid', 'go'),
+        ('year', finyear),
+    )
+
+    data = {
+      'State': '-1',
+      'District': district_code,
+      'Mandal': block_code,
+      'Panchayat': panchayat_code,
+      'Village': village_code,
+      'Financial': finyear,
+      'Go': ''
+    }
+
+    response = request_with_retry_timeout(logger,'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data)
+
+    dataframe = pd.read_html(response.content)[-1]
+
+    dataframe.columns = ['sno','jobcard_no','nic_jobcard_no','head_of_family','no_of_works_worked','no_of_days_worked','total_wage','avg_wage_per_day','no_of_labour_worked_hh']
+    dataframe['village_code'] = village_code
+    dataframe['finyear'] = finyear
+    return dataframe
+
+def add_leading_zeros_village(string):
+    if len(str(string)) == 2:
+        string = '0' + str(string)
+    if len(str(string)) == 1:
+        string = '00' + str(string)
+    return string
+
+def add_leading_zeros_panchayat(string):
+    if len(str(string)) != 2:
+        string = '0' + str(string)
+    return string
+
+def add_leading_zeros_mandal(string):
+    if len(str(string)) != 2:
+        string = '0' + str(string)
+    return string
+
+def add_leading_zeros_district(string):
+    if len(str(string)) != 2:
+        string = '0' + str(string)
+    return string
+
+
+def get_ap_hh_employment(lobj, logger,finyear):
+
+    url = 'http://www.mgnregs.ap.gov.in/Nregs/'
+    session = requests.Session()
+    response = session.get(url)
+
+    cookies = session.cookies
+    print(cookies)
+
+    location_codes = pd.read_csv(f'{NREGA_DATA_DIR}/general/FESAP_ITDA_village_codes.csv')
+    state_code='02'
+    district_code=lobj.district_code[2:]
+    block_code=lobj.block_code[5:]
+    panchayat_code=lobj.panchayat_code[8:]
+
+    location_codes.panchayat_code = location_codes.panchayat_code.astype(str).str[-2:]
+    location_codes.district_code = location_codes.district_code.astype(str).str[-2:]
+    location_codes.block_code = location_codes.block_code.astype(str).str[-2:]
+
+    location_codes['panchayat_code_to_use'] = location_codes.panchayat_code.map(add_leading_zeros_panchayat)
+    location_codes['block_code_to_use'] = location_codes.block_code.map(add_leading_zeros_mandal)
+    location_codes['district_code_to_use'] = location_codes.district_code.map(add_leading_zeros_district)
+    location_codes['village_code_to_use'] = location_codes.village_code.map(add_leading_zeros_village)
+
+    location_codes = location_codes[(location_codes.district_code_to_use == str(district_code)) & (location_codes.block_code_to_use == str(block_code)) & (location_codes.panchayat_code_to_use == str(panchayat_code))].reset_index(drop=True)
+    village_codes = location_codes.village_code_to_use.unique()
+    logger.info(village_codes)
+    logger.info(f'Shape of the location_codes df is {location_codes.shape}')
+
+    dfs_list = []
+    for i,village_code in enumerate(location_codes.village_code_to_use):
+        district_code = location_codes.district_code_to_use[i]
+        block_code = location_codes.block_code_to_use[i]
+        panchayat_code = location_codes.panchayat_code_to_use[i]
+        logger.debug("block_code : %s , panchayat_code: %s ,village_code: %s" % (block_code,panchayat_code,village_code))
+        dataframe = fetch_hh_employment(logger,district_code,block_code,panchayat_code,village_code,finyear,cookies)
+        if dataframe is not None:
+            dfs_list.append(dataframe)
+    if len(dfs_list):
+        dataframe = pd.concat(dfs_list)
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        logger.info("Dataframe is fetched")
+    return dataframe
 
 def get_ap_jobcard_register(lobj, logger):
     """Download Jobcard Register for a given panchayat
