@@ -929,6 +929,7 @@ def get_block_rejected_transactions_v2(lobj, logger, rej_stat_df):
     worker_df = worker_df.drop_duplicates()
     filtered_df = rej_stat_df[rej_stat_df['block_code'] == int(lobj.block_code)]
     start_fin_year = get_default_start_fin_year()
+    start_fin_year = 15
     logger.info(f"Shape of filtered_df is {filtered_df.shape}")
     filtered_df = filtered_df[filtered_df['finyear'] >= int(start_fin_year)]
     logger.info(f"Shape of filtered_df is {filtered_df.shape}")
@@ -1429,7 +1430,8 @@ def get_nic_stat_urls(lobj, logger, panchayat_code_array):
                                 csv_array.append(row)
                         if stats_url is None:
                             exception_message = f"Unable to get stats for {location_code_string} and block_code {lobj.block_code}"
-                            raise Exception('x should not exceed 5. The value of xwas:')
+                            continue
+                            raise Exception(exception_message)
     dataframe = pd.DataFrame(csv_array, columns=column_headers)
     return dataframe
 
@@ -2807,6 +2809,8 @@ def get_nic_r14_5(lobj, logger, url_df, finyear):
                                                 mydict=extract_dict)
             dataframe['finyear'] = finyear
             df_array.append(dataframe)
+    if(len(df_array) == 0):
+        return None
     dataframe = pd.concat(df_array)
     dataframe = dataframe[dataframe.location != 'Total'].reset_index(drop=True)
     if dataframe is not None:
