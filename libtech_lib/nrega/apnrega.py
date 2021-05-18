@@ -295,7 +295,11 @@ def get_ap_hh_employment(lobj, logger,finyear):
         block_code = location_codes.block_code_to_use[i]
         panchayat_code = location_codes.panchayat_code_to_use[i]
         logger.debug("block_code : %s , panchayat_code: %s ,village_code: %s" % (block_code,panchayat_code,village_code))
-        dataframe = fetch_hh_employment(logger,district_code,block_code,panchayat_code,village_code,finyear,cookies)
+        try:
+            dataframe = fetch_hh_employment(logger,district_code,block_code,panchayat_code,village_code,finyear,cookies)
+        except ValueError as v:
+            dataframe = None
+            pass
         if dataframe is not None:
             dfs_list.append(dataframe)
     if len(dfs_list):

@@ -2063,7 +2063,7 @@ def get_nrega_locations(lobj, logger):
     csv_array = []
     logger.info(f"Crawling locations for state {lobj.state_name}")
     url_prefix = "https://mnregaweb4.nic.in/netnrega/"
-    res = requests.get(lobj.mis_state_url)
+    res = requests.get(lobj.mis_state_url,verify=False)
     logger.info(lobj.mis_state_url)
     column_headers = ["parent_location_code", "crawl_ip", "state_short_code", "is_nic", "location_type", "name", "code", "name_not_english", "slug", "state_code", "state_name", "district_code", "district_name", "block_code", "block_name", "panchayat_code", "panchayat_name"]
     row = ["0", lobj.crawl_ip, lobj.state_short_code, lobj.is_nic, lobj.location_type, lobj.name, lobj.code, False, lobj.slug, lobj.state_code, lobj.state_name, "", "", "", "", "", ""]
@@ -2090,7 +2090,7 @@ def get_nrega_locations(lobj, logger):
         row = row1 + row2
         csv_array.append(row)
         block_identifier = 'PoIndexFrame.aspx'
-        res1 = requests.get(dist_url)
+        res1 = requests.get(dist_url,verify=False)
         if res1.status_code != 200:
             return None
         disthtml = res1.content
@@ -2109,7 +2109,7 @@ def get_nrega_locations(lobj, logger):
             row = row1 + row2
             csv_array.append(row)
             parent_location_code = code
-            res2 = requests.get(block_url)
+            res2 = requests.get(block_url,verify=False)
             if res2.status_code != 200:
                 return None
             block_html = res2.content

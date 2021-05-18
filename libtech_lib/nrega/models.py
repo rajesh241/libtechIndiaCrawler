@@ -104,6 +104,12 @@ REPORT_THRESHOLD_DICT = {
 }
 DEFAULT_REPORT_THRESHOLD = 20
 
+def add_leading_zeros_jcs(string):
+    if len(str(string)) != 18:
+        string = '~0' + str(string)
+    if len(str(string)) == 18:
+        string = '~' + str(string)
+    return string
 
 class Location():
     """This is the base Location Class"""
@@ -562,13 +568,6 @@ class APBlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type)
 
-    def add_leading_zeros_jcs(string):
-        if len(str(string)) != 18:
-            string = '~0' + str(string)
-        if len(str(string)) == 18:
-            string = '~' + str(string)
-        return string
-
     def ap_hh_employment(self, logger):
         """This function will fetch the jobcar dregister of AP"""
         report_type = "ap_hh_employment"
@@ -586,6 +585,8 @@ class APBlock(Location):
             if len(df_array) > 0:
                 dataframe = pd.concat(df_array)
                 dataframe['jobcard_no'] = dataframe['jobcard_no'].map(add_leading_zeros_jcs)
+                finyear_dict = {2018:'19',2019:'20',2020:'21',2021:'22'}
+                dataframe.finyear = dataframe.finyear.map(finyear_dict)
                 logger.info(dataframe)
                 if dataframe is not None:
                     self.save_report(logger, dataframe, report_type)
@@ -1138,27 +1139,32 @@ class NREGABlock(Location):
         df_array = []
         report_type = "nic_stats"
         panchayat_array = self.get_all_panchayats(logger)
-        dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
-        if len(dataframe) > 0:
-            df_array.append(dataframe)
-        else:
-            health = "red"
-            remarks = f"Unable to download for {self.code}"
-        for each_panchayat_code in panchayat_array:
-            my_location = NREGAPanchayat(logger, each_panchayat_code,
-                                         force_download=self.force_download)
-            dataframe = my_location.nic_stats(logger)
-            if ((dataframe is None) or (len(dataframe) == 0)):
-                health = "red"
-                remarks = remarks + \
-                    f"Unable to download for {each_panchayat_code}\n"
-            else:
+        try:
+            dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
+            if len(dataframe) > 0:
                 df_array.append(dataframe)
+            else:
+                health = "red"
+                remarks = f"Unable to download for {self.code}"
+            for each_panchayat_code in panchayat_array:
+                my_location = NREGAPanchayat(logger, each_panchayat_code,
+                                            force_download=self.force_download)
+                dataframe = my_location.nic_stats(logger)
+                if ((dataframe is None) or (len(dataframe) == 0)):
+                    health = "red"
+                    remarks = remarks + \
+                        f"Unable to download for {each_panchayat_code}\n"
+                else:
+                    df_array.append(dataframe)
+
+        except Exception as e:
+            logger.info(f'failed with exception {e}')
 
         if len(df_array) > 0:
             dataframe = pd.concat(df_array)
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type)
+
 
     def jobcard_register(self, logger):
         """This will fetch jobcard register for each panchayat in the block"""
