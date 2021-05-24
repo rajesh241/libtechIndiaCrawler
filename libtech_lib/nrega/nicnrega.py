@@ -196,8 +196,8 @@ def get_nic_block_urls(lobj, logger):
     end_fin_year = get_current_finyear()
     column_headers = ['finyear', 'report_name', 'report_slug',
                        'mis_url', 'location_type', 'panchayat_code']
-    mis_url_prefix = f"https://mnregaweb4.nic.in/netnrega/placeHolder1/"
-    mis_url_prefix_panchayat = f"https://mnregaweb4.nic.in/netnrega/placeHolder1/placeHolder2/"
+    mis_url_prefix = f"https://mnregaweb2.nic.in/netnrega/placeHolder1/"
+    mis_url_prefix_panchayat = f"https://mnregaweb2.nic.in/netnrega/placeHolder1/placeHolder2/"
     for finyear in range(start_fin_year, end_fin_year+1):
         logger.debug(f"Currently Processing {finyear} for {lobj.code}")
         finyear = str(finyear)
@@ -3007,7 +3007,7 @@ def get_nic_r8_1_5(lobj, logger, url_df):
 def get_nic_r8_1_5_state_urls(lobj, logger, report_type=None, url_text=None,
                       url_prefix=None):
     """This function will get the Urls at the block level"""
-    logger.info("Download  urls for hte state")
+    logger.info("Download  urls for the state")
     csv_array = []
     
     column_headers = ["state_code", "finyear", "url"]
@@ -3021,15 +3021,18 @@ def get_nic_r8_1_5_state_urls(lobj, logger, report_type=None, url_text=None,
             filename = f"{NREGA_DATA_DIR}/mis_urls/{state_code}_{finyear}.html"
             logger.info(filename)
             block_url_text = "rej_transftomusteroll.aspx"
-            with open(filename, "rb") as infile:
-                myhtml = infile.read()
-            mysoup = BeautifulSoup(myhtml, "lxml")
-            elem = mysoup.find("a", href=re.compile(url_text))
-            if elem is not None:
-                base_href = elem["href"]
-            logger.info(url_prefix+base_href)
-            row = [state_code, finyear, url_prefix+base_href]
-            csv_array.append(row)
+            try:
+                with open(filename, "rb") as infile:
+                    myhtml = infile.read()
+                mysoup = BeautifulSoup(myhtml, "lxml")
+                elem = mysoup.find("a", href=re.compile(url_text))
+                if elem is not None:
+                    base_href = elem["href"]
+                logger.info(url_prefix+base_href)
+                row = [state_code, finyear, url_prefix+base_href]
+                csv_array.append(row)
+            except Exception as e:
+                continue
     dataframe = pd.DataFrame(csv_array, columns=column_headers)
     return dataframe
 

@@ -277,6 +277,7 @@ class Location():
         report_type = 'nic_r8_1_5_state_urls'
         url_text = 'rej_trans_track.aspx'
         url_prefix = "http://mnregaweb4.nic.in/netnrega/"
+
         dataframe = get_nic_r8_1_5_state_urls(self, logger, report_type=report_type,
                                        url_text=url_text, url_prefix=url_prefix)
         self.save_report(logger, dataframe, report_type)
@@ -872,8 +873,8 @@ class NREGABlock(Location):
         Location.__init__(self, logger, self.code, scheme=self.scheme,
                           force_download=self.force_download,
                           sample_name=self.sample_name)
-        self.mis_state_url = f"https://mnregaweb4.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
-        self.mis_block_url = f"https://mnregaweb4.nic.in/netnrega/Progofficer/PoIndexFrame.aspx?flag_debited=S&lflag=eng&District_Code={self.district_code}&district_name={self.district_name}&state_name={self.state_name}&state_Code={self.state_code}&finyear=fullFinYear&check=1&block_name={self.block_name}&Block_Code={self.block_code}"
+        self.mis_state_url = f"https://mnregaweb2.nic.in/netnrega/homestciti.aspx?state_code={self.state_code}&state_name={self.state_name}&lflag=eng"
+        self.mis_block_url = f"https://mnregaweb2.nic.in/netnrega/Progofficer/PoIndexFrame.aspx?flag_debited=S&lflag=eng&District_Code={self.district_code}&district_name={self.district_name}&state_name={self.state_name}&state_Code={self.state_code}&finyear=fullFinYear&check=1&block_name={self.block_name}&Block_Code={self.block_code}"
         self.child_location_type = "panchayat"
 
     def get_all_panchayats(self, logger):
