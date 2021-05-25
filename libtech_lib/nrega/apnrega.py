@@ -294,7 +294,7 @@ def get_ap_hh_employment(lobj, logger,finyear):
         district_code = location_codes.district_code_to_use[i]
         block_code = location_codes.block_code_to_use[i]
         panchayat_code = location_codes.panchayat_code_to_use[i]
-        village_name = location_codes.village_name[index]
+        village_name = location_codes.village_name[i]
         logger.debug("block_code : %s , panchayat_code: %s ,village_code: %s" % (block_code,panchayat_code,village_code))
         try:
             dataframe = fetch_hh_employment(logger,district_code,block_code,panchayat_code,village_code,finyear,cookies)
