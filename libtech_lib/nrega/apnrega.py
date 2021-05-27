@@ -627,6 +627,8 @@ def get_ap_nefms_report_r14_37(lobj, logger):
         'S.No.',
         'File_Name',
         'File_Sent_Date',
+        'Social_Category',
+        'Social_Category_URL',
         'No._of_Transactions',
         'Transaction_URL',
         'No._of_Wage_Seekers',
@@ -696,7 +698,7 @@ def get_ap_nefms_report_r14_37(lobj, logger):
     extract_dict['column_headers'] = column_headers
     extract_dict['table_id'] = 'sortable'
     extract_dict['data_start_row'] = 3
-    extract_dict['extract_url_array'] = [3, 8]
+    extract_dict['extract_url_array'] = [3, 5, 9]
     extract_dict['url_prefix'] = "http://www.mgnregs.ap.gov.in"
     dataframe = get_dataframe_from_html(logger, myhtml, mydict=extract_dict)
     if dataframe is None:
@@ -852,7 +854,7 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
     for index, row in fto_report_df.iterrows():
         rej_count = row.get("Rejected_Transactions", 0)
         fto_date = row.get("File_Sent_Date", None)
-        rej_url = row.get("Rejected_Transaction_URL", None)
+        rej_url = row.get("Social_Category_URL", None)
         panchayat_code = row.get("panchayat_code", None)
         panchayat_name = row.get("panchayat_name", None)
         static_col_values = [panchayat_code, panchayat_name, fto_date]
