@@ -16,6 +16,8 @@ if ls_or_lc_widget == 'By Tag':
 else:
     ls_or_lc = '-lc'
     tag_name_or_code = st.text_input('Enter the location code')
+    if tag_name_or_code == '':
+        st.stop()
 
 response = requests.get('https://backend.libtech.in/api/public/reportagg/?limit=10000')
 results = response.json()['results']

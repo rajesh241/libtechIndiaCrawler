@@ -1435,8 +1435,71 @@ def get_nic_stat_urls(lobj, logger, panchayat_code_array):
     dataframe = pd.DataFrame(csv_array, columns=column_headers)
     return dataframe
 
+def nic_stats_df(logger,url):
 
-def get_nic_stats(lobj, logger, nic_stat_urls_df):
+    res = request_with_retry_timeout(logger, url, method="get")
+    dataframe_list = pd.read_html(res.content)
+
+    dataframe = dataframe_list[0]
+
+    dataframe.columns = ['name','22','21','20','19','18','graphs']
+
+    block_1_index = dataframe[dataframe.graphs == 'View Graph'].index.values[0]
+
+    df0 = dataframe[:block_1_index]
+
+    df1 = dataframe[block_1_index+1:]
+
+    df1 = df1[~df1.graphs.isin(['III Works', 'IV Financial Progress'])]
+
+    cols_to_na = [i for i in df0.columns if i not in ['name','22']]
+
+    df0.loc[:,cols_to_na] = ''
+
+    df0 = df0[df0.name != 'I Job Card']
+
+    fdf = pd.concat([df0,df1])
+
+    return fdf
+
+
+def get_nic_stats(lobj,logger,nic_stat_urls_df):
+    logger.info(f"Going to fetch nic Stats for {lobj.code}-{lobj.name}")
+    logger.debug(nic_stat_urls_df.columns)
+    filtered_df = nic_stat_urls_df[nic_stat_urls_df['block_code'] ==
+                                   int(lobj.code)].reset_index()
+    logger.debug(f"length of filtered_df is {len(filtered_df)}")
+
+    panchayat_url_df = filtered_df[filtered_df.location_type == 'panchayat'].reset_index(drop=True)
+    block_url_df = filtered_df[filtered_df.location_type == 'block'].reset_index(drop=True)
+   
+    dataframe_array = []
+
+    for index,stats_url in enumerate(block_url_df.stats_url):
+        logger.debug(f"{index}_Fetching stats for {block_url_df.block_code[index]}")
+        dataframe = nic_stats_df(logger, stats_url)
+        dataframe["panchayat_code"] = ''
+        dataframe["panchayat_name"] = ''
+        dataframe_array.append(dataframe)
+
+    for index,stats_url in enumerate(panchayat_url_df.stats_url):
+        panchayat_code = int(panchayat_url_df.panchayat_code[index])
+        logger.debug(f"{index}_Fetching stats for {panchayat_code}")
+        dataframe = nic_stats_df(logger, stats_url)
+        dataframe['panchayat_code'] = panchayat_code
+        url = f'https://backend.libtech.in/api/public/location/?code={panchayat_code}&format=json'
+        response = requests.get(url)
+        json_response = response.json()
+        panchayat_name = json_response['results'][0]['panchayat_name']
+        dataframe['panchayat_name'] = panchayat_name
+        dataframe_array.append(dataframe)
+
+    if len(dataframe_array) > 0:
+        dataframe = pd.concat(dataframe_array).reset_index(drop=True)
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        return dataframe
+
+def get_nic_stats_old(lobj, logger, nic_stat_urls_df):
     """This function will fetch nic Stats"""
     location_cols = ["state_code", "state_name", "district_code",
                      "district_name", "block_code", "block_name",

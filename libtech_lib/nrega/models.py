@@ -8,6 +8,8 @@ there is a class for each location type, and associated methods related to that
 # Archive data
 import datetime
 import pandas as pd
+import warnings
+warnings.filterwarnings('ignore')
 
 from libtech_lib.generic.commons import (
     get_full_finyear,
@@ -1123,7 +1125,31 @@ class NREGABlock(Location):
         if df is not None:
             self.save_report(logger, df, report_type)
 
+
     def nic_stats(self, logger):
+        """This function will fetch NIC Stats"""
+        report_type = "nic_stats"
+        is_updated = self.is_report_updated(logger, report_type)
+        if is_updated:
+            return
+        my_location = NREGADistrict(logger, self.district_code,
+                                    force_download=False)
+        my_location.nic_stat_urls(logger)
+        report_type = "nic_stat_urls"
+        nic_stat_urls_df = my_location.fetch_report_dataframe(
+            logger, report_type)
+        health = "green"
+        remarks = ''
+        df_array = []
+        report_type = "nic_stats"
+
+        dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
+
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+
+    def nic_stats_old(self, logger):
         """This function will fetch NIC Stats"""
         report_type = "nic_stats"
         is_updated = self.is_report_updated(logger, report_type)
@@ -1142,7 +1168,7 @@ class NREGABlock(Location):
         panchayat_array = self.get_all_panchayats(logger)
         try:
             dataframe = get_nic_stats(self, logger, nic_stat_urls_df)
-            if len(dataframe) > 0:
+            if dataframe.shape[0] > 0:
                 df_array.append(dataframe)
             else:
                 health = "red"
