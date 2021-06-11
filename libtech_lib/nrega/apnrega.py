@@ -140,19 +140,21 @@ def get_ap_muster_transactions(lobj, logger):
     dataframe = dataframe.reset_index(drop=True)
     return dataframe
 
-def fetch_ap_jobcard_register_for_village(logger, cookies, district_code, block_code, panchayat_code, village_code, village_name, extract_dict):
+def fetch_ap_jobcard_register_for_village(logger, cookie, district_code, block_code, panchayat_code, village_code, village_name, extract_dict):
     logger.info(f'fetch_ap_jobcard_register_for_village(cookies={cookies}, block_code={block_code}, panchayat_code={panchayat_code}, village_code={village_code}, village_name={village_name})')
 
     headers = {
-        'Connection': 'keep-alive',
-        'Cache-Control': 'max-age=0',
-        'Upgrade-Insecure-Requests': '1',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Mobile Safari/537.36',
-        'Origin': 'http://www.mgnregs.ap.gov.in',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,/;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        'Referer': 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=WageSeekersRH&actionVal=JobCardHolder&param=JCHI&type=-1&Atype=Display&Ajaxid=Village',
-        'Accept-Language': 'en-US,en;q=0.9',
+        'authority': 'mgnregs.ap.gov.in',
+        'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="90", "Google Chrome";v="90"',
+        'sec-ch-ua-mobile': '?0',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36',
+        'accept': '*/*',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-dest': 'empty',
+        'referer': 'https://mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=R1Display&page=Newreportcenter_ajax_eng',
+        'accept-language': 'en-US,en;q=0.9,te;q=0.8',
+        'cookie': f'JSESSIONID={cookie}',
     }
 
     params = (
@@ -164,7 +166,7 @@ def fetch_ap_jobcard_register_for_village(logger, cookies, district_code, block_
     )
 
     data = {
-        'State': '01',
+        'State': '-1',
         'District': district_code,
         'Mandal': block_code,
         'Panchayat': panchayat_code,
@@ -174,7 +176,7 @@ def fetch_ap_jobcard_register_for_village(logger, cookies, district_code, block_
     }
     url = 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet'
     #response = requests.post('http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data, verify=False)
-    response = request_with_retry_timeout(logger, url, data=data, headers=headers, params=params, cookies=cookies) 
+    response = request_with_retry_timeout(logger, url, data=data, headers=headers, params=params) 
     if response is None:
         return []
     content = response.content
@@ -260,6 +262,77 @@ def add_leading_zeros_district(string):
     return string
 
 
+def get_ap_village_codes(lobj, logger):
+    response = requests.get('https://mgnregs.ap.gov.in/Nregs/')
+    cookies = response.cookies
+
+    cookie = str(cookies).split('=')[-1].split(' ')[0]
+    district_code=lobj.district_code[2:]
+    block_code=lobj.block_code[5:]
+    panchayat_code=lobj.panchayat_code[8:]
+    logger.info(district_code+block_code+panchayat_code)
+
+    headers = {
+        'authority': 'mgnregs.ap.gov.in',
+        'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="90", "Google Chrome";v="90"',
+        'sec-ch-ua-mobile': '?0',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36',
+        'accept': '*/*',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-dest': 'empty',
+        'referer': 'https://mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=R1Display&page=Newreportcenter_ajax_eng',
+        'accept-language': 'en-US,en;q=0.9,te;q=0.8',
+        'cookie': f'JSESSIONID={cookie}',
+    }
+
+  
+    params = (
+        ('requestType', 'WageSeekersRH'),
+        ('actionVal', 'JobCardHolder'),
+        ('param', 'JCHI'),
+        ('type', '-1'),
+        ('Atype', 'Display'),
+        ('Ajaxid', 'Panchayat'),
+    )
+
+    data = {
+      'State': '-1',
+      'District': district_code,
+      'Mandal': block_code,
+      'Panchayat': panchayat_code,
+      'Village': '-1',
+      'HouseHoldId': ''
+    }
+
+    response3 = requests.get('https://mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params,data=data)
+
+    soup3 = BeautifulSoup(response3.content)
+    village_tags = soup3.find('select',{'id':'Village'})
+    village_tags = [i for i in village_tags if 'ALL' not in str(i)]
+    village_tags = [i for i in village_tags if '\n' not in str(i)]
+
+    allvillage_codes = []
+    for village in village_tags:
+            village_name = village.text
+            village_code = village.get('value')
+            village_dic = {}
+            #village_dic['dist_code'] = dist_code
+            village_dic['village_name'] = village_name
+            village_dic['village_code'] = village_code
+            try:
+                allvillage_codes.append(village_dic)
+            except:
+                print('No villages found')
+                pass
+
+    dataframe = pd.DataFrame(allvillage_codes)
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        logger.info("Dataframe is fetched")
+    return dataframe
+
+
 def get_ap_hh_employment(lobj, logger,finyear):
 
     url = 'http://www.mgnregs.ap.gov.in/Nregs/'
@@ -315,6 +388,11 @@ def get_ap_jobcard_register(lobj, logger):
     """Download Jobcard Register for a given panchayat
     return the pandas dataframe of jobcard Register"""
     dataframe = None
+    with requests.Session() as session:
+        response = session.get('http://www.mgnregs.ap.gov.in/Nregs/')
+        cookies = response.cookies
+
+    cookie = str(cookies).split('=')[-1].split(' ')[0]
     logger.info(f"Fetching Jobcard Register for {lobj.code}")
     logger.info(f"state url = {lobj.home_url}")
     url = f"{lobj.home_url}?requestType=WageSeekersRH&actionVal=JobCardHolder&page=WageSeekersHome&param=JCHI"
@@ -351,26 +429,27 @@ def get_ap_jobcard_register(lobj, logger):
 
     logger.debug("DistrictCode: %s, block_code : %s , panchayat_code: %s " % (district_code,block_code,panchayat_code))
     headers = {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:54.0) Gecko/20100101 Firefox/54.0',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'Accept-Encoding': 'gzip, deflate',
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Referer': url,
-      'Connection': 'keep-alive',
-      'Upgrade-Insecure-Requests': '1',
-     }
+        'authority': 'mgnregs.ap.gov.in',
+        'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="90", "Google Chrome";v="90"',
+        'sec-ch-ua-mobile': '?0',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36',
+        'accept': '*/*',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-dest': 'empty',
+        'referer': 'https://mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=R1Display&page=Newreportcenter_ajax_eng',
+        'accept-language': 'en-US,en;q=0.9,te;q=0.8',
+        'cookie': f'JSESSIONID={cookie}',
+    }
 
     data = [
-    ('State', state_code),
+    ('State', '-1'),
     ('District', district_code),
     ('Mandal', block_code),
     ('Panchayat', panchayat_code),
     ('Village', '-1'),
     ('HouseHoldId', ''),
-    ('Go', ''),
-    ('spl', 'Select'),
-    ('input2', ''),
+    ('Go', '')
     ]
     logger.debug(lobj.home_url)
     response = requests.get(base_url)
@@ -402,7 +481,7 @@ def get_ap_jobcard_register(lobj, logger):
                 continue
             village_name = option.text
             logger.info(f'Fetching jobcard register for village_code[{village_code}]/village_name[{village_name}]')
-            df = fetch_ap_jobcard_register_for_village(logger, cookies, district_code, block_code, panchayat_code, village_code, village_name, extract_dict)
+            df = fetch_ap_jobcard_register_for_village(logger, cookie, district_code, block_code, panchayat_code, village_code, village_name, extract_dict)
             if len(df):
                 #logger.info(df.head)
                 dfs.append(df)

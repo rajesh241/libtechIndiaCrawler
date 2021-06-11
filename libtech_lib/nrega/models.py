@@ -87,7 +87,8 @@ from libtech_lib.nrega.apnrega import (
     get_ap_cm_dashboard_avg_days_worked_r26_3,
     get_ap_cm_dashboard_avg_wage_report_r26_5,
     get_ap_grama_sachivalayam_report_r29_1,
-    get_ap_hh_employment
+    get_ap_hh_employment,
+    get_ap_village_codes
 )
 
 from libtech_lib.generic.aws import days_since_modified_s3
@@ -571,6 +572,23 @@ class APBlock(Location):
             if dataframe is not None:
                 self.save_report(logger, dataframe, report_type)
 
+    def ap_village_codes(self, logger):
+        """This function will fetch the jobcar dregister of AP"""
+        report_type = "ap_village_codes"
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            my_location = APPanchayat(logger, each_panchayat_code)
+            dataframe = get_ap_village_codes(my_location, logger)
+            if dataframe is not None:
+                df_array.append(dataframe)
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+
+                
     def ap_hh_employment(self, logger):
         """This function will fetch the jobcar dregister of AP"""
         report_type = "ap_hh_employment"
@@ -595,6 +613,7 @@ class APBlock(Location):
                     self.save_report(logger, dataframe, report_type)
                     logger.info(f"Saved for file")
 
+    
 
     def worker_register(self, logger):
         """this will fetch the worker register for entire block"""
