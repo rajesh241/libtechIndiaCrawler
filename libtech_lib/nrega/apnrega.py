@@ -140,21 +140,29 @@ def get_ap_muster_transactions(lobj, logger):
     dataframe = dataframe.reset_index(drop=True)
     return dataframe
 
-def fetch_ap_jobcard_register_for_village(logger, cookie, district_code, block_code, panchayat_code, village_code, village_name, extract_dict):
-    logger.info(f'fetch_ap_jobcard_register_for_village(cookies={cookies}, block_code={block_code}, panchayat_code={panchayat_code}, village_code={village_code}, village_name={village_name})')
+def fetch_ap_jobcard_register_for_village(logger, district_code, block_code, panchayat_code, village_code, village_name):
+
+    response = requests.get('https://mgnregs.ap.gov.in/Nregs')
+    cookies = response.cookies
+    logger.info(district_code+block_code+panchayat_code+village_code)
+
 
     headers = {
-        'authority': 'mgnregs.ap.gov.in',
-        'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="90", "Google Chrome";v="90"',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'max-age=0',
+        'sec-ch-ua': '" Not;A Brand";v="99", "Google Chrome";v="91", "Chromium";v="91"',
         'sec-ch-ua-mobile': '?0',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36',
-        'accept': '*/*',
-        'sec-fetch-site': 'same-origin',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-dest': 'empty',
-        'referer': 'https://mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=NewReportsRH&actionVal=R1Display&page=Newreportcenter_ajax_eng',
-        'accept-language': 'en-US,en;q=0.9,te;q=0.8',
-        'cookie': f'JSESSIONID={cookie}',
+        'Upgrade-Insecure-Requests': '1',
+        'Origin': 'https://mgnregs.ap.gov.in',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-User': '?1',
+        'Sec-Fetch-Dest': 'document',
+        'Referer': 'https://mgnregs.ap.gov.in/Nregs/FrontServlet?requestType=WageSeekersRH&actionVal=JobCardHolder&param=JCHI&type=-1&Atype=Display&Ajaxid=Village',
+        'Accept-Language': 'en-US,en;q=0.9',
     }
 
     params = (
@@ -166,36 +174,26 @@ def fetch_ap_jobcard_register_for_village(logger, cookie, district_code, block_c
     )
 
     data = {
-        'State': '-1',
-        'District': district_code,
-        'Mandal': block_code,
-        'Panchayat': panchayat_code,
-        'Village': village_code,
-        'HouseHoldId': '',
-        'Go': ''
+    'State': '-1',
+    'District': district_code,
+    'Mandal': block_code,
+    'Panchayat': panchayat_code,
+    'Village': village_code,
+    'HouseHoldId': '',
+    'Go': ''
     }
-    url = 'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet'
-    #response = requests.post('http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data, verify=False)
-    response = request_with_retry_timeout(logger, url, data=data, headers=headers, params=params) 
-    if response is None:
-        return []
-    content = response.content
-    try:
-        #df = pd.read_html(content, attrs = {'id': 'sortable'})[0]
-        df = get_dataframe_from_html(logger, content, mydict=extract_dict)
-    except Exception as e:
-        logger.error(f'Errored in fetch. Exception[{e}]')
-        df = pd.read_html(content, attrs = {'id': 'Table2'})[0]
-        if df.iloc[0, 0] == 'No records found for the selection made':
-            logger.error('No records found for the selection made')
-            return []
-        
-    if df is None:
-        return []
 
-    df['village_code'] = village_code
-    df['village_name'] = village_name
-    return df
+    response = requests.post('https://mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data)
+
+    dataframe = pd.read_html(response.content)[-1]
+    if dataframe.iloc[0,0] != 'No records found for the selection made':
+        dataframe.columns = ['sno','jobcard_num','nic_jobcard','head_of_the_family','registration_date','no_of_disabled','no_of_shg_members','no_of_males','no_of_females']
+        dataframe['village_code'] = village_code
+        dataframe['village_name'] = village_name
+        dataframe['jobcard_num'] = '~0' + dataframe['jobcard_num'].astype(str)
+        logger.info(f'shape of df is {dataframe.shape}')
+
+    return dataframe
 
 def fetch_hh_employment(logger,district_code,block_code,panchayat_code,village_code,finyear,cookies):
     
@@ -384,13 +382,39 @@ def get_ap_hh_employment(lobj, logger,finyear):
         logger.info("Dataframe is fetched")
     return dataframe
 
-def get_ap_jobcard_register(lobj, logger):
+def get_ap_jobcard_register(lobj,logger):
+
+    location_codes = get_ap_village_codes(lobj,logger)
+    logger.info(f"Filtered df shape {location_codes.shape}")
+    logger.info(location_codes)
+
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+    panchayat_code = lobj.panchayat_code[8:10]
+
+    #filtered_codes = location_codes[location_codes.panchayat_code == int(panchayat_code)].reset_index(drop=True)
+
+    dfs_list = []
+    for index, row in location_codes.iterrows():
+        village_code = str(row['village_code'])
+        village_name = row['village_name']
+        logger.info(panchayat_code + village_code + village_name)
+        dataframe = fetch_ap_jobcard_register_for_village(logger,district_code,block_code,panchayat_code,village_code,village_name)
+        dfs_list.append(dataframe)
+    dataframe = pd.concat(dfs_list).reset_index(drop=True)
+    if dataframe is not None:
+        dataframe = insert_location_details(logger, lobj, dataframe)
+        logger.info(dataframe.head())
+
+    return dataframe
+
+    
+def get_ap_jobcard_register_old(lobj, logger):
     """Download Jobcard Register for a given panchayat
     return the pandas dataframe of jobcard Register"""
     dataframe = None
-    with requests.Session() as session:
-        response = session.get('http://www.mgnregs.ap.gov.in/Nregs/')
-        cookies = response.cookies
+    response = requests.get('https://mgnregs.ap.gov.in/Nregs/')
+    cookies = response.cookies
 
     cookie = str(cookies).split('=')[-1].split(' ')[0]
     logger.info(f"Fetching Jobcard Register for {lobj.code}")
@@ -899,7 +923,7 @@ def get_ap_labour_report_r3_17(lobj, logger):
 def get_ap_rejected_transactions(lobj, logger, fto_report_df):
     """Get AP rejected transactions"""
     logger.debug(f"Labout report df columns {fto_report_df.columns}")
-    column_headers = ['sr_no', 'tjobcard', 'worker_code', 'name',
+    column_headers = ['sr_no', 'jobcard_num', 'worker_code', 'name',
                       'epayorder_no', 'amount', 'nrega_account_no', 'file_sent_date',
                       'credit_status', 'credited_account_no', 'bank_name',
                       'bank_iin', 'utr_no', 'remarks']
@@ -926,17 +950,18 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
     extract_dict['column_headers'] = column_headers
     extract_dict['table_id'] = 'sortable'
     extract_dict['data_start_row'] = 2
-    static_col_names = ["panchayat_code", "panchayat_name", "fto_date"]
-    static_col_values = ["", "", ""]
+    static_col_names = ["panchayat_code", "panchayat_name", "fto_date","fto_number"]
+    static_col_values = ["", "", "",""]
     func_name = "ap_fetch_table_from_url"
 
     for index, row in fto_report_df.iterrows():
         rej_count = row.get("Rejected_Transactions", 0)
+        fto_number = row.get("File_Name", None)
         fto_date = row.get("File_Sent_Date", None)
         rej_url = row.get("Social_Category_URL", None)
         panchayat_code = row.get("panchayat_code", None)
         panchayat_name = row.get("panchayat_name", None)
-        static_col_values = [panchayat_code, panchayat_name, fto_date]
+        static_col_values = [panchayat_code, panchayat_name, fto_date,fto_number]
         if rej_count > 0:
             func_args = [lobj, rej_url, session, headers, params, cookies, extract_dict,
                  static_col_names, static_col_values]
@@ -952,24 +977,24 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
     dataframe = pd.DataFrame(csv_array)
     dataframe = libtech_queue_manager(logger, job_list)
     dataframe = insert_location_details(logger, lobj, dataframe)
-    dataframe['~tjobcard'] = "~" + dataframe['tjobcard']
+    dataframe['jobcard_num'] = "~" + dataframe['jobcard_num']
     '''
     changed by Ranu
     '''
     dataframe['~epayorder_no'] = "~" + dataframe['epayorder_no'].astype(str)
-    dataframe = dataframe[dataframe["~tjobcard"]!="~2"]
+    dataframe = dataframe[dataframe["jobcard_num"]!="~2"]
     dataframe = insert_finyear_in_dataframe(logger, dataframe,
                                            "fto_date",
                                            date_format="%d-%b-%Y")
-    dataframe["tjobcard"] = dataframe["tjobcard"].astype(str).astype(int)
+    dataframe["jobcard_num"] = dataframe["jobcard_num"].astype(str)
     jr_df = lobj.fetch_report_dataframe(logger, "ap_jobcard_register")
     jr_df.rename(columns = {'Jobcard ID':'tjobcard', 'Govt of India JobCard ID':'jobcard'},
                        inplace = True)
-    col_list = ["tjobcard", "jobcard", "village_code", "village_name", "Head of Family"]
+    col_list = ["jobcard_num", "nic_jobcard", "village_code", "village_name", "head_of_the_family"]
     jr_df = jr_df[col_list]
     wr_df = lobj.fetch_report_dataframe(logger, "worker_register")
     if jr_df is not None:
-        dataframe = dataframe.merge(jr_df, on=['tjobcard'], how='left')
+        dataframe = dataframe.merge(jr_df, on=['jobcard_num'], how='left')
   # if wr_df is not None:
   #     col_list = ["jobcard", "village_name", "head_of_household", "caste"]
   #     wr_df = wr_df[col_list]
@@ -978,13 +1003,11 @@ def get_ap_rejected_transactions(lobj, logger, fto_report_df):
     additional_cols = ["state_code", "state_name", "district_code",
                       "district_name", "block_code", "block_name",
                       "panchayat_code", "panchayat_name", "village_name", 
-                       "village_code", "Head of Family", "jobcard", "~tjobcard", 
+                       "village_code", "head_of_the_family", "jobcard_num", "nic_jobcard", 
                         "finyear", "fto_date", "~epayorder_no"]
     cols = additional_cols + column_headers
     dataframe = dataframe[cols]
     return dataframe
-
-
 
 def get_ap_rejected_transactions1(lobj, logger):
     """Get AP rejected transactions"""
