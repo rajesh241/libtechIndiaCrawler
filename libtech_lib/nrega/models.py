@@ -603,15 +603,15 @@ class APBlock(Location):
                 dataframe = get_ap_hh_employment(my_location, logger,finyear)
                 if dataframe is not None:
                     df_array.append(dataframe)
-            if len(df_array) > 0:
-                dataframe = pd.concat(df_array)
-                dataframe['jobcard_no'] = dataframe['jobcard_no'].map(add_leading_zeros_jcs)
-                finyear_dict = {2018:'19',2019:'20',2020:'21',2021:'22'}
-                dataframe.finyear = dataframe.finyear.map(finyear_dict)
-                logger.info(dataframe)
-                if dataframe is not None:
-                    self.save_report(logger, dataframe, report_type)
-                    logger.info(f"Saved for file")
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            dataframe['jobcard_no'] = dataframe['jobcard_no'].map(add_leading_zeros_jcs)
+            finyear_dict = {'2018':'19','2019':'20','2020':'21','2021':'22'}
+            dataframe.finyear = dataframe.finyear.map(finyear_dict)
+            logger.info(dataframe)
+            if dataframe is not None:
+                self.save_report(logger, dataframe, report_type)
+                logger.info(f"Saved for file")
 
     
 

@@ -219,7 +219,7 @@ def fetch_hh_employment(logger,district_code,block_code,panchayat_code,village_c
     )
 
     data = {
-      'State': '-1',
+      'State': '01',
       'District': district_code,
       'Mandal': block_code,
       'Panchayat': panchayat_code,
@@ -228,7 +228,7 @@ def fetch_hh_employment(logger,district_code,block_code,panchayat_code,village_c
       'Go': ''
     }
 
-    response = request_with_retry_timeout(logger,'http://www.mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data)
+    response = request_with_retry_timeout(logger,'https://mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies, data=data)
 
     dataframe = pd.read_html(response.content)[-1]
 
@@ -333,39 +333,28 @@ def get_ap_village_codes(lobj, logger):
 
 def get_ap_hh_employment(lobj, logger,finyear):
 
-    url = 'http://www.mgnregs.ap.gov.in/Nregs/'
+    url = 'https://mgnregs.ap.gov.in/Nregs/'
     session = requests.Session()
     response = session.get(url)
 
     cookies = session.cookies
     print(cookies)
+    location_codes = get_ap_village_codes(lobj,logger)
+    logger.info(f"Filtered df shape {location_codes.shape}")
+    logger.info(location_codes)
 
-    location_codes = pd.read_csv(f'{NREGA_DATA_DIR}/general/FESAP_ITDA_village_codes.csv')
     state_code='02'
-    district_code=lobj.district_code[2:]
-    block_code=lobj.block_code[5:]
-    panchayat_code=lobj.panchayat_code[8:]
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+    panchayat_code = lobj.panchayat_code[8:10]
 
-    location_codes.panchayat_code = location_codes.panchayat_code.astype(str).str[-2:]
-    location_codes.district_code = location_codes.district_code.astype(str).str[-2:]
-    location_codes.block_code = location_codes.block_code.astype(str).str[-2:]
-
-    location_codes['panchayat_code_to_use'] = location_codes.panchayat_code.map(add_leading_zeros_panchayat)
-    location_codes['block_code_to_use'] = location_codes.block_code.map(add_leading_zeros_mandal)
-    location_codes['district_code_to_use'] = location_codes.district_code.map(add_leading_zeros_district)
-    location_codes['village_code_to_use'] = location_codes.village_code.map(add_leading_zeros_village)
-
-    location_codes = location_codes[(location_codes.district_code_to_use == str(district_code)) & (location_codes.block_code_to_use == str(block_code)) & (location_codes.panchayat_code_to_use == str(panchayat_code))].reset_index(drop=True)
-    village_codes = location_codes.village_code_to_use.unique()
-    logger.info(village_codes)
-    logger.info(f'Shape of the location_codes df is {location_codes.shape}')
+    #filtered_codes = location_codes[location_codes.panchayat_code == int(panchayat_code)].reset_index(drop=True)
 
     dfs_list = []
-    for i,village_code in enumerate(location_codes.village_code_to_use):
-        district_code = location_codes.district_code_to_use[i]
-        block_code = location_codes.block_code_to_use[i]
-        panchayat_code = location_codes.panchayat_code_to_use[i]
-        village_name = location_codes.village_name[i]
+    for index, row in location_codes.iterrows():
+        village_code = str(row['village_code'])
+        village_name = row['village_name']
+        logger.info(panchayat_code + village_code + village_name + finyear)
         logger.debug("block_code : %s , panchayat_code: %s ,village_code: %s" % (block_code,panchayat_code,village_code))
         try:
             dataframe = fetch_hh_employment(logger,district_code,block_code,panchayat_code,village_code,finyear,cookies)
