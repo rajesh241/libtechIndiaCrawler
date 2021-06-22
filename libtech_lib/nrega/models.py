@@ -88,7 +88,8 @@ from libtech_lib.nrega.apnrega import (
     get_ap_cm_dashboard_avg_wage_report_r26_5,
     get_ap_grama_sachivalayam_report_r29_1,
     get_ap_hh_employment,
-    get_ap_village_codes
+    get_ap_village_codes,
+    get_ap_npci_status
 )
 
 from libtech_lib.generic.aws import days_since_modified_s3
@@ -701,6 +702,31 @@ class APBlock(Location):
             if dataframe is not None:
                 # FIXME TBD merge here with Ranu's help
                 self.save_report(logger, dataframe, report_type)
+
+    def ap_npci_status(self, logger):
+        "Will fetch R26.20 PMJDY NPCI status report"
+        report_type = "ap_npci_status"
+        # FIXME df_prev = self.fetch_report_dataframe(logger, report_type)
+        panchayat_array = self.get_all_panchayats(logger)
+        logger.info(panchayat_array)
+        df_array = []
+        for each_panchayat_code in panchayat_array:
+            logger.info(
+                f"Currently Processing panchayat code {each_panchayat_code}")
+            my_location = APPanchayat(logger, each_panchayat_code)
+            try:    
+                dataframe = get_ap_npci_status(my_location, logger)
+                if dataframe is not None:
+                    df_array.append(dataframe)
+            except Exception as e:
+                pass
+        if len(df_array) > 0:
+            dataframe = pd.concat(df_array)
+            if dataframe is not None:
+                # FIXME TBD merge here with Ranu's help
+                logger.info(dataframe)
+                self.save_report(logger, dataframe, report_type)
+
 
     def ap_labour_report_r3_17(self, logger):
         "Will fetch R3.17"

@@ -1563,3 +1563,60 @@ def fetch_ap_r29_1(logger,block_code,fromDate = None,toDate = None,cookies = Non
     dataframe['toDate'] = toDate
         
     return dataframe
+
+
+def get_ap_npci_status(lobj, logger):
+
+    url = 'https://mgnregs.ap.gov.in/Nregs/'
+    session = requests.Session()
+    response = session.get(url)
+
+    cookies = session.cookies
+    logger.info(cookies)
+
+    district_code = lobj.district_code[-2:]
+    block_code = lobj.block_code[-2:]
+    panchayat_code = lobj.panchayat_code[8:10]
+
+    gp_code_to_use = district_code + block_code + panchayat_code
+
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'max-age=0',
+        'sec-ch-ua': '" Not;A Brand";v="99", "Google Chrome";v="91", "Chromium";v="91"',
+        'sec-ch-ua-mobile': '?0',
+        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.106 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-User': '?1',
+        'Sec-Fetch-Dest': 'document',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+
+    params = (
+        ('requestType', 'CMDashBoardRH'),
+        ('actionVal', 'PMJDYNPCIStatus'),
+        ('id', str(gp_code_to_use)),
+        ('JOB_No', str(gp_code_to_use)),
+        ('type', '-1'),
+        ('listType', ''),
+        ('var', 'null'),
+    )
+
+    response = get_request_with_retry_timeout(logger, 'https://mgnregs.ap.gov.in/Nregs/FrontServlet', headers=headers, params=params, cookies=cookies)
+
+    dataframe = pd.read_html(response.content,attrs={"id":'sortable'})
+
+    dataframe = dataframe[0]
+
+    dataframe.columns = ['sno','village_name','jobcard','worker_code','name','npci_status']
+
+    dataframe.jobcard = '~0' + dataframe.jobcard.astype(str)
+
+    dataframe = insert_location_details(logger, lobj, dataframe)
+
+    logger.info(f'the shape of the dataframe is {dataframe.shape}')
+
+    return dataframe
