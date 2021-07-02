@@ -68,7 +68,8 @@ from libtech_lib.nrega.nicnrega import (
     get_nic_r8_1_5_urls,
     get_nic_r8_1_5_state_urls,
     get_nic_r8_1_5,
-    get_nic_r14_5
+    get_nic_r14_5,
+    get_dynamic_muster_roll_tracking
 )
 
 from libtech_lib.nrega.apnrega import (
@@ -1124,6 +1125,13 @@ class NREGABlock(Location):
         """This will fetch the dynamic work report from MIS reports"""
         report_type = "dynamic_work_report_r6_18"
         dataframe = get_dynamic_work_report_r6_18(self, logger)
+        if dataframe is not None:
+            self.save_report(logger, dataframe, report_type)
+
+    def dynamic_muster_roll_tracking(self, logger):
+        """This will fetch the dynamic work report from MIS reports"""
+        report_type = "dynamic_muster_roll_tracking"
+        dataframe = get_dynamic_muster_roll_tracking(self, logger)
         if dataframe is not None:
             self.save_report(logger, dataframe, report_type)
 

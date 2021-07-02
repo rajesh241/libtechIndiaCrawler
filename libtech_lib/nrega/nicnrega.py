@@ -2264,6 +2264,140 @@ def update_muster_transactions_v2(lobj, logger):
     dataframe = dataframe[all_cols]
     return dataframe
 
+def get_dynamic_muster_roll_tracking(lobj, logger):
+    state_code = lobj.state_code
+    district_code = lobj.district_code
+    block_code = lobj.block_code
+    logger.info(f"{state_code}_{district_code}_{block_code}")
+    logger.info(f"Downloading Dynamic muster roll tracking report for {lobj.code}")
+    res = requests.get('https://mnregaweb2.nic.in/netnrega/morest.aspx?Zone=wrk&state_code=15&state_name=KARNATAKA&fin_year=2021-2022&lflag=&page=S&Digest=guen6aj5Al3cG4qshS7q9Q')
+
+    soup = BeautifulSoup(res.content)
+
+    all_atags = soup.find_all("a")
+
+    url = 'https://mnregaweb2.nic.in/netnrega/' + [i for i in all_atags if 'dynamic' in str(i)][0].get('href')
+
+    res = requests.get(url)
+
+    cookies = res.cookies
+    soup = BeautifulSoup(res.content)
+
+    VIEWSTATE=soup.find(id="__VIEWSTATE")['value']
+    VIEWSTATEGENERATOR=soup.find(id="__VIEWSTATEGENERATOR")['value']
+    EVENTVALIDATION = soup.find(id="__EVENTVALIDATION")['value']
+
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'max-age=0',
+        'sec-ch-ua': '" Not;A Brand";v="99", "Google Chrome";v="91", "Chromium";v="91"',
+        'sec-ch-ua-mobile': '?0',
+        'Upgrade-Insecure-Requests': '1',
+        'Origin': 'https://mnregaweb2.nic.in',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-User': '?1',
+        'Sec-Fetch-Dest': 'document',
+        'Referer': 'https://mnregaweb2.nic.in/netnrega/dynamic_muster_track.aspx?lflag=local&state_code=15&fin_year=2021-2022&state_name=KARNATAKA&Digest=%2fN+TPSb2e7ouEpKpQfAqXQ',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+
+    params = (
+        ('lflag', 'local'),
+        ('state_code', '15'),
+        ('fin_year', '2021-2022'),
+        ('state_name', 'KARNATAKA'),
+        ('Digest', '/N TPSb2e7ouEpKpQfAqXQ'),
+    )
+
+    data = {
+    '__EVENTTARGET': 'ctl00$ContentPlaceHolder1$Rbtn_pay$1',
+    '__EVENTARGUMENT': '',
+    '__LASTFOCUS': '',
+    '__VIEWSTATE': '5rS4R6wEbpGpn2vjLshu8h/R2kgPqajIL3uUHcJZd9Aoo2lAkyUERk9aAzeZJyIFbMuv91S5Yqj0GSETwuXf85w4Jc2kfOhE28+zn71QJmDtLR/SdCahPH/5p4y6qjTJmigPIJZ/yjpQWYe+ga7Bb1MfYrEyY7kyPwFb+TJIavP3O00UouNfLYDSFqJ3yQ5GgBacjlCaFWWxGbtG3lZb8uAJnqBKiEAZYAHSTOYKrWqTgpRRDPEb5F1sVhBkBgoakyyibPrxRUhw8bLDuaguh6A+kTGTQpk2kvQ4HcQvk5nGEq7zkRMMoqFqZ+YEZ78PBI5Vr2m4w/I4D9uf9bbqD9da9o8x20fwPamrB9P+fNiE+V9qtHpEzoz5W9FglMQDkiftZb3dJ8vYIrRS0RHBN2auvyeCTZwkWD2f99OEkX+hnXU17wPhacwTra3Jj8Da32vHOkrhPm/2zliF1pu6ZtibkxLw0oCYPD51LQispQ6OYQ2AB62AWnO9vt4ATaJmvGj1ucHH5Cj+mh8tvG3wZWb9aXV5CHrGU0qKLiIlprUs9T9HtMwoL1q94yIjgJrCw5cjEnGPwp/K7c3y+KTk1NrtC0HMpEKuagPKgPPjxpoCmFIaJc+VjCfqt81uCjkv+NFQPd8o8hb+6TNXjjtUncZ/TtDQ/q7PirIC/Bdh27YQqqATQRtScBr0y50shHAlaBLgUmUNfHPcSpCthyWDtK5/3JF6iryr/mkTbXh9/2o8eNct7/6Hjj8EgkA/O9APR6KGh822xKW4ZJIl2Hj3ImTES7hjG8aBsemP4iXp+geO2bH2P7GUSJ5FTD4Bjr7nImae5BEUW9Mejhl4iJZOXdv3+70a+NqZHsmBBc3J+vxm0W8QlHPrFns9b+oLTmoGEA7gg5tBef7Yfrxv5K/9hvNR2wiD7aOFC2w7Qy/AxoRYguWgJXWh8wDKNv1/Lgr23G9TzBN6LIWjbAx06BxDahUNfaFPCZV+qQg08kPdOImHVQVKaDflEmq2AidVmMV9/LfLMXCP0acx6fvGMzIiEpFR77HO7SHaJN6w1qv7Pp1ozv6mcgOMdZVi6RllMXpygJYdUfXaXLXCArxlw9uqTO3wDDgpoSEkd5hOyhyiDlDOomg7H6PTYpo1h9F2bQmcJRjzGd23Q0Bb7mkuOqv6f4fFkKJg2OSCJeends2Y9nwVDENRJM31mtFHdIqnGIF3PX9OqNpFjfV8q486lCwSfB7C9OJf71xNRTfLoHo79m3j5FuCEDn9j3ZSZO71LJ54U8P/y/CGf+bZV1EyAW8YqKGkARVqs1TEjRLYFaOk6PeXuj1pdNlunXiREqQZ06pVUDR/GqFMPAFwu6ejO5sXU7dtRVc9ra+7cAR48x+RFq429vJvTEb+jvuhxXkQSI6fo5lQaB5PiSAOh1XABtN+Fe/FksB+rwY1ECQXz+OEpLTUCGaGP7f5/cf+I/lr1mVp',
+    '__VIEWSTATEGENERATOR': 'E646F314',
+    '__VIEWSTATEENCRYPTED': '',
+    '__EVENTVALIDATION': 'TAe7xeK2rp65Yk0yJEc27nWtqlSUGpVi8pGpstkb86lTL8+W7f7Tdc+x9G7rr5NC8l9yNIWO+MvnTKDFtrsCLE7Q/tdBfz8b4cTp06+cR5nMYkIApqepstnQVF+7dSpfKThRjuMXlOl17TmnCNO+d7NGIbznk3ADqOgy+sK/tJiZJI8ATycHA6nkQH0WJuJBCIvqWSXZKCyOpCna8wHcXbwKcMdn8KuUT418etLzousqszW7Gnldsu33sdzHwKq+1Vov+NC4CoDlFJDhZ1ujovMTTY5lN3m3ilYU6Mk2KCgUWpt/0OK+magMKwj3tDDd220PoScOzomFK7Hu6WxtCPkaLCSprIZFi63LKq7lq1vdLWbAemeylQ5pQ5R/Szym+Q4fUM6NkkwNMbpo1o4du3y4/U3cxnFcsbCdeO6pKpJNU/zg+FuCNsD3elGrhrEXQSnT0xAQzeFcQdkLH49TQe8nzLXCN6fq8a+MxXZn1I4KNHXeuhj9gPiJkKQFaC01dfev+nclPIhvej2WMTLhPgMT4kAy9+uLwat7+Uveqoz/iAYbOU0r3uBaDVSsomA9SvKqjlqBJyIKvWUyK9HRIAYpAZECIFgV58keDcd+4BtKop4zPxJtvUB3SLsY4GS0Rj+EbfPMfuUmcdnHar9Y89RJ2etw3/eUr1cJ+gpiP3Li/y8fzCL/FBLbOdeMS/sK7Ce65yQGznIgRAGxBust7Wm4JRU2SXhrxsPXdDuf4ExMekxibZGW7GKu2uz8xDfht53bG7u4T/xIcfKFp3GzSvnLLy0ZouZG2E3eJK0Ak/09kMwQZO09zsNk0iVBr0iyatYILhU1JHQha7vcGkRcemqkXzBqq7zxwDspfeNHdUaLCLS8bS84QvBBNYMWSI8Fe2rz+v361IyXvp3QHKF608NVnhPrdyTUGv9hfs60pdOfjVC1O2oIlT+1t9KB/jDlcdTWshaF6AMB6zVsXQ15kJ5hY+0wTbP//bxzkJ9LOj4qi7N8PsSYPNSGWUa0c0mjEFxnIhpCpU8XqccVq7xHtV1x5Z7T7SBwEWgh8BrhbSU8ZYClOFrB8TVS19yRvbYJ',
+    'ctl00$ContentPlaceHolder1$ddl_state': state_code,
+    'ctl00$ContentPlaceHolder1$ddl_dist': 'Select',
+    'ctl00$ContentPlaceHolder1$TextBox1': '',
+    'ctl00$ContentPlaceHolder1$TextBox2': '',
+    'ctl00$ContentPlaceHolder1$Rbtn_pay': '1'
+    }
+
+    response = requests.post('https://mnregaweb2.nic.in/netnrega/dynamic_muster_track.aspx', headers=headers, params=params, cookies=cookies, data=data)
+
+    logger.info('Python has crossed the state')
+    soup = BeautifulSoup(response.content)
+
+    VIEWSTATE=soup.find(id="__VIEWSTATE")['value']
+    VIEWSTATEGENERATOR=soup.find(id="__VIEWSTATEGENERATOR")['value']
+    EVENTVALIDATION = soup.find(id="__EVENTVALIDATION")['value']
+
+    data['____EVENTTARGET'] = 'ctl00$ContentPlaceHolder1$ddl_dist'
+    data['__VIEWSTATE'] = VIEWSTATE
+    data['__VIEWSTATEGENERATOR'] = VIEWSTATEGENERATOR
+    data['__EVENTVALIDATION'] = EVENTVALIDATION
+    data['ctl00$ContentPlaceHolder1$ddl_dist'] = district_code
+
+    response = requests.post('https://mnregaweb2.nic.in/netnrega/dynamic_muster_track.aspx', headers=headers, params=params, cookies=cookies, data=data)
+
+
+    soup = BeautifulSoup(response.content)
+
+    VIEWSTATE=soup.find(id="__VIEWSTATE")['value']
+    VIEWSTATEGENERATOR=soup.find(id="__VIEWSTATEGENERATOR")['value']
+    EVENTVALIDATION = soup.find(id="__EVENTVALIDATION")['value']
+    logger.info('Python has crossed the district')
+
+    data['____EVENTTARGET'] = 'ctl00$ContentPlaceHolder1$ddl_blk'
+    data['__VIEWSTATE'] = VIEWSTATE
+    data['__VIEWSTATEGENERATOR'] = VIEWSTATEGENERATOR
+    data['__EVENTVALIDATION'] = EVENTVALIDATION
+    data['ctl00$ContentPlaceHolder1$ddl_blk'] = block_code
+    logger.info('Python has crossed the block')
+
+    response = requests.post('https://mnregaweb2.nic.in/netnrega/dynamic_muster_track.aspx', headers=headers, params=params, cookies=cookies, data=data)
+
+    soup = BeautifulSoup(response.content)
+
+    VIEWSTATE=soup.find(id="__VIEWSTATE")['value']
+    VIEWSTATEGENERATOR=soup.find(id="__VIEWSTATEGENERATOR")['value']
+    EVENTVALIDATION = soup.find(id="__EVENTVALIDATION")['value']
+
+    data['____EVENTTARGET'] = ''
+    data['__VIEWSTATE'] = VIEWSTATE
+    data['__VIEWSTATEGENERATOR'] = VIEWSTATEGENERATOR
+    data['__EVENTVALIDATION'] = EVENTVALIDATION
+    data['ctl00$ContentPlaceHolder1$ddl_pan'] = 'ALL'
+    data['ctl00$ContentPlaceHolder1$Button1'] = 'submit'
+    logger.info('final request')
+
+    response = requests.post('https://mnregaweb2.nic.in/netnrega/dynamic_muster_track.aspx', headers=headers, params=params, cookies=cookies, data=data)
+
+    dataframe = pd.read_html(response.content,header=0)[-1]
+
+    colnames = ['sno','panchayat_name','muster_roll_number','technical_staff_designation','record_number','work_code',
+            'muster_roll_closure_date','muster_filling_status','wagelist_generation_date','fto_number','fto_generated_date',
+            'date_of_first_sign','date_of_second_sign']
+
+    dataframe.columns = colnames
+
+    dataframe = insert_location_details(logger, lobj, dataframe)
+    location_cols = ["state_code", "state_name", "district_code",
+                     "district_name", "block_code", "block_name",
+                     "panchayat_name"]
+    dataframe = dataframe[location_cols]
+
+    logger.info(f'the shape of df is {dataframe.shape}')
+
+    return dataframe
+
+
+
 def get_dynamic_work_report_r6_18(lobj, logger):
     """Will fetch dynamic work report"""
     state_code = lobj.state_code
