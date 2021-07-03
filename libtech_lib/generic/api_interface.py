@@ -46,8 +46,9 @@ def get_authentication_token():
         'password' : API_PASSWORD
         }
     try:
-        req = requests.post(AUTHENDPOINT, data=data)
-        token = req.json()['access']
+        r=requests.post(AUTHENDPOINT,data=data)
+        #print(r.json())
+        token=r.json()['token']
     except:
         token = None
     return token
@@ -58,7 +59,7 @@ def get_authentication_header(token=None):
         token = get_authentication_token()
     headers = {
         'content-type':'application/json',
-        "Authorization" : "Bearer " + token
+        "Authorization" : "Token " + token
         }
     return headers
 

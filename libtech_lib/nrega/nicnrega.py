@@ -2390,9 +2390,6 @@ def get_dynamic_muster_roll_tracking(lobj, logger):
     location_cols = ["state_code", "state_name", "district_code",
                      "district_name", "block_code", "block_name",
                      "panchayat_name"]
-    dataframe = dataframe[location_cols]
-
-    logger.info(f'the shape of df is {dataframe.shape}')
 
     return dataframe
 
