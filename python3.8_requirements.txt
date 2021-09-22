@@ -21,7 +21,7 @@ cryptography==2.8
 cssselect==1.1.0
 distlib==0.3.0
 distro==1.4.0
-Django==3.0.1
+Django==3.1.13
 djangorestframework-jwt==1.11.0
 docutils==0.14
 EasyProcess==0.2.9
