@@ -51,7 +51,7 @@ lxml==4.4.2
 Markdown==3.1.1
 mccabe==0.6.1
 msgpack==0.6.2
-numpy==1.18.1
+numpy==1.22.0
 opencv-python==4.1.2.30
 openpyxl==2.6.3
 packaging==20.3
